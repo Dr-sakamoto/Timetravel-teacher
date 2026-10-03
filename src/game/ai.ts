@@ -1,23 +1,23 @@
-import { MAX_CLASS, classPower, roleOf, studentTotal } from './calc';
+import { MAX_CLASS, POWER_CAP, classPower, roleOf, studentTotal } from './calc';
 import { CARD_MAP } from './data/cards';
 import { CLASS_MAP } from './data/classes';
 import { ERAS } from './data/eras';
 import { EVENT_MAP, type SchoolEventDef } from './data/events';
-import { poachable } from './engine';
-import { STAT_KEYS, type Action, type GameState, type Player, type StatKey, type Student } from './types';
+import { canLearn, poachable } from './engine';
+import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type Student } from './types';
 
 /** クラスの強さを測る代表イベント（scaleで正規化、wは重要度） */
 const REPRESENTATIVE: { id: string; scale: number; w: number }[] = [
-  { id: 'test1', scale: 6, w: 2 },
-  { id: 'sportsday', scale: 60, w: 1.2 },
-  { id: 'festival', scale: 70, w: 1.2 },
-  { id: 'yankee', scale: 35, w: 0.7 },
-  { id: 'election', scale: 18, w: 0.6 },
-  { id: 'quiz', scale: 40, w: 0.5 },
-  { id: 'marathon', scale: 6, w: 0.5 },
-  { id: 'chorus', scale: 7, w: 0.5 },
-  { id: 'eating', scale: 15, w: 0.3 },
-  { id: 'graduation', scale: 450, w: 1 },
+  { id: 'test1', scale: 3, w: 2 },
+  { id: 'sportsday', scale: 30, w: 1.2 },
+  { id: 'festival', scale: 30, w: 1.2 },
+  { id: 'yankee', scale: 14, w: 0.8 },
+  { id: 'election', scale: 8, w: 0.6 },
+  { id: 'quiz', scale: 20, w: 0.5 },
+  { id: 'marathon', scale: 2, w: 0.4 },
+  { id: 'chorus', scale: 2, w: 0.4 },
+  { id: 'eating', scale: 8, w: 0.3 },
+  { id: 'graduation', scale: 120, w: 1 },
 ];
 
 export function classScore(p: Player): number {
@@ -37,11 +37,11 @@ export interface CategorySummary {
 export function classSummary(p: Player): CategorySummary[] {
   const f = (id: string) => classPower(p, EVENT_MAP[id] as SchoolEventDef).power;
   return [
-    { label: '運動', icon: '🏃', value: f('sportsday'), hint: '体育祭（運動上位6人）' },
-    { label: '学力', icon: '📚', value: f('test1'), hint: '定期テスト（全員の平均）' },
-    { label: '芸術', icon: '🎪', value: f('festival'), hint: '文化祭（芸術上位6人）' },
-    { label: '喧嘩', icon: '🏍️', value: f('yankee'), hint: 'ヤンキー襲来（喧嘩上位3人）' },
-    { label: '人望', icon: '🗳️', value: f('election'), hint: '生徒会選挙（一番の1人）' },
+    { label: '勉強', icon: ATTR_ICON.study, value: f('test1'), hint: '定期テスト（📚の全員平均）' },
+    { label: '運動', icon: ATTR_ICON.sports, value: f('sportsday'), hint: '体育祭（🏃上位6人）' },
+    { label: '芸術', icon: ATTR_ICON.art, value: f('festival'), hint: '文化祭（🎨上位6人）' },
+    { label: '人望', icon: ATTR_ICON.charm, value: f('election'), hint: '生徒会選挙（👑一番の1人）' },
+    { label: '喧嘩', icon: ATTR_ICON.fight, value: f('yankee'), hint: 'ヤンキー襲来（👊上位3人）' },
   ];
 }
 
@@ -91,13 +91,12 @@ export function evaluateTransfer(p: Player, cand: Student): { gain: number; rele
 
 function cardValue(id: string): number {
   const c = CARD_MAP[id];
-  const sum = STAT_KEYS.reduce((a, k) => a + c.stats[k], 0);
-  return sum + (c.ability ? 6 : 0);
+  return c.power * c.attrs.length + (c.ability ? 3 : 0);
 }
 
 function eraValue(s: GameState, idx: number): number {
   const era = ERAS[idx].id;
-  if (era === 'present') return 30;
+  if (era === 'present') return 9;
   const vals = s.pools[era].map(cardValue).sort((a, b) => b - a);
   if (vals.length === 0) return 0;
   const top = vals.slice(0, 3);
@@ -146,22 +145,27 @@ export function cpuAction(s: GameState): Action | null {
       // 少しでも足しになるなら迎える（歴史上の人物は基本的に歓迎）
       if (bestIdx === null) {
         const strongest = ph.options.map((o, i) => ({ i, t: studentTotal(o) })).sort((a, b) => b.t - a.t)[0];
-        if (strongest && strongest.t >= 40 && p.students.length < MAX_CLASS) bestIdx = strongest.i;
+        if (strongest && strongest.t >= 14 && p.students.length < MAX_CLASS) bestIdx = strongest.i;
       }
       return { type: 'pickTransfer', index: bestIdx, releaseUid: best.release };
     }
     case 'train': {
       const p = s.players[ph.player];
       const base = classScore(p);
-      let best = { uid: p.students[0].uid, stat: 'study' as StatKey, gain: -Infinity };
+      let best: { action: Action; gain: number } = { action: { type: 'train', uid: p.students[0].uid, mode: 'power' }, gain: -Infinity };
+      const tryStudent = (uid: string, mod: (x: Student) => Student, action: Action) => {
+        const students = p.students.map((x) => (x.uid === uid ? mod(x) : x));
+        const g = classScore({ ...p, students }) - base;
+        if (g > best.gain) best = { action, gain: g };
+      };
       for (const st of p.students) {
-        for (const k of STAT_KEYS) {
-          const students = p.students.map((x) => (x.uid === st.uid ? { ...x, base: { ...x.base, [k]: x.base[k] + 2 } } : x));
-          const g = classScore({ ...p, students }) - base;
-          if (g > best.gain) best = { uid: st.uid, stat: k, gain: g };
+        if (st.power < POWER_CAP) tryStudent(st.uid, (x) => ({ ...x, power: x.power + 1 }), { type: 'train', uid: st.uid, mode: 'power' });
+        for (const a of ATTRS as Attr[]) {
+          if (!canLearn(st, a)) continue;
+          tryStudent(st.uid, (x) => ({ ...x, attrs: [...x.attrs, a] }), { type: 'train', uid: st.uid, mode: 'attr', attr: a });
         }
       }
-      return { type: 'train', uid: best.uid, stat: best.stat };
+      return best.action;
     }
     case 'poach': {
       const p = s.players[ph.player];

@@ -1,25 +1,23 @@
-export type StatKey = 'pe' | 'study' | 'fight' | 'art' | 'charm';
-export const STAT_KEYS: StatKey[] = ['pe', 'study', 'fight', 'art', 'charm'];
-export const STAT_LABEL: Record<StatKey, string> = {
-  pe: '運動',
-  study: '学力',
-  fight: '喧嘩',
+/** 生徒の属性（パワプロの特殊能力のようなアイコン）。勉強はヤンキー以外ほぼ全員、喧嘩はヤンキー専用 */
+export type Attr = 'study' | 'sports' | 'art' | 'charm' | 'fight';
+export const ATTRS: Attr[] = ['study', 'sports', 'art', 'charm', 'fight'];
+export const ATTR_ICON: Record<Attr, string> = {
+  study: '📚',
+  sports: '🏃',
+  art: '🎨',
+  charm: '👑',
+  fight: '👊',
+};
+export const ATTR_LABEL: Record<Attr, string> = {
+  study: '勉強',
+  sports: '運動',
   art: '芸術',
   charm: '人望',
+  fight: '喧嘩',
 };
-export type Stats = Record<StatKey, number>;
 
 export type Rarity = 'N' | 'R' | 'SR' | 'SSR';
 export type Tag = '現代' | 'ヤンキー' | '恐竜' | '武将' | '忍者' | '学者' | '芸術家' | '王族' | '未来' | '動物';
-export type Category = 'sports' | 'study' | 'culture' | 'fight' | 'charisma' | 'food';
-export const CATEGORY_LABEL: Record<Category, string> = {
-  sports: '運動系',
-  study: '勉強系',
-  culture: '文化系',
-  fight: '喧嘩系',
-  charisma: '人望系',
-  food: '大食い',
-};
 
 export type RoleId =
   | 'leader'
@@ -35,8 +33,8 @@ export type RoleId =
   | 'animal';
 
 export type Ability =
-  | { kind: 'aura'; stat: StatKey; amount: number }
-  | { kind: 'boost'; category: Category; amount: number }
+  | { kind: 'aura'; attr: Attr; amount: number }
+  | { kind: 'boost'; attr: Attr; amount: number }
   | { kind: 'roleBonus'; role: RoleId; mult: number }
   | { kind: 'income'; amount: number }
   | { kind: 'guard'; ratio: number };
@@ -63,7 +61,9 @@ export interface Student {
   era: EraId;
   rarity: Rarity;
   icon: string;
-  base: Stats;
+  /** 生徒の数値（強さ）。属性を持つイベントでこの数値が戦力になる */
+  power: number;
+  attrs: Attr[];
   tags: Tag[];
   ability?: Ability;
   flavor: string;
@@ -97,6 +97,9 @@ export interface ResultRow {
 export interface EventResult {
   title: string;
   icon: string;
+  attr?: Attr | 'all';
+  effects?: string[];
+  tone?: 'blue' | 'red' | 'special';
   desc: string;
   scoring?: string;
   rows: ResultRow[];
@@ -138,7 +141,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 1;
+  version: 2;
   rng: number;
   players: Player[];
   years: number;
@@ -164,5 +167,5 @@ export type Action =
   | { type: 'travel'; era: number }
   | { type: 'drawEvent' }
   | { type: 'pickTransfer'; index: number | null; releaseUid?: string }
-  | { type: 'train'; uid: string; stat: StatKey }
+  | { type: 'train'; uid: string; mode: 'power' } | { type: 'train'; uid: string; mode: 'attr'; attr: Attr }
   | { type: 'poach'; uid: string | null };

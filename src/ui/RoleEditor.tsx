@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { autoRoles, classSummary } from '../game/ai';
-import { effStats } from '../game/calc';
+import { attrValues } from '../game/calc';
 import { CLASS_MAP } from '../game/data/classes';
 import { ROLES, roleDesc } from '../game/data/roles';
-import { STAT_LABEL, type Player, type StatKey } from '../game/types';
+import { ATTR_ICON, type Attr, type Player } from '../game/types';
 import { StudentCard } from './StudentCard';
 
 interface Props {
@@ -32,12 +32,12 @@ export function RoleEditor({ player, termLabel, onConfirm }: Props) {
   };
 
   const roleKey = card.roles[activeSlot];
-  const focusStats = Object.keys(ROLES[roleKey].mult) as StatKey[];
-  const sorted = [...player.students].sort((a, b) => {
-    const sa = focusStats.reduce((x, k) => x + a.base[k], 0);
-    const sb = focusStats.reduce((x, k) => x + b.base[k], 0);
-    return sb - sa;
-  });
+  const focusAttrs = Object.keys(ROLES[roleKey].mult) as Attr[];
+  const fit = (st: Player['students'][number]) => {
+    const n = focusAttrs.filter((a) => st.attrs.includes(a)).length;
+    return ROLES[roleKey].animal && (st.tags.includes('恐竜') || st.tags.includes('動物')) ? 99 : n;
+  };
+  const sorted = [...player.students].sort((a, b) => fit(b) - fit(a) || b.power - a.power);
 
   return (
     <div className="role-editor">
@@ -45,7 +45,7 @@ export function RoleEditor({ player, termLabel, onConfirm }: Props) {
         {termLabel}の係を決めよう — {player.name}
       </h2>
       <p className="hint">
-        係スロットを選んでから生徒をタップ。係についた生徒は能力にバフがかかる。係は学期ごとにしか変えられないので、
+        係スロットを選んでから生徒をタップ。係は生徒が「持っている属性」の数値を強化する（持っていない属性は増えない）。係は学期ごとにしか変えられないので、
         次の学期までのイベントを見越して編成しよう。
       </p>
       <div className="slots">
@@ -61,9 +61,9 @@ export function RoleEditor({ player, termLabel, onConfirm }: Props) {
               <span className="slot-who">{st ? `${st.icon} ${st.name}` : '— 未設定 —'}</span>
               {st && (
                 <span className="slot-eff">
-                  {(Object.keys(ROLES[r].mult) as StatKey[])
-                    .map((k) => `${STAT_LABEL[k]} ${Math.round(effStats(draft, st)[k] * 10) / 10}`)
-                    .join(' / ')}
+                  {Object.entries(attrValues(draft, st))
+                    .map(([k, v]) => `${ATTR_ICON[k as Attr]}${v}`)
+                    .join(' ')}
                 </span>
               )}
             </button>
@@ -96,7 +96,7 @@ export function RoleEditor({ player, termLabel, onConfirm }: Props) {
         </button>
       </div>
       <h3>
-        {ROLES[roleKey].icon} {ROLES[roleKey].name}の候補（{focusStats.map((k) => STAT_LABEL[k]).join('・')}順）
+        {ROLES[roleKey].icon} {ROLES[roleKey].name}の候補（{focusAttrs.map((k) => ATTR_ICON[k]).join('')}を持つ子が上）
       </h3>
       <div className="card-grid">
         {sorted.map((s) => (

@@ -657,7 +657,7 @@ h3 {
   border-radius: 999px;
   border: 2px solid #2b2410;
 }
-.stats {
+.stats-unused {
   display: grid;
   gap: 2px;
   margin-top: 0.2rem;
@@ -1160,4 +1160,136 @@ h3 {
   .result-table .top-names {
     display: none;
   }
+}
+
+/* ---------- 数値と属性アイコン ---------- */
+.power {
+  flex: none;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 1.15rem;
+  color: #fff;
+  background: #6b6b6b;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}
+.r-R .power {
+  background: #3d86cf;
+}
+.r-SR .power {
+  background: #9150c7;
+}
+.r-SSR .power {
+  background: linear-gradient(135deg, #e0a91d, #ff6f61);
+}
+.scard-title .rarity {
+  font-size: 0.6rem;
+  padding: 0 0.35em;
+  vertical-align: 1px;
+}
+.attrs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.4rem 0 0.25rem;
+}
+.attr {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0.2rem 0.3rem;
+  border-radius: 8px;
+  background: #efe7d2;
+  border: 2px solid transparent;
+}
+.attr small {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #d1453b;
+}
+.attr.boosted {
+  border-color: #f2b33d;
+  background: #fff2c8;
+}
+.attr.a-study {
+  background: #e3edfb;
+}
+.attr.a-sports {
+  background: #fde6df;
+}
+.attr.a-art {
+  background: #f9e3f5;
+}
+.attr.a-charm {
+  background: #fbf1d0;
+}
+.attr.a-fight {
+  background: #eadfd7;
+}
+.event-icon {
+  position: relative;
+}
+.event-attr {
+  position: absolute;
+  right: -10px;
+  bottom: -6px;
+  font-size: 1.6rem;
+  background: #fff;
+  border-radius: 50%;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--blue);
+}
+.event-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+.effect {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #7a3b9a;
+  background: #f3e6fb;
+  border-radius: 6px;
+  padding: 0.15em 0.5em;
+}
+.tone-blue .event-card {
+  border-color: #4f9de0;
+  background: linear-gradient(160deg, #e6f2ff, var(--paper) 50%);
+}
+.tone-red .event-card {
+  border-color: #e05252;
+  background: linear-gradient(160deg, #ffe6e6, var(--paper) 50%);
+}
+.tone-blue .event-attr {
+  border-color: #4f9de0;
+}
+.tone-red .event-attr {
+  border-color: #e05252;
+}
+.effect-inline {
+  color: var(--pink);
+  font-size: 0.85em;
+}
+.tone-dot {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  border-radius: 3px;
+  vertical-align: middle;
+  background: #c79bf2;
+}
+.tone-dot.blue {
+  background: #4f9de0;
+}
+.tone-dot.red {
+  background: #e05252;
 }

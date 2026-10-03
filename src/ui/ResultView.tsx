@@ -1,17 +1,36 @@
-import type { EventResult, GameState } from '../game/types';
+import { attrIcon } from '../game/data/events';
+import { ATTR_LABEL, type EventResult, type GameState } from '../game/types';
 import { StudentCard } from './StudentCard';
 
 export function ResultView({ result, state }: { result: EventResult; state: GameState }) {
   const rankLabel = (r?: number) => (r === undefined ? '' : `${r + 1}位`);
   return (
-    <div className={`result ${result.school ? 'school' : 'personal'}`}>
+    <div className={`result ${result.school ? 'school' : 'personal'} tone-${result.tone ?? 'special'}`}>
       <div className="event-card flip-in">
-        <div className="event-icon">{result.icon}</div>
+        <div className="event-icon">
+          {result.icon}
+          {result.attr && (
+            <span className="event-attr" title={result.attr === 'all' ? '全属性' : ATTR_LABEL[result.attr]}>
+              {attrIcon(result.attr)}
+            </span>
+          )}
+        </div>
         <div className="event-body">
-          <div className="event-kind">{result.school ? '学校行事' : 'イベント'}</div>
+          <div className="event-kind">
+            {result.school ? '学校行事（全クラス参加）' : result.tone === 'blue' ? '青マス' : result.tone === 'red' ? '赤マス' : 'イベント'}
+          </div>
           <h2 className="event-title">{result.title}</h2>
           <p className="event-desc">{result.desc}</p>
           {result.scoring && <p className="event-scoring">{result.scoring}</p>}
+          {result.effects && result.effects.length > 0 && (
+            <div className="event-effects">
+              {result.effects.map((e) => (
+                <span key={e} className="effect">
+                  ✦ {e}
+                </span>
+              ))}
+            </div>
+          )}
           {result.threat !== undefined && (
             <p className="threat">
               🏍️ 襲来した不良軍団の戦力：<b>{result.threat}</b>
