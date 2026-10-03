@@ -83,6 +83,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const term = termOfMonth(month);
 
   const pushing = ph.kind === 'push' && !cpuTurn && ph.player === focus;
+  const releasing = ph.kind === 'release' && !cpuTurn && ph.player === focus;
   const targets = pushing ? pushTargets(state, ph.player) : [];
   const far = (pi: number) => (
     <Playmat
@@ -151,7 +152,13 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               near
               acting={actor === focus}
               delta={deltas.get(focus)}
-              onSeatClick={pushing && me.students.length > MIN_CLASS ? (uid) => setPush((x) => ({ ...x, uid })) : undefined}
+              onSeatClick={
+                releasing
+                  ? (uid) => dispatch({ type: 'release', uid })
+                  : pushing && me.students.length > MIN_CLASS
+                    ? (uid) => setPush((x) => ({ ...x, uid }))
+                    : undefined
+              }
               selectedUid={pushing ? push.uid : null}
             />
           )}

@@ -1,6 +1,3 @@
-import { useState } from 'react';
-import { evaluateTransfer } from '../game/ai';
-import { MAX_CLASS } from '../game/calc';
 import { ERAS } from '../game/data/eras';
 import { currentEra, pushTargets } from '../game/engine';
 import type { Action, GameState } from '../game/types';
@@ -49,16 +46,16 @@ export function Center({ state, dispatch, cpuBusy, push }: Props) {
             <span className="pile-count">{state.modernDeck.length}</span>
           </button>
         ) : (
-          <div className="pile era-pile" style={{ borderColor: era.color }} title={`${era.name}の生徒の山札`}>
+          <div className="pile era-pile" style={{ borderColor: era.color }} title={era.id === 'present' ? '現代の生徒' : `まだ転入していない${era.name}の偉人`}>
             <span className="pile-back">{era.icon}</span>
-            <span className="pile-label">{era.name}</span>
-            <span className="pile-count">{state.pools[era.id].length}</span>
+            <span className="pile-label">{era.id === 'present' ? '現代の生徒' : `${era.name}の偉人`}</span>
+            <span className="pile-count">{era.id === 'present' ? '∞' : state.pools[era.id].length}</span>
           </div>
         )}
       </div>
       <div className="action">
         <Action
-          key={`${ph.kind}-${ph.kind === 'transfer' ? ph.options.map((o) => o.uid).join() : ''}`}
+          key={ph.kind}
           state={state}
           dispatch={dispatch}
           cpuBusy={cpuBusy}
@@ -71,8 +68,6 @@ export function Center({ state, dispatch, cpuBusy, push }: Props) {
 
 function Action({ state, dispatch, cpuBusy, push }: Props) {
   const ph = state.phase;
-  const [sel, setSel] = useState<number | null>(null);
-  const [release, setRelease] = useState('');
   if (ph.kind === 'gameOver') return null;
   const actor = ph.player !== null ? state.players[ph.player] : null;
   const who = actor ? <b style={{ color: actor.color }}>{actor.name}</b> : null;
@@ -97,71 +92,22 @@ function Action({ state, dispatch, cpuBusy, push }: Props) {
       return <div className="say">{who} の係決め — 手前の教室で係を選び、生徒をタップ</div>;
     case 'draw':
       return <div className="say">{who} の番 — イベントの山札をめくろう</div>;
-    case 'summerTravel':
+    case 'release':
       return (
         <div className="say">
-          🌻 {who} の夏休み合宿 — 行き先の時代を選ぶ
-          <div className="era-choice">
-            {state.yearEras.map((i) => {
-              const e = ERAS[i];
-              return (
-                <button key={e.id} className="pile era-pile glow" style={{ borderColor: e.color }} onClick={() => dispatch({ type: 'travel', era: i })}>
-                  <span className="pile-back">{e.icon}</span>
-                  <span className="pile-label">{e.name}</span>
-                  <span className="pile-count">{state.pools[e.id].length}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      );
-    case 'transfer': {
-      const p = state.players[ph.player];
-      const full = p.students.length >= MAX_CLASS;
-      return (
-        <div className="say">
-          🚪 {who}：{ph.reason}の転入 — 1人選ぶ
+          🚪 {who} のクラスに転入生！ でも満席 — 手前の教室から帰ってもらう子をタップ
           <div className="deal">
-            {ph.options.map((o, i) => (
-              <div key={o.uid} className="deal-in" style={{ animationDelay: `${i * 0.12}s` }}>
-                <TcgCard student={o} selected={sel === i} onClick={() => setSel(i)} />
-                <div className="fit">{Math.round(evaluateTransfer(p, o).gain) > 0 ? '▲' : '▼'}</div>
-              </div>
-            ))}
-          </div>
-          {full && (
-            <div className="say-sub">
-              満席：帰ってもらう子
-              <select value={release} onChange={(e) => setRelease(e.target.value)}>
-                <option value="">選ぶ</option>
-                {p.students.map((s) => (
-                  <option key={s.uid} value={s.uid}>
-                    {s.icon} {s.name}（{s.power}）
-                  </option>
-                ))}
-              </select>
+            <div className="deal-in">
+              <TcgCard student={ph.incoming} />
             </div>
-          )}
+          </div>
           <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'pickTransfer', index: null })}>
-              見送る
-            </button>
-            <button
-              className="btn primary"
-              disabled={sel === null || (full && !release)}
-              onClick={() => {
-                if (sel === null) return;
-                dispatch({ type: 'pickTransfer', index: sel, releaseUid: full ? release : undefined });
-                setSel(null);
-                setRelease('');
-              }}
-            >
-              迎える
+            <button className="btn ghost" onClick={() => dispatch({ type: 'release', uid: ph.incoming.uid })}>
+              転入を断る
             </button>
           </div>
         </div>
       );
-    }
     case 'push': {
       const targets = pushTargets(state, ph.player);
       return (

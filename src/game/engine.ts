@@ -4,11 +4,12 @@ import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
   ALL_EVENT_CARDS,
   CONTEST_POINTS,
+  ERA_NORMAL_NAMES,
+  ERA_RAIDERS,
   EVENT_MAP,
   FIXED_BY_MONTH,
   FIXED_MAP,
-  RAID_LOSE,
-  RAID_WIN,
+  PERSON_CARDS_PER_TERM,
   TEST_YANKEE_PENALTY,
   cardRule,
   fixedRule,
@@ -20,7 +21,6 @@ import {
 import { ARCHETYPES, GIVEN_NAMES, STARTER_ARCHETYPES, SURNAMES, type Archetype } from './data/modern';
 import { ROLES, ROLE_ORDER } from './data/roles';
 import {
-  ATTR_ICON,
   type Action,
   type EraId,
   type EventResult,
@@ -98,7 +98,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   const s: GameState = {
-    version: 6,
+    version: 7,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -130,7 +130,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     s,
     STARTER_ARCHETYPES.flatMap((a) => Array.from({ length: MODERN_COPIES }, () => a.id)),
   );
-  drawYearEras(s);
+  drawYearEras(s, true);
   s.eventDeck = buildDeck(s);
   log(s, `時空最強クラス決定戦、開幕！ ${years}年間の勝負です。`);
   return s;
@@ -184,23 +184,18 @@ function fromCard(s: GameState, cardId: string, joined: string): Student {
 const HISTORY_RARITY_WEIGHT: Record<Rarity, number> = { N: 60, R: 55, SR: 32, SSR: 13 };
 const PRESENT_RARITY_WEIGHT: Record<Rarity, number> = { N: 70, R: 24, SR: 6, SSR: 0 };
 
-/** 時代の山札から転校生候補をk人めくる（選ばれなければ山札に戻る） */
-export function drawOptions(s: GameState, eraIdx: number, k: number): Student[] {
-  const era = ERAS[eraIdx].id;
-  const joined = joinedLabel(s);
-  if (era === 'present') {
-    return Array.from({ length: k }, () =>
-      fromArchetype(s, ARCHETYPES[weightedIndex(s, ARCHETYPES.map((a) => PRESENT_RARITY_WEIGHT[a.rarity]))], joined),
-    );
-  }
-  const pool = [...s.pools[era]];
-  const out: Student[] = [];
-  while (out.length < k && pool.length > 0) {
-    const idx = weightedIndex(s, pool.map((id) => HISTORY_RARITY_WEIGHT[CARD_MAP[id].rarity]));
-    out.push(fromCard(s, pool[idx], joined));
-    pool.splice(idx, 1);
-  }
-  return out;
+/** 現代の生徒を1人ランダムに引く（たまにレアな転校生） */
+function randomModern(s: GameState): Student {
+  const a = ARCHETYPES[weightedIndex(s, ARCHETYPES.map((x) => PRESENT_RARITY_WEIGHT[x.rarity]))];
+  return fromArchetype(s, a, joinedLabel(s));
+}
+
+/** その時代の偉人を1人ランダムに引く。残っていなければ現代の生徒 */
+function randomPerson(s: GameState, eraIdx: number): Student {
+  const pool = s.pools[ERAS[eraIdx].id];
+  if (pool.length === 0) return randomModern(s);
+  const id = pool[weightedIndex(s, pool.map((x) => HISTORY_RARITY_WEIGHT[CARD_MAP[x].rarity]))];
+  return fromCard(s, id, joinedLabel(s));
 }
 
 function addStudent(s: GameState, p: Player, st: Student) {
@@ -254,9 +249,9 @@ function afterMemberDraw(s: GameState, last: { player: number; student: Student 
 
 // ---------- 時代と山札 ----------
 
-/** その年の3学期ぶんの時代をランダムに決める（ゲーム中はなるべく被らない） */
-function drawYearEras(s: GameState) {
-  s.yearEras = [];
+/** その年の3学期ぶんの時代をランダムに決める（ゲーム中はなるべく被らない）。1年目の1学期は現代で固定 */
+function drawYearEras(s: GameState, first = false) {
+  s.yearEras = first ? [PRESENT_INDEX] : [];
   while (s.yearEras.length < 3) {
     if (s.eraDeck.length === 0) s.eraDeck = shuffle(s, [...HISTORY_ERAS]);
     const e = s.eraDeck.pop()!;
@@ -270,14 +265,17 @@ export function currentEra(s: GameState): number {
   return s.yearEras[Math.max(1, t) - 1];
 }
 
-/** 山札：全時代共通のカード＋今学期の時代カード */
+/** 山札：全時代共通のカード＋今学期の時代カード＋人物カード（その時代の偉人、足りなければ現代の生徒） */
 function buildDeck(s: GameState): string[] {
   const era = ERAS[currentEra(s)].id;
   const deck: string[] = [];
   for (const e of ALL_EVENT_CARDS) {
-    if ((e.kind === 'contest' || e.kind === 'normal') && e.era && e.era !== era) continue;
+    if (e.kind === 'contest' && e.era && e.era !== era) continue;
     for (let i = 0; i < e.count; i++) deck.push(e.id);
   }
+  const figures = shuffle(s, [...s.pools[era]]).slice(0, PERSON_CARDS_PER_TERM);
+  for (const id of figures) deck.push(`person:${id}`);
+  for (let i = figures.length; i < PERSON_CARDS_PER_TERM; i++) deck.push('modern');
   return shuffle(s, deck);
 }
 
@@ -330,17 +328,29 @@ function advanceMonth(s: GameState) {
   else startTurns(s);
 }
 
+/** 夏休み合宿：全員が2学期の時代から1人ずつランダムに迎える */
 function startSummer(s: GameState) {
-  s.queue = order(s);
-  s.queueIdx = 0;
-  log(s, '夏休み！今年の時代から1つ選んで、転校生を1人スカウトできる。');
-  s.phase = { kind: 'summerTravel', player: s.queue[0] };
-}
-
-function nextSummer(s: GameState) {
-  s.queueIdx++;
-  if (s.queueIdx < s.queue.length) s.phase = { kind: 'summerTravel', player: s.queue[s.queueIdx] };
-  else advanceMonth(s);
+  const era = ERAS[s.yearEras[1]];
+  const lines: string[] = [];
+  const students: Student[] = [];
+  for (const pi of order(s)) {
+    const p = s.players[pi];
+    if (p.students.length >= MAX_CLASS) {
+      lines.push(`${p.name}：満席なので見送り`);
+      continue;
+    }
+    const st = randomPerson(s, s.yearEras[1]);
+    addStudent(s, p, st);
+    students.push(st);
+    lines.push(`${p.name} ← ${st.icon}${st.name}`);
+  }
+  log(s, `夏休み合宿（${era.name}）：` + lines.join(' / '));
+  s.phase = {
+    kind: 'result',
+    player: null,
+    ctx: 'summer',
+    result: { title: '夏休み合宿', icon: '🌻', tone: 'fixed', desc: `${era.icon}${era.name}から全員に1人ずつ転入`, rows: [], lines, students },
+  };
 }
 
 function yearEnd(s: GameState) {
@@ -387,8 +397,9 @@ function logRows(s: GameState, title: string, rows: ResultRow[]) {
   log(s, `【${title}】 ` + rows.map((r) => `${s.players[r.player].name} ${r.delta >= 0 ? '+' : ''}${r.delta}`).join(' / '));
 }
 
-/** 通常カード：アイコンを持つ生徒1人につき+1（係ボーナスでさらに+1）を全クラスに加点 */
+/** 通常カード：アイコンを持つ生徒1人につき+1（係ボーナスでさらに+1）を全クラスに加点。名前と絵柄は時代で変わる */
 function resolveNormal(s: GameState, c: NormalCard): EventResult {
+  const [name, icon] = ERA_NORMAL_NAMES[ERAS[currentEra(s)].id][c.attr];
   const rows = s.players.map((p, i) => {
     const sc = iconCount(p, c.attr);
     p.points += sc.total;
@@ -396,8 +407,8 @@ function resolveNormal(s: GameState, c: NormalCard): EventResult {
     return { player: i, count: sc.total, delta: sc.total };
   });
   sortRows(rows);
-  logRows(s, c.name, rows);
-  return { title: c.name, icon: ATTR_ICON[c.attr], attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), rows };
+  logRows(s, name, rows);
+  return { title: name, icon, attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), rows };
 }
 
 /** イベントカード（引いた人だけ）：そのアイコンを持つ子の数値の合計＋係ボーナスが入る。時代カードはその時代の生徒が2倍 */
@@ -411,17 +422,17 @@ function resolveContest(s: GameState, c: ContestCard, pi: number): EventResult {
   return { title: c.name, icon: c.icon, attr: c.attr, tone: c.era ? 'era' : 'contest', desc: c.desc, rule: cardRule(c), rows };
 }
 
-/** カチコミ（引いた人だけ）：👊の数値の合計が敵の強さ以上なら撃退 */
+/** カチコミ（引いた人だけ）：👊の合計が敵の強さに足りなければ、その差がそのままマイナス */
 function resolveRaid(s: GameState, c: RaidCard, pi: number): EventResult {
   const p = s.players[pi];
+  const [name, icon] = ERA_RAIDERS[ERAS[currentEra(s)].id];
   const sc = attrScore(p, 'fight');
-  const win = sc.total >= c.threat;
-  const delta = win ? RAID_WIN : RAID_LOSE;
+  const delta = Math.min(0, sc.total - c.threat);
   p.points += delta;
-  if (win) sc.holders.forEach((h) => h.mvp++);
-  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, note: win ? '撃退' : sc.total ? '突破' : '無防備' }];
-  logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: 'fight', tone: 'contest', desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
+  if (delta === 0) sc.holders.forEach((h) => h.mvp++);
+  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, note: delta === 0 ? '撃退' : sc.total ? '突破' : '無防備' }];
+  logRows(s, `カチコミ（${name}）`, rows);
+  return { title: `カチコミ！${name}`, icon, attr: 'fight', tone: 'contest', desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
 }
 
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {
@@ -435,12 +446,16 @@ function setResult(s: GameState, pi: number | null, result: EventResult, ctx: Re
   s.phase = { kind: 'result', player: pi, result, ctx };
 }
 
-function startTransfer(s: GameState, pi: number, eraIdx: number, title: string, ctx: ResultCtx) {
-  // その時代の偉人が残っていなければ、現代の生徒が転入してくる
-  if (s.pools[ERAS[eraIdx].id].length === 0) eraIdx = PRESENT_INDEX;
-  const era = ERAS[eraIdx];
-  const options = drawOptions(s, eraIdx, 3);
-  s.phase = { kind: 'transfer', player: pi, options, picks: 1, added: [], title, reason: `${era.icon} ${era.name}から`, ctx };
+/** 人物カードを引いた：そのまま転入。満席なら誰に帰ってもらうか選ぶ */
+function welcome(s: GameState, pi: number, st: Student, ctx: ResultCtx) {
+  const p = s.players[pi];
+  if (p.students.length >= MAX_CLASS) {
+    s.phase = { kind: 'release', player: pi, incoming: st, ctx };
+    return;
+  }
+  addStudent(s, p, st);
+  log(s, `${p.name}のクラスに${st.name}が転入！`, pi);
+  setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc: `${st.icon}${st.name}がやってきた！`, rows: [], students: [st] }, ctx);
 }
 
 /** 転校で押しつけられる相手（定員に空きがあるクラス） */
@@ -455,9 +470,16 @@ function resolveDraw(s: GameState, pi: number) {
     log(s, '捨て札をシャッフルして山札に戻した。');
   }
   const id = s.eventDeck.pop()!;
+  const p = s.players[pi];
+  // 人物カード：引いたらそのまま転入
+  if (id === 'modern' || id.startsWith('person:')) {
+    const cardId = id.slice('person:'.length);
+    const st = id !== 'modern' && s.pools[CARD_MAP[cardId].era].includes(cardId) ? fromCard(s, cardId, joinedLabel(s)) : randomModern(s);
+    welcome(s, pi, st, 'turn');
+    return;
+  }
   s.discard.push(id);
   const c = EVENT_MAP[id];
-  const p = s.players[pi];
   switch (c.kind) {
     case 'normal':
       setResult(s, pi, resolveNormal(s, c), 'turn');
@@ -468,9 +490,6 @@ function resolveDraw(s: GameState, pi: number) {
     case 'raid':
       setResult(s, pi, resolveRaid(s, c, pi), 'turn');
       return;
-    case 'transfer':
-      startTransfer(s, pi, currentEra(s), c.name, 'turn');
-      return;
     case 'push':
       if (pushTargets(s, pi).length === 0 || p.students.length <= MIN_CLASS) {
         setResult(s, pi, { title: c.name, icon: c.icon, tone: 'personal', desc: '押しつけられる相手がいなかった。', rows: [] }, 'turn');
@@ -479,27 +498,6 @@ function resolveDraw(s: GameState, pi: number) {
       }
       return;
   }
-}
-
-function finishTransfer(s: GameState) {
-  const ph = s.phase;
-  if (ph.kind !== 'transfer') return;
-  const p = s.players[ph.player];
-  if (ph.added.length) log(s, `${p.name}のクラスに${ph.added.map((a) => a.name).join('、')}が転入！`, ph.player);
-  else log(s, `${p.name}は転入を見送った。`, ph.player);
-  setResult(
-    s,
-    ph.player,
-    {
-      title: ph.title,
-      icon: ph.added.length ? '🚪' : '🙅',
-      tone: 'personal',
-      desc: ph.added.length ? `${ph.added.map((a) => a.name).join('と')}が転入してきた！` : '今回は見送った。',
-      rows: [],
-      students: ph.added,
-    },
-    ph.ctx,
-  );
 }
 
 // ---------- メイン：アクション適用 ----------
@@ -535,7 +533,7 @@ export function step(prev: GameState, a: Action): GameState {
           endTurn(s);
           break;
         case 'summer':
-          nextSummer(s);
+          advanceMonth(s);
           break;
         case 'monthEnd':
           advanceMonth(s);
@@ -568,37 +566,30 @@ export function step(prev: GameState, a: Action): GameState {
       else startTurns(s);
       return s;
     }
-    case 'travel': {
-      if (ph.kind !== 'summerTravel' || !s.yearEras.includes(a.era)) return prev;
-      log(s, `${s.players[ph.player].name}は夏休みに${ERAS[a.era].name}へ！`, ph.player);
-      startTransfer(s, ph.player, a.era, '夏休み合宿', 'summer');
-      return s;
-    }
     case 'drawEvent': {
       if (ph.kind !== 'draw') return prev;
       resolveDraw(s, ph.player);
       return s;
     }
-    case 'pickTransfer': {
-      if (ph.kind !== 'transfer') return prev;
-      if (a.index === null) {
-        finishTransfer(s);
+    case 'release': {
+      if (ph.kind !== 'release') return prev;
+      const p = s.players[ph.player];
+      const st = ph.incoming;
+      if (a.uid === st.uid) {
+        log(s, `${p.name}は満席のため${st.name}の転入を断った。`, ph.player);
+        setResult(s, ph.player, { title: '転入', icon: '🙅', tone: 'personal', desc: `満席のため${st.name}は元の時代へ帰った。`, rows: [] }, ph.ctx);
         return s;
       }
-      const opt = ph.options[a.index];
-      if (!opt) return prev;
-      const p = s.players[ph.player];
-      if (p.students.length >= MAX_CLASS) {
-        if (!a.releaseUid) return prev;
-        const gone = removeStudent(s, p, a.releaseUid, true);
-        if (!gone) return prev;
-        log(s, `${gone.name}は元の時代へ帰っていった…`, ph.player);
-      }
-      addStudent(s, p, opt);
-      ph.options.splice(a.index, 1);
-      ph.added.push(opt);
-      ph.picks--;
-      if (ph.picks <= 0 || ph.options.length === 0) finishTransfer(s);
+      const gone = removeStudent(s, p, a.uid, true);
+      if (!gone) return prev;
+      addStudent(s, p, st);
+      log(s, `${gone.name}が帰り、${st.name}が転入！`, ph.player);
+      setResult(
+        s,
+        ph.player,
+        { title: '転入', icon: '🚪', tone: 'personal', desc: `${gone.icon}${gone.name}と入れ替わりで${st.icon}${st.name}がやってきた！`, rows: [], students: [st] },
+        ph.ctx,
+      );
       return s;
     }
     case 'push': {

@@ -1,6 +1,4 @@
 import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, iconCount, roleSlots } from './calc';
-import { CARD_MAP } from './data/cards';
-import { ERAS } from './data/eras';
 import { ALL_EVENT_CARDS, TEST_YANKEE_PENALTY } from './data/events';
 import { ROLES, ROLE_ORDER } from './data/roles';
 import { pushTargets } from './engine';
@@ -54,23 +52,6 @@ function withStudents(p: Player, students: Student[]): Player {
   return { ...p, students, roles: p.roles.map((r) => (r && students.some((s) => s.uid === r) ? r : null)) };
 }
 
-/** 転入した場合の強さの変化と、定員オーバー時に外す生徒 */
-export function evaluateTransfer(p: Player, cand: Student): { gain: number; release?: string } {
-  const base = classScore(p);
-  if (p.students.length < MAX_CLASS) return { gain: classScore(withStudents(p, [...p.students, cand])) - base };
-  let best: { gain: number; release?: string } = { gain: -Infinity };
-  for (const out of p.students) {
-    const g = classScore(withStudents(p, [...p.students.filter((s) => s.uid !== out.uid), cand])) - base;
-    if (g > best.gain) best = { gain: g, release: out.uid };
-  }
-  return best;
-}
-
-function eraValue(s: GameState, idx: number): number {
-  const vals = s.pools[ERAS[idx].id].map((id) => CARD_MAP[id].power * CARD_MAP[id].attrs.length).sort((a, b) => b - a);
-  return vals.slice(0, 3).reduce((a, b) => a + b, 0);
-}
-
 export function cpuAction(s: GameState): Action | null {
   const ph = s.phase;
   switch (ph.kind) {
@@ -80,18 +61,16 @@ export function cpuAction(s: GameState): Action | null {
       return { type: 'setRoles', roles: autoRoles(s.players[ph.player]) };
     case 'draw':
       return { type: 'drawEvent' };
-    case 'transfer': {
+    case 'release': {
+      // 満席：転入生も含めて、いなくなっても一番損しない子に帰ってもらう
       const p = s.players[ph.player];
-      let bestIdx: number | null = null;
-      let best: { gain: number; release?: string } = { gain: 0 };
-      ph.options.forEach((o, i) => {
-        const e = evaluateTransfer(p, o);
-        if (e.gain > best.gain) {
-          best = e;
-          bestIdx = i;
-        }
-      });
-      return { type: 'pickTransfer', index: bestIdx, releaseUid: best.release };
+      const all = [...p.students, ph.incoming];
+      let best = { uid: ph.incoming.uid, score: -Infinity };
+      for (const out of all) {
+        const sc = classScore(withStudents(p, all.filter((x) => x.uid !== out.uid)));
+        if (sc > best.score) best = { uid: out.uid, score: sc };
+      }
+      return { type: 'release', uid: best.uid };
     }
     case 'push': {
       const p = s.players[ph.player];
@@ -107,10 +86,6 @@ export function cpuAction(s: GameState): Action | null {
       if (!best || (best.loss > 6 && p.students.length < MAX_CLASS - 2)) return { type: 'push', uid: null };
       const target = [...targets].sort((x, y) => s.players[y].points - s.players[x].points)[0];
       return { type: 'push', uid: best.uid, target };
-    }
-    case 'summerTravel': {
-      const era = [...s.yearEras].sort((x, y) => eraValue(s, y) - eraValue(s, x))[0];
-      return { type: 'travel', era };
     }
     case 'result':
       return { type: 'continue' };

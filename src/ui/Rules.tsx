@@ -2,15 +2,14 @@ import { CARDS } from '../game/data/cards';
 import { ERAS } from '../game/data/eras';
 import {
   CONTEST_CARDS,
-  CONTEST_POINTS,
   ERA_CARDS,
-  ERA_NORMAL_CARDS,
+  ERA_NORMAL_NAMES,
+  ERA_RAIDERS,
   FIXED_EVENTS,
   NORMAL_CARDS,
-  PERSONAL_CARDS,
+  PERSON_CARDS_PER_TERM,
+  PUSH_CARDS,
   RAID_CARDS,
-  RAID_LOSE,
-  RAID_WIN,
   fixedRule,
 } from '../game/data/events';
 import { ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
@@ -49,56 +48,57 @@ export function Rules({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </li>
-          <li>時代は1年に3つランダム。1学期に1つずつ巡り、その学期の時代の偉人と、時代の固有カード（イベント・通常）を使う。</li>
+          <li>時代は1年に3つ。1年目の1学期は現代、あとはランダム。1学期に1つずつ巡る。</li>
         </ol>
 
-        <h3>手番：1人1枚ずつイベントの山札をめくる</h3>
-        <p>
-          <b>通常カードは全員</b>に、<b>イベントカードはめくった人だけ</b>に効果がある。
-        </p>
+        <h3>手番：1人1枚ずつ山札をめくる</h3>
         <ul className="rule-list">
           <li>
-            <b>通常カード（全員）</b>（{NORMAL_CARDS.length}枚・{NORMAL_CARDS.map((c) => c.name).slice(0, 4).join('・')}…）：
-            そのアイコンを持つ子1人につき<b>+1</b>。全クラスが数える。
+            <b>通常カード（全員）</b>（{NORMAL_CARDS.map((c) => `${ATTR_ICON[c.attr]}×${c.count}`).join(' ')}）：
+            そのアイコンを持つ子1人につき<b>+1</b>。名前と絵柄は時代で変わるだけ。
           </li>
           <li>
-            <b>イベントカード（めくった人だけ）</b>（{CONTEST_CARDS.map((c) => c.icon + c.name).join('・')}）：
-            そのアイコンを持つ子の<b>数値の合計</b>（＋係ボーナス）がそのまま入る。
+            <b>イベントカード（めくった人だけ）</b>（{CONTEST_CARDS.map((c) => c.icon + c.name).join('・')}＋時代の固有イベント）：
+            そのアイコンを持つ子の<b>数値の合計</b>（＋係ボーナス）が入る。時代の固有イベントはその時代出身の子が数値2倍。
           </li>
           <li>
-            <b>カチコミ（めくった人だけ）</b>（{RAID_CARDS.length}枚）：👊の数値の合計がカードの敵の強さ（{RAID_CARDS.map((c) => c.threat).join('・')}）以上なら+{RAID_WIN}、足りなければ{RAID_LOSE}。
+            <b>カチコミ（めくった人だけ）</b>（敵の強さ {RAID_CARDS.map((c) => c.threat).join('・')}）：👊の数値の合計が敵の強さに<b>足りない分だけマイナス</b>。プラスはなし。
           </li>
-          {PERSONAL_CARDS.map((c) => (
+          <li>
+            <b>人物カード</b>（学期ごとに{PERSON_CARDS_PER_TERM}枚）：めくったらその子が<b>そのまま転入</b>。その時代の偉人が足りない分は現代の生徒カード。満席なら誰か1人（転入生本人でもいい）に帰ってもらう。
+          </li>
+          {PUSH_CARDS.map((c) => (
             <li key={c.id}>
               <b>
                 {c.icon}
-                {c.name}
+                {c.name}（めくった人）
               </b>
-              （{c.count}枚）：{c.desc}
+              ：{c.desc}
             </li>
           ))}
-          <li>
-            <b>時代カード（めくった人だけ）</b>：イベントカードと同じ。ただしその時代出身の生徒は数値2倍。
-          </li>
         </ul>
 
         <h3>時代ごとのカード</h3>
-        <p>各時代に、固有の偉人（転入で来る）・固有イベントカード2種・固有通常カード2枚がある。</p>
         <ul className="rule-list">
-          {ERAS.filter((e) => e.id !== 'present').map((era) => (
+          {ERAS.map((era) => (
             <li key={era.id}>
-              {era.icon} <b>{era.name}</b>：偉人{' '}
-              {CARDS.filter((c) => c.era === era.id)
-                .map((c) => c.icon + c.name)
-                .join('・')}
-              ／イベント{' '}
+              {era.icon} <b>{era.name}</b>：
+              {era.id !== 'present' && (
+                <>
+                  偉人{' '}
+                  {CARDS.filter((c) => c.era === era.id)
+                    .map((c) => c.icon + c.name)
+                    .join('・')}
+                  ／
+                </>
+              )}
+              イベント{' '}
               {ERA_CARDS.filter((c) => c.era === era.id)
                 .map((c) => `${c.icon}${c.name}（${ATTR_ICON[c.attr]}）`)
                 .join('・')}
-              ／通常{' '}
-              {ERA_NORMAL_CARDS.filter((c) => c.era === era.id)
-                .map((c) => `${c.name}（${ATTR_ICON[c.attr]}）`)
-                .join('・')}
+              ／カチコミ {ERA_RAIDERS[era.id][1]}
+              {ERA_RAIDERS[era.id][0]}／通常{' '}
+              {ATTRS.map((a) => ERA_NORMAL_NAMES[era.id][a][0]).join('・')}
             </li>
           ))}
         </ul>
@@ -107,10 +107,10 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <ul className="rule-list">
           {FIXED_EVENTS.map((f) => (
             <li key={f.id}>
-              {f.icon} <b>{f.name}</b>（全員）：{fixedRule(f)}。順位点は{(CONTEST_POINTS[4] ?? []).join('／')}点×倍率。
+              {f.icon} <b>{f.name}</b>（全員）：{fixedRule(f)}。順位点は10／6／3／1点×倍率。
             </li>
           ))}
-          <li>🌻 8月 夏休み合宿：今年の3つの時代から1つ選んで転入（3枚から1人）。</li>
+          <li>🌻 8月 夏休み合宿（全員）：2学期の時代から1人ずつランダムに転入。</li>
         </ul>
       </div>
     </div>

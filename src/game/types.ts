@@ -95,19 +95,10 @@ export type Phase =
   | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
   | { kind: 'roles'; player: number }
   | { kind: 'draw'; player: number }
-  | {
-      kind: 'transfer';
-      player: number;
-      options: Student[];
-      picks: number;
-      added: Student[];
-      title: string;
-      reason: string;
-      ctx: ResultCtx;
-    }
+  /** 満席で転入生が来た：誰か1人（転入生本人でもよい）に帰ってもらう */
+  | { kind: 'release'; player: number; incoming: Student; ctx: ResultCtx }
   /** 転校：いらない生徒を別のクラスに押しつける */
   | { kind: 'push'; player: number }
-  | { kind: 'summerTravel'; player: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
   | { kind: 'gameOver' };
 
@@ -119,7 +110,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 6;
+  version: 7;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -133,7 +124,7 @@ export interface GameState {
   queue: number[];
   queueIdx: number;
   phase: Phase;
-  /** イベントの山札（末尾が一番上） */
+  /** イベントの山札（末尾が一番上）。人物カードは 'person:<id>'（偉人）か 'modern'（現代の生徒） */
   eventDeck: string[];
   /** 捨て札（末尾が一番上） */
   discard: string[];
@@ -150,7 +141,6 @@ export type Action =
   | { type: 'drawAllMembers' }
   | { type: 'continue' }
   | { type: 'setRoles'; roles: (string | null)[] }
-  | { type: 'travel'; era: number }
   | { type: 'drawEvent' }
-  | { type: 'pickTransfer'; index: number | null; releaseUid?: string }
+  | { type: 'release'; uid: string }
   | { type: 'push'; uid: string | null; target?: number };

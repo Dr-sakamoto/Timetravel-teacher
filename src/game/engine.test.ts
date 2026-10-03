@@ -3,7 +3,7 @@ import { cpuAction } from './ai';
 import { attrScore, iconCount, roleSlots, testScore } from './calc';
 import { CARDS, parseAttrs } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
-import { ERA_CARDS, ERA_NORMAL_CARDS } from './data/events';
+import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES } from './data/modern';
 import { currentEra, newGame, step } from './engine';
 import type { Attr, GameState, Player, Student } from './types';
@@ -114,44 +114,81 @@ describe('engine', () => {
     }
   });
 
-  it('picks 3 eras a year and transfers come from the current term era', () => {
+  it('picks 3 eras a year and person cards come from the current term era', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 2, 42);
     while (s.phase.kind !== 'gameOver') {
       expect(new Set(s.yearEras).size).toBe(3);
-      expect(s.yearEras).not.toContain(PRESENT_INDEX);
+      if (s.year > 1) expect(s.yearEras).not.toContain(PRESENT_INDEX);
       const ph = s.phase;
-      if (ph.kind === 'transfer' && ph.title === '転入') {
-        for (const o of ph.options) expect([ERAS[currentEra(s)].id, 'present']).toContain(o.era);
+      if (ph.kind === 'result' && ph.result.title === '転入' && ph.result.students?.length && ph.ctx === 'turn') {
+        for (const o of ph.result.students) expect([ERAS[currentEra(s)].id, 'present']).toContain(o.era);
       }
       s = step(s, cpuAction(s)!);
     }
   });
 
-  it('era cards are only in the deck during their own term', () => {
-    const s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 77);
+  it('year 1 term 1 is the present era; era cards and person cards fill the deck', () => {
+    const s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 2, 77);
+    expect(s.yearEras[0]).toBe(PRESENT_INDEX);
     const era = ERAS[currentEra(s)].id;
     expect(s.eventDeck.some((id) => ERA_CARDS.some((e) => e.id === id && e.era === era))).toBe(true);
     expect(s.eventDeck.some((id) => ERA_CARDS.some((e) => e.id === id && e.era !== era))).toBe(false);
-    expect(s.eventDeck.filter((id) => ERA_NORMAL_CARDS.some((e) => e.id === id && e.era === era))).toHaveLength(2);
-    expect(s.eventDeck.some((id) => ERA_NORMAL_CARDS.some((e) => e.id === id && e.era !== era))).toBe(false);
+    const persons = s.eventDeck.filter((id) => id === 'modern' || id.startsWith('person:'));
+    expect(persons).toHaveLength(PERSON_CARDS_PER_TERM);
+    expect(persons.every((id) => id === 'modern')).toBe(true);
   });
 
-  it('every era has 3-6 figures, 2 era events and 2 era normal cards', () => {
+  it('every era has 3-6 figures and 2 era events', () => {
     for (const era of ERAS.filter((e) => e.id !== 'present')) {
       const figures = CARDS.filter((c) => c.era === era.id).length;
       expect(figures, era.name).toBeGreaterThanOrEqual(3);
       expect(figures, era.name).toBeLessThanOrEqual(6);
       expect(ERA_CARDS.filter((c) => c.era === era.id)).toHaveLength(2);
-      expect(ERA_NORMAL_CARDS.filter((c) => c.era === era.id)).toHaveLength(2);
     }
+  });
+
+  it('drawing a person card makes them join directly; a full class must send someone home', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 5);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    const t = structuredClone(s);
+    t.eventDeck.push('modern');
+    const n = t.players[pi].students.length;
+    const joined = step(t, { type: 'drawEvent' });
+    expect(joined.players[pi].students).toHaveLength(n + 1);
+    // 満席
+    const f = structuredClone(s);
+    while (f.players[pi].students.length < 12) f.players[pi].students.push({ ...f.players[pi].students[0], uid: `f${f.players[pi].students.length}` });
+    f.eventDeck.push('modern');
+    const full = step(f, { type: 'drawEvent' });
+    expect(full.phase.kind).toBe('release');
+    if (full.phase.kind !== 'release') return;
+    const out = full.players[pi].students[0].uid;
+    const after = step(full, { type: 'release', uid: out });
+    expect(after.players[pi].students).toHaveLength(12);
+    expect(after.players[pi].students.some((x) => x.uid === out)).toBe(false);
+  });
+
+  it('raids only take away the shortfall', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    const t = structuredClone(s);
+    t.players[pi].students = [mk('y', 3, ['fight'])];
+    t.players[pi].roles = Array(6).fill(null);
+    t.eventDeck.push('raid_8');
+    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(-5);
+    const u = structuredClone(t);
+    u.players[pi].students = [mk('y', 5, ['fight']), mk('z', 4, ['fight'])];
+    expect(step(u, { type: 'drawEvent' }).players[pi].points).toBe(u.players[pi].points);
   });
 
   it('drawn event cards go to the discard pile', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 3);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
-    const top = s.eventDeck[s.eventDeck.length - 1];
+    s.eventDeck.push('n_study');
     s = step(s, { type: 'drawEvent' });
-    expect(s.discard[s.discard.length - 1]).toBe(top);
+    expect(s.discard[s.discard.length - 1]).toBe('n_study');
   });
 
   it('push moves an unwanted student to another class', () => {
@@ -175,12 +212,12 @@ describe('engine', () => {
       const after = step(t, { type: 'drawEvent' }).players.map((p) => p.points);
       return after.map((v, i) => v - before[i]);
     };
-    const normal = run('n_study_0');
+    const normal = run('n_study');
     expect(normal.filter((d) => d > 0).length).toBeGreaterThan(1);
     const contest = run('sportsday');
     contest.forEach((d, i) => i !== drawer && expect(d).toBe(0));
-    const raid = run('raid_5');
+    const raid = run('raid_8');
     raid.forEach((d, i) => i !== drawer && expect(d).toBe(0));
-    expect(raid[drawer]).not.toBe(0);
+    expect(raid[drawer]).toBeLessThanOrEqual(0);
   });
 });

@@ -1,13 +1,10 @@
 import { ATTR_ICON, type Attr, type EraId } from '../types';
 
-/** 通常カード：そのアイコンを持つ生徒1人につき+1を全クラスに加点（名前違いでも効果は同じ） */
+/** 通常カード：そのアイコンを持つ生徒1人につき+1を全クラスに加点。名前と絵柄は時代ごとに変わるだけ */
 export interface NormalCard {
   id: string;
   kind: 'normal';
-  name: string;
   attr: Attr;
-  /** 時代の固有カードなら、その時代の学期だけ山札に入る */
-  era?: EraId;
   count: number;
 }
 
@@ -24,26 +21,24 @@ export interface ContestCard {
   count: number;
 }
 
-/** カチコミ（引いた人だけ）：👊の合計が敵の強さ以上なら撃退 */
+/** カチコミ（引いた人だけ）：👊の合計が敵の強さに足りなければ、その差がマイナス。攻めてくる敵は時代ごとに変わる */
 export interface RaidCard {
   id: string;
   kind: 'raid';
-  name: string;
-  icon: string;
   threat: number;
   count: number;
 }
 
-export interface PersonalCard {
+export interface PushCard {
   id: string;
-  kind: 'transfer' | 'push';
+  kind: 'push';
   name: string;
   icon: string;
   desc: string;
   count: number;
 }
 
-export type EventCard = NormalCard | ContestCard | RaidCard | PersonalCard;
+export type EventCard = NormalCard | ContestCard | RaidCard | PushCard;
 
 /** 定期テスト・卒業式（全員参加）の順位点（人数別） */
 export const CONTEST_POINTS: Record<number, number[]> = {
@@ -52,19 +47,42 @@ export const CONTEST_POINTS: Record<number, number[]> = {
   4: [10, 6, 3, 1],
   5: [10, 6, 3, 1, 0],
 };
-export const RAID_WIN = 6;
-export const RAID_LOSE = -4;
 
-const N = (attr: Attr, names: string[]): NormalCard[] =>
-  names.map((name, i) => ({ id: `n_${attr}_${i}`, kind: 'normal', name, attr, count: 1 }));
+/** 学期ごとの山札に入る人物カードの枚数（その時代の偉人が足りなければ現代の生徒で埋める） */
+export const PERSON_CARDS_PER_TERM = 7;
 
-export const NORMAL_CARDS: NormalCard[] = [
-  ...N('study', ['授業', '自習', '図書室']),
-  ...N('sports', ['体育', '昼休みのサッカー', '部活動']),
-  ...N('art', ['音楽', '美術', '書道']),
-  ...N('charm', ['学級会', '朝の会']),
-  ...N('fight', ['番長の縄張り']),
-];
+const N = (attr: Attr, count: number): NormalCard => ({ id: `n_${attr}`, kind: 'normal', attr, count });
+export const NORMAL_CARDS: NormalCard[] = [N('study', 3), N('sports', 3), N('art', 3), N('charm', 2), N('fight', 1)];
+
+/** 時代ごとの通常カードの名前と絵柄（効果はどれも同じ） */
+export const ERA_NORMAL_NAMES: Record<EraId, Record<Attr, [string, string]>> = {
+  present: { study: ['授業', '🏫'], sports: ['体育', '🏃'], art: ['音楽', '🎵'], charm: ['学級会', '🙋'], fight: ['番長の縄張り', '😎'] },
+  cretaceous: { study: ['化石の観察', '🦴'], sports: ['恐竜の大移動', '🦕'], art: ['シダの森で写生', '🌿'], charm: ['群れの集会', '🥚'], fight: ['縄張り争い', '🦖'] },
+  egypt: { study: ['ナイルの暦', '🌊'], sports: ['石運び', '🧱'], art: ['壁画を描く', '🎨'], charm: ['ファラオの祭り', '🤴'], fight: ['戦車の訓練', '🐎'] },
+  greece: { study: ['アカデメイアの講義', '📜'], sports: ['円盤投げ', '🥏'], art: ['悲劇の上演', '🎭'], charm: ['アゴラで討論', '🏛️'], fight: ['剣闘士の稽古', '⚔️'] },
+  china: { study: ['論語の素読', '📖'], sports: ['馬術の稽古', '🐴'], art: ['書の練習', '🖌️'], charm: ['宴会', '🥟'], fight: ['武芸の稽古', '🥋'] },
+  heian: { study: ['漢詩の勉強', '📜'], sports: ['蹴鞠', '⚽'], art: ['和歌を詠む', '🌸'], charm: ['宮中の行事', '🏯'], fight: ['検非違使の見回り', '🗡️'] },
+  europe: { study: ['修道院の写本', '📕'], sports: ['騎馬の訓練', '🏇'], art: ['工房の修行', '🖼️'], charm: ['宮廷の舞踏会', '💃'], fight: ['騎士の決闘', '🛡️'] },
+  sengoku: { study: ['寺での学問', '⛩️'], sports: ['早馬', '🐎'], art: ['茶の湯', '🍵'], charm: ['城下町の市', '🏮'], fight: ['鉄砲の稽古', '🔫'] },
+  edo: { study: ['そろばん塾', '🧮'], sports: ['飛脚', '🏃'], art: ['浮世絵を摺る', '🌊'], charm: ['祭りの神輿', '🏮'], fight: ['道場破り', '🥋'] },
+  modern: { study: ['工場見学', '🏭'], sports: ['自転車レース', '🚲'], art: ['サロンの演奏会', '🎻'], charm: ['社交界デビュー', '🎩'], fight: ['ボクシング', '🥊'] },
+  future: { study: ['VR授業', '🥽'], sports: ['反重力スポーツ', '🛸'], art: ['ホログラム展', '✨'], charm: ['銀河会議', '🪐'], fight: ['ロボバトル', '🤖'] },
+};
+
+/** 時代ごとのカチコミしてくる敵の名前と絵柄 */
+export const ERA_RAIDERS: Record<EraId, [string, string]> = {
+  present: ['他校のヤンキー', '🏍️'],
+  cretaceous: ['肉食恐竜の群れ', '🦖'],
+  egypt: ['墓泥棒の一味', '🏺'],
+  greece: ['ペルシア軍', '🛡️'],
+  china: ['黄巾の乱', '🔥'],
+  heian: ['鬼の軍団', '👹'],
+  europe: ['ヴァイキング', '🏴‍☠️'],
+  sengoku: ['野武士の群れ', '⚔️'],
+  edo: ['浪人の殴り込み', '🗡️'],
+  modern: ['マフィア', '🕴️'],
+  future: ['宇宙海賊', '👾'],
+};
 
 const C = (id: string, name: string, icon: string, attr: Attr, desc: string, era?: EraId): ContestCard => ({
   id, kind: 'contest', name, icon, attr, desc, era, count: era ? 2 : 1,
@@ -79,33 +97,16 @@ export const CONTEST_CARDS: ContestCard[] = [
   C('election', '生徒会選挙', '🗳️', 'charm', 'クラス代表を擁立。'),
 ];
 
-export const RAID_CARDS: RaidCard[] = [5, 8, 11].map((threat) => ({
-  id: `raid_${threat}`, kind: 'raid', name: 'カチコミ！', icon: '🏍️', threat, count: 1,
-}));
+export const RAID_CARDS: RaidCard[] = [4, 6, 8].map((threat) => ({ id: `raid_${threat}`, kind: 'raid', threat, count: 1 }));
 
-export const PERSONAL_CARDS: PersonalCard[] = [
-  { id: 'transfer', kind: 'transfer', name: '転入', icon: '🚪', desc: '今学期の時代の偉人から3人めくり、1人を迎える（いなければ現代の生徒）', count: 7 },
+export const PUSH_CARDS: PushCard[] = [
   { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: 'いらない生徒を1人、別のクラスに押しつける', count: 2 },
-];
-
-/** 時代の固有通常カード：効果は通常カードと同じ（全員・アイコン1人につき+1）。その時代の学期だけ山札に混ざる */
-const EN = (era: EraId, list: [string, Attr][]): NormalCard[] =>
-  list.map(([name, attr], i) => ({ id: `en_${era}_${i}`, kind: 'normal', name, attr, era, count: 1 }));
-export const ERA_NORMAL_CARDS: NormalCard[] = [
-  ...EN('cretaceous', [['恐竜の大移動', 'sports'], ['縄張り争い', 'fight']]),
-  ...EN('egypt', [['ナイルの氾濫', 'study'], ['壁画を描く', 'art']]),
-  ...EN('greece', [['アゴラで討論', 'charm'], ['円盤投げの練習', 'sports']]),
-  ...EN('china', [['論語の素読', 'study'], ['武芸の稽古', 'fight']]),
-  ...EN('heian', [['蹴鞠', 'sports'], ['和歌を詠む', 'art']]),
-  ...EN('europe', [['宮廷の舞踏会', 'charm'], ['工房の修行', 'art']]),
-  ...EN('sengoku', [['鉄砲の稽古', 'fight'], ['城下町の市', 'charm']]),
-  ...EN('edo', [['そろばん塾', 'study'], ['浮世絵を摺る', 'art']]),
-  ...EN('modern', [['工場見学', 'study'], ['社交界デビュー', 'charm']]),
-  ...EN('future', [['VR授業', 'study'], ['反重力スポーツ', 'sports']]),
 ];
 
 /** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代出身の生徒は数値2倍 */
 export const ERA_CARDS: ContestCard[] = [
+  C('trip', '修学旅行', '🚌', 'charm', '班長がみんなを引率。', 'present'),
+  C('videocon', '動画コンテスト', '📱', 'art', 'クラスで動画を撮って投稿。', 'present'),
   C('dino_race', '恐竜レース', '🦖', 'sports', '恐竜と並んで走れ！', 'cretaceous'),
   C('roar', '雄叫びコンテスト', '📢', 'fight', '一番でかい声を出した者の勝ち。', 'cretaceous'),
   C('pyramid', 'ピラミッド建設', '🔺', 'sports', '石を運んで積み上げろ。', 'egypt'),
@@ -147,7 +148,7 @@ export const FIXED_BY_MONTH: Record<number, string> = { 7: 'test1', 12: 'test2',
 /** テストでは👊を持つ生徒1人につきこれだけ減点 */
 export const TEST_YANKEE_PENALTY = 2;
 
-export const ALL_EVENT_CARDS: EventCard[] = [...NORMAL_CARDS, ...ERA_NORMAL_CARDS, ...CONTEST_CARDS, ...RAID_CARDS, ...PERSONAL_CARDS, ...ERA_CARDS];
+export const ALL_EVENT_CARDS: EventCard[] = [...NORMAL_CARDS, ...CONTEST_CARDS, ...RAID_CARDS, ...PUSH_CARDS, ...ERA_CARDS];
 export const EVENT_MAP: Record<string, EventCard> = Object.fromEntries(ALL_EVENT_CARDS.map((e) => [e.id, e]));
 export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EVENTS.map((e) => [e.id, e]));
 
@@ -159,7 +160,7 @@ export function cardRule(c: EventCard): string {
     case 'contest':
       return `引いた人：${ATTR_ICON[c.attr]}の数値の合計を加点${c.era ? '（この時代の生徒は2倍）' : ''}`;
     case 'raid':
-      return `引いた人：👊の数値の合計が${c.threat}以上なら+${RAID_WIN}、足りなければ${RAID_LOSE}`;
+      return `引いた人：👊の数値の合計が${c.threat}に足りない分だけマイナス`;
     default:
       return c.desc;
   }
@@ -169,8 +170,4 @@ export function fixedRule(f: FixedEvent): string {
   return f.rule === 'test'
     ? `📚の数値の合計−👊1人につき${TEST_YANKEE_PENALTY}で勝負（順位点×${f.mult}）`
     : `全員の数値の合計で勝負（順位点×${f.mult}）`;
-}
-
-export function cardIcon(c: EventCard): string {
-  return c.kind === 'normal' ? ATTR_ICON[c.attr] : c.icon;
 }
