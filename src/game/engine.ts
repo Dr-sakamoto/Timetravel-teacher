@@ -275,7 +275,7 @@ function buildDeck(s: GameState): string[] {
   const era = ERAS[currentEra(s)].id;
   const deck: string[] = [];
   for (const e of ALL_EVENT_CARDS) {
-    if (e.kind === 'contest' && e.era && e.era !== era) continue;
+    if ((e.kind === 'contest' || e.kind === 'normal') && e.era && e.era !== era) continue;
     for (let i = 0; i < e.count; i++) deck.push(e.id);
   }
   return shuffle(s, deck);
@@ -436,12 +436,10 @@ function setResult(s: GameState, pi: number | null, result: EventResult, ctx: Re
 }
 
 function startTransfer(s: GameState, pi: number, eraIdx: number, title: string, ctx: ResultCtx) {
+  // その時代の偉人が残っていなければ、現代の生徒が転入してくる
+  if (s.pools[ERAS[eraIdx].id].length === 0) eraIdx = PRESENT_INDEX;
   const era = ERAS[eraIdx];
   const options = drawOptions(s, eraIdx, 3);
-  if (options.length === 0) {
-    setResult(s, pi, { title, icon: '🕳️', tone: 'personal', desc: 'この時代の山札はもう空っぽだった…。', rows: [] }, ctx);
-    return;
-  }
   s.phase = { kind: 'transfer', player: pi, options, picks: 1, added: [], title, reason: `${era.icon} ${era.name}から`, ctx };
 }
 

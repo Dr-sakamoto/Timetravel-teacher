@@ -6,6 +6,8 @@ export interface NormalCard {
   kind: 'normal';
   name: string;
   attr: Attr;
+  /** 時代の固有カードなら、その時代の学期だけ山札に入る */
+  era?: EraId;
   count: number;
 }
 
@@ -82,11 +84,27 @@ export const RAID_CARDS: RaidCard[] = [5, 8, 11].map((threat) => ({
 }));
 
 export const PERSONAL_CARDS: PersonalCard[] = [
-  { id: 'transfer', kind: 'transfer', name: '転入', icon: '🚪', desc: '今学期の時代の山札から3枚めくり、1人を迎える', count: 7 },
+  { id: 'transfer', kind: 'transfer', name: '転入', icon: '🚪', desc: '今学期の時代の偉人から3人めくり、1人を迎える（いなければ現代の生徒）', count: 7 },
   { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: 'いらない生徒を1人、別のクラスに押しつける', count: 2 },
 ];
 
-/** 時代カード：その時代の学期だけ山札に混ざる。その時代出身の生徒は数値2倍 */
+/** 時代の固有通常カード：効果は通常カードと同じ（全員・アイコン1人につき+1）。その時代の学期だけ山札に混ざる */
+const EN = (era: EraId, list: [string, Attr][]): NormalCard[] =>
+  list.map(([name, attr], i) => ({ id: `en_${era}_${i}`, kind: 'normal', name, attr, era, count: 1 }));
+export const ERA_NORMAL_CARDS: NormalCard[] = [
+  ...EN('cretaceous', [['恐竜の大移動', 'sports'], ['縄張り争い', 'fight']]),
+  ...EN('egypt', [['ナイルの氾濫', 'study'], ['壁画を描く', 'art']]),
+  ...EN('greece', [['アゴラで討論', 'charm'], ['円盤投げの練習', 'sports']]),
+  ...EN('china', [['論語の素読', 'study'], ['武芸の稽古', 'fight']]),
+  ...EN('heian', [['蹴鞠', 'sports'], ['和歌を詠む', 'art']]),
+  ...EN('europe', [['宮廷の舞踏会', 'charm'], ['工房の修行', 'art']]),
+  ...EN('sengoku', [['鉄砲の稽古', 'fight'], ['城下町の市', 'charm']]),
+  ...EN('edo', [['そろばん塾', 'study'], ['浮世絵を摺る', 'art']]),
+  ...EN('modern', [['工場見学', 'study'], ['社交界デビュー', 'charm']]),
+  ...EN('future', [['VR授業', 'study'], ['反重力スポーツ', 'sports']]),
+];
+
+/** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代出身の生徒は数値2倍 */
 export const ERA_CARDS: ContestCard[] = [
   C('dino_race', '恐竜レース', '🦖', 'sports', '恐竜と並んで走れ！', 'cretaceous'),
   C('roar', '雄叫びコンテスト', '📢', 'fight', '一番でかい声を出した者の勝ち。', 'cretaceous'),
@@ -129,7 +147,7 @@ export const FIXED_BY_MONTH: Record<number, string> = { 7: 'test1', 12: 'test2',
 /** テストでは👊を持つ生徒1人につきこれだけ減点 */
 export const TEST_YANKEE_PENALTY = 2;
 
-export const ALL_EVENT_CARDS: EventCard[] = [...NORMAL_CARDS, ...CONTEST_CARDS, ...RAID_CARDS, ...PERSONAL_CARDS, ...ERA_CARDS];
+export const ALL_EVENT_CARDS: EventCard[] = [...NORMAL_CARDS, ...ERA_NORMAL_CARDS, ...CONTEST_CARDS, ...RAID_CARDS, ...PERSONAL_CARDS, ...ERA_CARDS];
 export const EVENT_MAP: Record<string, EventCard> = Object.fromEntries(ALL_EVENT_CARDS.map((e) => [e.id, e]));
 export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EVENTS.map((e) => [e.id, e]));
 

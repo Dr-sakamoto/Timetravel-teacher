@@ -3,7 +3,7 @@ import { cpuAction } from './ai';
 import { attrScore, iconCount, roleSlots, testScore } from './calc';
 import { CARDS, parseAttrs } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
-import { ERA_CARDS } from './data/events';
+import { ERA_CARDS, ERA_NORMAL_CARDS } from './data/events';
 import { ARCHETYPES } from './data/modern';
 import { currentEra, newGame, step } from './engine';
 import type { Attr, GameState, Player, Student } from './types';
@@ -121,7 +121,7 @@ describe('engine', () => {
       expect(s.yearEras).not.toContain(PRESENT_INDEX);
       const ph = s.phase;
       if (ph.kind === 'transfer' && ph.title === '転入') {
-        for (const o of ph.options) expect(o.era).toBe(ERAS[currentEra(s)].id);
+        for (const o of ph.options) expect([ERAS[currentEra(s)].id, 'present']).toContain(o.era);
       }
       s = step(s, cpuAction(s)!);
     }
@@ -132,6 +132,18 @@ describe('engine', () => {
     const era = ERAS[currentEra(s)].id;
     expect(s.eventDeck.some((id) => ERA_CARDS.some((e) => e.id === id && e.era === era))).toBe(true);
     expect(s.eventDeck.some((id) => ERA_CARDS.some((e) => e.id === id && e.era !== era))).toBe(false);
+    expect(s.eventDeck.filter((id) => ERA_NORMAL_CARDS.some((e) => e.id === id && e.era === era))).toHaveLength(2);
+    expect(s.eventDeck.some((id) => ERA_NORMAL_CARDS.some((e) => e.id === id && e.era !== era))).toBe(false);
+  });
+
+  it('every era has 3-6 figures, 2 era events and 2 era normal cards', () => {
+    for (const era of ERAS.filter((e) => e.id !== 'present')) {
+      const figures = CARDS.filter((c) => c.era === era.id).length;
+      expect(figures, era.name).toBeGreaterThanOrEqual(3);
+      expect(figures, era.name).toBeLessThanOrEqual(6);
+      expect(ERA_CARDS.filter((c) => c.era === era.id)).toHaveLength(2);
+      expect(ERA_NORMAL_CARDS.filter((c) => c.era === era.id)).toHaveLength(2);
+    }
   });
 
   it('drawn event cards go to the discard pile', () => {

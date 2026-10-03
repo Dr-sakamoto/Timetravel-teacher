@@ -1,8 +1,10 @@
+import { CARDS } from '../game/data/cards';
 import { ERAS } from '../game/data/eras';
 import {
   CONTEST_CARDS,
   CONTEST_POINTS,
   ERA_CARDS,
+  ERA_NORMAL_CARDS,
   FIXED_EVENTS,
   NORMAL_CARDS,
   PERSONAL_CARDS,
@@ -47,7 +49,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </li>
-          <li>時代は1年に3つランダム。1学期に1つずつ巡り、その学期の時代の生徒の山札と時代カードを使う。</li>
+          <li>時代は1年に3つランダム。1学期に1つずつ巡り、その学期の時代の偉人と、時代の固有カード（イベント・通常）を使う。</li>
         </ol>
 
         <h3>手番：1人1枚ずつイベントの山札をめくる</h3>
@@ -80,14 +82,23 @@ export function Rules({ onClose }: { onClose: () => void }) {
           </li>
         </ul>
 
-        <h3>時代カード一覧</h3>
+        <h3>時代ごとのカード</h3>
+        <p>各時代に、固有の偉人（転入で来る）・固有イベントカード2種・固有通常カード2枚がある。</p>
         <ul className="rule-list">
           {ERAS.filter((e) => e.id !== 'present').map((era) => (
             <li key={era.id}>
-              {era.icon} {era.name}：
+              {era.icon} <b>{era.name}</b>：偉人{' '}
+              {CARDS.filter((c) => c.era === era.id)
+                .map((c) => c.icon + c.name)
+                .join('・')}
+              ／イベント{' '}
               {ERA_CARDS.filter((c) => c.era === era.id)
                 .map((c) => `${c.icon}${c.name}（${ATTR_ICON[c.attr]}）`)
-                .join('　')}
+                .join('・')}
+              ／通常{' '}
+              {ERA_NORMAL_CARDS.filter((c) => c.era === era.id)
+                .map((c) => `${c.name}（${ATTR_ICON[c.attr]}）`)
+                .join('・')}
             </li>
           ))}
         </ul>
