@@ -21,7 +21,7 @@ function a(id: string, title: string, icon: string, rarity: Rarity, power: numbe
   return { id, title, icon, rarity, power, attrs, tags: attrs.includes('f') ? Y : M, flavor };
 }
 
-// 📚はヤンキー以外ほぼ標準装備。👊はヤンキー専用
+// 📚はヤンキー以外ほぼ標準装備。👊はヤンキー専用で、ヤンキーの約半分は👊のみ
 export const ARCHETYPES: Archetype[] = [
   a('baseball', '野球部', '⚾', 'N', 3, 'sp', '坊主頭。声がでかい。'),
   a('soccer', 'サッカー部', '⚽', 'N', 3, 'sp', '昼休みは必ずグラウンド。'),
@@ -46,10 +46,10 @@ export const ARCHETYPES: Archetype[] = [
   a('tennen', '天然', '🌼', 'N', 2, 'sac', '上履きのまま帰る。'),
   a('kitaku', '帰宅部', '🏠', 'N', 4, 's', '放課後の帰宅スピードは全国レベル。'),
   a('quiet', '目立たない子', '🙂', 'N', 3, 'sa', '出席を取るまで居たか分からない。'),
-  a('yankee', 'ヤンキー', '😎', 'N', 4, 'pf', 'リーゼント。根は優しい。'),
+  a('yankee', 'ヤンキー', '😎', 'N', 4, 'f', 'リーゼント。根は優しい。'),
   a('sukeban', 'スケバン', '💄', 'N', 4, 'fc', 'スカートが長い。'),
   a('furyo', '不良', '👊', 'N', 6, 'f', '授業中はだいたい寝ている。'),
-  a('bosozoku', '暴走族見習い', '🏍️', 'N', 3, 'pfc', 'まだ自転車。'),
+  a('bosozoku', '暴走族見習い', '🏍️', 'N', 3, 'f', 'まだ自転車。'),
   // 転校生限定（現代）
   a('returnee', '帰国子女', '✈️', 'R', 4, 'sac', '英語の発音がネイティブ。'),
   a('childstar', '天才子役', '🎬', 'R', 6, 'ac', 'ドラマ撮影で早退しがち。'),

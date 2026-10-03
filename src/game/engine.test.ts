@@ -100,19 +100,19 @@ describe('engine', () => {
     expect([6, 7, 8, 10, 12].map((n) => roleSlots(sized(n)))).toEqual([3, 3, 4, 5, 6]);
   });
 
-  it('fight icons belong only to yankees, who never study', () => {
+  it('fight icons belong only to yankees, and about half of them are fight-only', () => {
     const all = [
       ...CARDS.map((c) => ({ name: c.name, attrs: c.attrs, tags: c.tags })),
       ...ARCHETYPES.map((a) => ({ name: a.title, attrs: parseAttrs(a.attrs), tags: a.tags })),
     ];
     for (const x of all) {
-      if (x.attrs.includes('fight')) {
-        expect(x.tags, x.name).toContain('ヤンキー');
-        expect(x.attrs, x.name).not.toContain('study');
-      } else {
-        expect(x.tags, x.name).not.toContain('ヤンキー');
-      }
+      if (x.attrs.includes('fight')) expect(x.tags, x.name).toContain('ヤンキー');
+      else expect(x.tags, x.name).not.toContain('ヤンキー');
     }
+    const yankees = all.filter((x) => x.tags.includes('ヤンキー'));
+    const fightOnly = yankees.filter((x) => x.attrs.every((a) => a === 'fight'));
+    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.45);
+    expect(fightOnly.length / yankees.length).toBeLessThanOrEqual(0.6);
   });
 
   it('picks 3 eras a year and person cards come from the current term era', () => {
