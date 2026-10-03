@@ -1,14 +1,15 @@
 import {
   MAX_CLASS,
+  POWER_CAP,
   RANK_POINTS,
   applyDelta,
+  attrValues,
   auraTotals,
   classPower,
-  effStats,
+  countAttr,
   isAnimal,
-  roleOf,
 } from './calc';
-import { CARDS, CARD_MAP } from './data/cards';
+import { CARDS, CARD_MAP, parseAttrs } from './data/cards';
 import { CLASS_CARDS, CLASS_MAP, className } from './data/classes';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
@@ -16,15 +17,15 @@ import {
   FIXED_BY_MONTH,
   PERSONAL_EVENTS,
   SCHOOL_EVENTS,
-  describeScoring,
+  aggText,
+  effectText,
   type PersonalEventDef,
   type SchoolEventDef,
 } from './data/events';
 import { ARCHETYPES, GIVEN_NAMES, STARTER_ARCHETYPES, SURNAMES, type Archetype } from './data/modern';
 import { ROLES } from './data/roles';
 import {
-  STAT_KEYS,
-  STAT_LABEL,
+  ATTR_ICON,
   type Action,
   type EraId,
   type EventResult,
@@ -38,7 +39,6 @@ import {
 
 export const MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
 export const PLAYER_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b', '#da77f2'];
-export const STAT_CAP = 30;
 
 export function termOfMonth(m: number): number {
   if (m >= 4 && m <= 7) return 1;
@@ -101,7 +101,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   const s: GameState = {
-    version: 1,
+    version: 2,
     rng: seed | 0,
     players: setup.map((p, i) => ({
       id: i,
@@ -145,9 +145,9 @@ function joinedLabel(s: GameState): string {
 }
 
 function fromArchetype(s: GameState, a: Archetype, joined: string): Student {
-  const [pe, study, fight, art, charm] = a.stats;
-  const base = { pe, study, fight, art, charm };
-  for (const k of STAT_KEYS) base[k] = Math.max(0, base[k] + randInt(s, 3) - 1);
+  // 同じ部活でも少し個人差がある
+  const roll = rand(s);
+  const power = Math.max(1, a.power + (roll < 0.2 ? -1 : roll > 0.8 ? 1 : 0));
   return {
     uid: `u${s.uidCounter++}`,
     name: `${pick(s, SURNAMES)} ${pick(s, GIVEN_NAMES)}`,
@@ -155,7 +155,8 @@ function fromArchetype(s: GameState, a: Archetype, joined: string): Student {
     era: 'present',
     rarity: a.rarity,
     icon: a.icon,
-    base,
+    power,
+    attrs: parseAttrs(a.attrs),
     tags: [...a.tags],
     ability: a.ability,
     flavor: a.flavor,
@@ -174,7 +175,8 @@ function fromCard(s: GameState, cardId: string, joined: string): Student {
     era: c.era,
     rarity: c.rarity,
     icon: c.icon,
-    base: { ...c.stats },
+    power: c.power,
+    attrs: [...c.attrs],
     tags: [...c.tags],
     ability: c.ability,
     flavor: c.flavor,
@@ -324,11 +326,8 @@ function yearEnd(s: GameState) {
   if (s.year < s.years) {
     const lines: string[] = [];
     for (const p of s.players) {
-      for (const st of p.students) {
-        const k = pick(s, STAT_KEYS);
-        st.base[k] = Math.min(STAT_CAP, st.base[k] + 1);
-      }
-      lines.push(`${p.name}のクラス：全員の能力がどれか1つ+1`);
+      for (const st of p.students) st.power = Math.min(POWER_CAP, st.power + 1);
+      lines.push(`${p.name}のクラス：全員の数値+1`);
     }
     log(s, `${s.year}年生が終わった。進級！みんな少し成長した。`);
     s.phase = {
@@ -378,14 +377,20 @@ export function resolveSchool(s: GameState, ev: SchoolEventDef, drawer: number |
         for (const c of powers[r.player].contributors) c.mvp++;
       } else {
         r.delta = applyDelta(p, ev.threshold.lose);
-        r.note = '突破された…';
+        r.note = r.power ? '突破された…' : '無防備…';
       }
     }
   } else {
     const table = RANK_POINTS[n] ?? RANK_POINTS[5];
+    const minPower = Math.min(...rows.map((r) => r.power!));
     for (const r of rows) {
       r.rank = rows.filter((o) => o.power! > r.power!).length;
-      const pts = Math.round((table[r.rank] ?? 0) * ev.mult);
+      let pts = Math.round((table[r.rank] ?? 0) * ev.mult);
+      for (const e of ev.effects) {
+        if (e.kind === 'firstBonus' && r.rank === 0) pts += e.amount;
+        if (e.kind === 'everyone') pts += e.amount;
+        if (e.kind === 'lastPenalty' && r.power === minPower && rows.some((o) => o.power! > minPower)) pts -= e.amount;
+      }
       r.delta = applyDelta(s.players[r.player], pts);
       if (r.delta > 0) for (const c of powers[r.player].contributors) c.mvp++;
     }
@@ -402,8 +407,11 @@ export function resolveSchool(s: GameState, ev: SchoolEventDef, drawer: number |
   return {
     title: ev.name,
     icon: ev.icon,
+    attr: ev.attr,
+    tone: 'special',
     desc: ev.desc,
-    scoring: describeScoring(ev) + (ev.threshold ? ` ／ 撃退で${ev.threshold.win}pt・突破されると${ev.threshold.lose}pt` : ` ／ 順位点×${ev.mult}`),
+    scoring: aggText(ev) + (ev.threshold ? ` ／ 撃退で+${ev.threshold.win}pt・突破されると${ev.threshold.lose}pt` : ` ／ 順位点×${ev.mult}`),
+    effects: ev.effects.map(effectText),
     rows,
     threat,
     school: true,
@@ -420,7 +428,7 @@ function personalResult(
   const p = s.players[pi];
   const d = delta === 0 ? 0 : applyDelta(p, delta);
   log(s, `${p.name}：${ev.name}${d !== 0 ? ` ${d > 0 ? '+' : ''}${d}pt` : ''}`, pi);
-  return { title: ev.name, icon: ev.icon, desc: ev.desc, rows: [{ player: pi, delta: d }], lines };
+  return { title: ev.name, icon: ev.icon, attr: ev.attr, tone: ev.tone, desc: ev.desc, rows: [{ player: pi, delta: d }], lines };
 }
 
 function setResult(s: GameState, pi: number | null, result: EventResult, ctx: ResultCtx) {
@@ -449,9 +457,9 @@ function startTransfer(
   s.phase = { kind: 'transfer', player: pi, options, picks, added: [], title, reason, ctx };
 }
 
-function maxEffCharm(p: Player): number {
+function maxCharm(p: Player): number {
   const auras = auraTotals(p);
-  return Math.max(0, ...p.students.map((st) => effStats(p, st, auras).charm));
+  return Math.max(0, ...p.students.map((st) => attrValues(p, st, auras).charm ?? 0));
 }
 
 function resolveDraw(s: GameState, pi: number) {
@@ -497,27 +505,54 @@ function resolveDraw(s: GameState, pi: number) {
       return;
     }
     case 'bonus':
-      setResult(s, pi, personalResult(s, pi, ev, 4, []), 'turn');
+      setResult(s, pi, personalResult(s, pi, ev, 3, []), 'turn');
       return;
+    case 'lunch':
+      setResult(s, pi, personalResult(s, pi, ev, 2, []), 'turn');
+      return;
+    case 'oversleep':
+      setResult(s, pi, personalResult(s, pi, ev, -1, []), 'turn');
+      return;
+    case 'lesson': {
+      const c = countAttr(p, 'study');
+      setResult(s, pi, personalResult(s, pi, ev, Math.floor(c / 3), [`${ATTR_ICON.study}持ち：${c}人`]), 'turn');
+      return;
+    }
+    case 'club': {
+      const c = countAttr(p, 'sports') + countAttr(p, 'art');
+      setResult(s, pi, personalResult(s, pi, ev, Math.floor(c / 4), [`${ATTR_ICON.sports}持ち＋${ATTR_ICON.art}持ち：のべ${c}人`]), 'turn');
+      return;
+    }
+    case 'homework': {
+      const c = countAttr(p, 'study');
+      const ok = c >= 8;
+      setResult(
+        s,
+        pi,
+        personalResult(s, pi, ev, ok ? 0 : -2, [`${ATTR_ICON.study}持ち：${c}人`, ok ? '優等生がノートを見せてくれた！' : '誰も宿題をやっていなかった…'] ),
+        'turn',
+      );
+      return;
+    }
     case 'inspection': {
-      const y = p.students.filter((st) => st.tags.includes('ヤンキー')).length;
+      const y = countAttr(p, 'fight');
       const delta = y === 0 ? 2 : -2 * y;
       setResult(
         s,
         pi,
-        personalResult(s, pi, ev, delta, [y === 0 ? 'ヤンキーはいなかった。模範的なクラス！' : `ヤンキーが${y}人…色々出てきた。`]),
+        personalResult(s, pi, ev, delta, [y === 0 ? 'ヤンキーはいなかった。模範的なクラス！' : `${ATTR_ICON.fight}持ちが${y}人…色々出てきた。`]),
         'turn',
       );
       return;
     }
     case 'crisis': {
-      const c = maxEffCharm(p);
-      const ok = c >= 15;
+      const c = maxCharm(p);
+      const ok = c >= 9;
       setResult(
         s,
         pi,
         personalResult(s, pi, ev, ok ? 5 : -5, [
-          `クラスで一番の人望：${Math.round(c * 10) / 10}`,
+          `クラスで一番の${ATTR_ICON.charm}：${Math.round(c * 10) / 10}`,
           ok ? 'カリスマがクラスをまとめ上げた！' : 'まとめ役がいない…クラスがバラバラに。',
         ]),
         'turn',
@@ -545,10 +580,8 @@ function resolveDraw(s: GameState, pi: number) {
       return;
     }
     case 'parents': {
-      const auras = auraTotals(p);
-      const avg = p.students.reduce((a, st) => a + effStats(p, st, auras).charm, 0) / Math.max(1, p.students.length);
-      const delta = Math.round(avg / 2);
-      setResult(s, pi, personalResult(s, pi, ev, delta, [`クラスの平均人望：${Math.round(avg * 10) / 10}`]), 'turn');
+      const c = countAttr(p, 'charm');
+      setResult(s, pi, personalResult(s, pi, ev, Math.min(6, c), [`${ATTR_ICON.charm}持ち：${c}人`]), 'turn');
       return;
     }
   }
@@ -716,9 +749,18 @@ export function step(prev: GameState, a: Action): GameState {
       const p = s.players[ph.player];
       const st = p.students.find((x) => x.uid === a.uid);
       if (!st) return prev;
-      st.base[a.stat] = Math.min(STAT_CAP, st.base[a.stat] + 2);
       const ev = EVENT_MAP.train as PersonalEventDef;
-      setResult(s, ph.player, personalResult(s, ph.player, ev, 0, [`${st.name}の${STAT_LABEL[a.stat]}が+2！（${st.base[a.stat]}）`]), 'turn');
+      let line: string;
+      if (a.mode === 'power') {
+        if (st.power >= POWER_CAP) return prev;
+        st.power += 1;
+        line = `${st.name}の数値が+1！（${st.power}）`;
+      } else {
+        if (!canLearn(st, a.attr)) return prev;
+        st.attrs.push(a.attr);
+        line = `${st.name}が${ATTR_ICON[a.attr]}を覚えた！`;
+      }
+      setResult(s, ph.player, personalResult(s, ph.player, ev, 0, [line]), 'turn');
       return s;
     }
     case 'poach': {
@@ -746,10 +788,15 @@ export function step(prev: GameState, a: Action): GameState {
   return prev;
 }
 
+/** 特訓で覚えられる属性か（👊は覚えられない／👊持ちは📚を覚えられない） */
+export function canLearn(st: Student, attr: Student['attrs'][number]): boolean {
+  if (st.attrs.includes(attr)) return false;
+  if (attr === 'fight') return false;
+  if (attr === 'study' && st.attrs.includes('fight')) return false;
+  return true;
+}
+
 export function finalRanking(s: GameState): Player[] {
   return [...s.players].sort((a, b) => b.points - a.points);
 }
 
-export function playerRole(p: Player, uid: string) {
-  return roleOf(p, uid);
-}

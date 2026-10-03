@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
-import { classPower, effStats } from './calc';
+import { attrValues, classPower } from './calc';
+import { CARDS, parseAttrs } from './data/cards';
+import { ARCHETYPES } from './data/modern';
 import { EVENT_MAP, type SchoolEventDef } from './data/events';
 import { newGame, step } from './engine';
-import type { GameState } from './types';
+import type { Attr, GameState, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): { s: GameState; steps: number } {
   let s = newGame(
@@ -54,31 +56,49 @@ describe('engine', () => {
     expect(s.players[0].classCardId).not.toBe(s.players[1].classCardId);
   });
 
-  it('role assignment buffs the assigned stat', () => {
+  it('role assignment multiplies the attributes the student has', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 7);
     s = step(s, { type: 'drawClass' });
     const p = s.players[0];
-    const st = p.students[0];
-    const before = effStats(p, st).charm;
-    const card = p.classCardId!;
-    const idx = ['normal', 'elite', 'arts', 'council', 'sports'].includes(card) ? 0 : -1;
-    if (idx === 0) {
-      p.roles[0] = st.uid; // 学級委員長 → 人望×1.5
-      expect(effStats(p, st).charm).toBeCloseTo(before * 1.5);
-    }
+    p.classCardId = 'normal'; // 0番目の係は学級委員長（👑×1.5）
+    p.roles = [null, null, null, null, null, null];
+    const st = { ...p.students[0], uid: 'x', power: 4, attrs: ['study', 'charm'] as Attr[], ability: undefined };
+    p.students = [st];
+    expect(attrValues(p, st).charm).toBe(4);
+    p.roles[0] = 'x';
+    expect(attrValues(p, st).charm).toBe(6);
+    expect(attrValues(p, st).sports).toBeUndefined();
   });
 
   it('yankees defend against rival yankees but hurt tests', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 3);
     s = step(s, { type: 'drawClass' });
     const p = s.players[0];
-    const yankee = { ...p.students[0], uid: 'y', tags: ['現代', 'ヤンキー'] as const, base: { pe: 5, study: 1, fight: 8, art: 2, charm: 3 } };
-    const nerd = { ...p.students[0], uid: 'n', tags: ['現代'] as const, base: { pe: 2, study: 8, fight: 1, art: 3, charm: 3 } };
-    const yClass = { ...p, roles: [], students: [yankee, yankee, yankee].map((x, i) => ({ ...x, uid: `y${i}`, tags: [...x.tags] })) };
-    const nClass = { ...p, roles: [], students: [nerd, nerd, nerd].map((x, i) => ({ ...x, uid: `n${i}`, tags: [...x.tags] })) };
+    const mk = (uid: string, attrs: Attr[], tags: Student['tags']): Student => ({ ...p.students[0], uid, power: 5, attrs, tags, ability: undefined });
+    const yClass = { ...p, roles: [], students: [0, 1, 2].map((i) => mk(`y${i}`, ['sports', 'fight'], ['現代', 'ヤンキー'])) };
+    const nClass = { ...p, roles: [], students: [0, 1, 2].map((i) => mk(`n${i}`, ['study'], ['現代'])) };
     const raid = EVENT_MAP.yankee as SchoolEventDef;
     const test = EVENT_MAP.test1 as SchoolEventDef;
-    expect(classPower(yClass, raid).power).toBeGreaterThan(classPower(nClass, raid).power);
+    expect(classPower(yClass, raid).power).toBeGreaterThan(0);
+    expect(classPower(nClass, raid).power).toBe(0);
     expect(classPower(nClass, test).power).toBeGreaterThan(classPower(yClass, test).power);
+  });
+
+  it('fight attribute belongs only to yankees, who never study', () => {
+    const all = [
+      ...CARDS.map((c) => ({ name: c.name, attrs: c.attrs, tags: c.tags })),
+      ...ARCHETYPES.map((a) => ({ name: a.title, attrs: parseAttrs(a.attrs), tags: a.tags })),
+    ];
+    for (const x of all) {
+      if (x.attrs.includes('fight')) {
+        expect(x.tags, x.name).toContain('ヤンキー');
+        expect(x.attrs, x.name).not.toContain('study');
+      } else {
+        expect(x.tags, x.name).not.toContain('ヤンキー');
+      }
+    }
+    const modernNonYankee = ARCHETYPES.filter((a) => !a.attrs.includes('f'));
+    const studying = modernNonYankee.filter((a) => a.attrs.includes('s'));
+    expect(studying.length / modernNonYankee.length).toBeGreaterThan(0.7);
   });
 });

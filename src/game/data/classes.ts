@@ -32,7 +32,7 @@ export const CLASS_CARDS: ClassCardDef[] = [
   {
     id: 'elite', dept: '特進科', letter: 'C', nick: 'ガリ勉クラス', icon: '📚', color: '#9575cd',
     roles: ['leader', 'study', 'study', 'library', 'pe'],
-    bias: { study: 5, charm: 1.5, art: 1, plain: 1 }, guaranteed: ['nerd', 'shogi'],
+    bias: { study: 3, charm: 1.5, art: 1, plain: 1 }, guaranteed: ['nerd', 'shogi'],
     desc: '定期テストに強い秀才集団。喧嘩はからっきし。',
   },
   {
@@ -44,14 +44,14 @@ export const CLASS_CARDS: ClassCardDef[] = [
   {
     id: 'trouble', dept: '普通科', letter: 'E', nick: '問題児の掃き溜め', icon: '😎', color: '#ffb74d',
     roles: ['discipline', 'discipline', 'cheer', 'pe', 'animal', 'study'],
-    bias: { yankee: 2, sports: 1.5, plain: 1, charm: 1 }, guaranteed: ['yankee', 'sukeban', 'furyo', 'bosozoku'],
-    desc: 'ヤンキーだらけで勉強は壊滅的。でも他校が攻めてきたら頼もしい。係は6つ。',
+    bias: { yankee: 0.8, sports: 1.5, plain: 1, charm: 1, art: 0.8 }, guaranteed: ['yankee', 'sukeban', 'furyo', 'bosozoku'],
+    desc: 'ヤンキーだらけで勉強は壊滅的。でも他校が攻めてきたら頼もしい。係は6つ。（上級者向け）',
   },
   {
     id: 'council', dept: '生徒会', letter: 'F', nick: 'エリート委員会', icon: '📋', color: '#4db6ac',
-    roles: ['leader', 'vice', 'broadcast', 'library', 'discipline'],
+    roles: ['leader', 'vice', 'broadcast', 'library', 'cheer'],
     bias: { charm: 5, study: 1.5, plain: 1 }, guaranteed: ['council', 'rep'],
-    desc: '人望で押し切る優等生クラス。選挙と視察に強い。',
+    desc: '人望で押し切る優等生クラス。選挙と修学旅行に強い。',
   },
   {
     id: 'ikimono', dept: '普通科', letter: 'G', nick: 'いきものがかりクラス', icon: '🐾', color: '#aed581',

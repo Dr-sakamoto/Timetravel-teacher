@@ -4,8 +4,9 @@ import { MAX_CLASS, roleOf } from '../game/calc';
 import { CLASS_MAP, className } from '../game/data/classes';
 import { ERAS } from '../game/data/eras';
 import { roleDesc, ROLES } from '../game/data/roles';
-import { MONTHS, poachable, termOfMonth } from '../game/engine';
-import { STAT_KEYS, STAT_LABEL, type Action, type GameState, type StatKey } from '../game/types';
+import { MONTHS, canLearn, poachable, termOfMonth } from '../game/engine';
+import { POWER_CAP } from '../game/calc';
+import { ATTRS, ATTR_ICON, ATTR_LABEL, type Action, type Attr, type GameState } from '../game/types';
 import { ResultView } from './ResultView';
 import { RoleEditor } from './RoleEditor';
 import { StudentCard } from './StudentCard';
@@ -142,7 +143,8 @@ export function PhasePanel({ state, dispatch, cpuBusy }: Props) {
         <div className="panel center">
           <h2>{p.name}のターン — イベントカード</h2>
           <p className="hint">
-            学校行事なら全クラスが参加して順位でポイント。転校生カードなら{ERAS[p.era].icon} {ERAS[p.era].name}から転校生がやってくる。
+            学校行事は全クラスが参加し、イベントの属性アイコンを持つ生徒の数値で勝負。青マス・赤マスはちょっとした増減、転校生カードなら
+            {ERAS[p.era].icon} {ERAS[p.era].name}から転校生がやってくる。
           </p>
           <button className="deck-card" onClick={() => dispatch({ type: 'drawEvent' })}>
             <span className="deck-back">🃏</span>
@@ -302,29 +304,48 @@ function TransferPanel({ state, dispatch }: { state: GameState; dispatch: (a: Ac
 function TrainPanel({ state, dispatch }: { state: GameState; dispatch: (a: Action) => void }) {
   const ph = state.phase;
   const [uid, setUid] = useState<string | null>(null);
-  const [stat, setStat] = useState<StatKey>('study');
+  const [mode, setMode] = useState<'power' | Attr>('power');
   if (ph.kind !== 'train') return null;
   const p = state.players[ph.player];
+  const st = p.students.find((x) => x.uid === uid);
+  const ok = st ? (mode === 'power' ? st.power < POWER_CAP : canLearn(st, mode)) : false;
+  const list = [...p.students].sort((a, b) =>
+    mode === 'power' ? b.power - a.power : Number(canLearn(b, mode)) - Number(canLearn(a, mode)) || b.power - a.power,
+  );
   return (
     <div className="panel">
       <h2>💪 放課後の特訓 — {p.name}</h2>
-      <p className="hint">生徒と伸ばしたい能力を選んでください（+2）。</p>
+      <p className="hint">
+        数値を+1するか、新しい属性を覚えさせる（属性の幅が広がる）。👊は覚えられず、ヤンキーは📚を覚えられない。
+      </p>
       <div className="stat-picker">
-        {STAT_KEYS.map((k) => (
-          <button key={k} className={`btn ${stat === k ? 'primary' : 'ghost'}`} onClick={() => setStat(k)}>
-            {STAT_LABEL[k]}
-          </button>
-        ))}
-      </div>
-      <div className="card-grid">
-        {[...p.students]
-          .sort((a, b) => b.base[stat] - a.base[stat])
-          .map((s) => (
-            <StudentCard key={s.uid} student={s} owner={p} compact selected={uid === s.uid} onClick={() => setUid(s.uid)} />
+        <button className={`btn ${mode === 'power' ? 'primary' : 'ghost'}`} onClick={() => setMode('power')}>
+          数値 +1
+        </button>
+        {(ATTRS as Attr[])
+          .filter((a) => a !== 'fight')
+          .map((a) => (
+            <button key={a} className={`btn ${mode === a ? 'primary' : 'ghost'}`} onClick={() => setMode(a)}>
+              {ATTR_ICON[a]} {ATTR_LABEL[a]}を覚える
+            </button>
           ))}
       </div>
+      <div className="card-grid">
+        {list.map((s) => {
+          const can = mode === 'power' ? s.power < POWER_CAP : canLearn(s, mode);
+          return (
+            <StudentCard key={s.uid} student={s} owner={p} compact selected={uid === s.uid} dim={!can} onClick={() => setUid(s.uid)} />
+          );
+        })}
+      </div>
       <div className="actions">
-        <button className="btn primary" disabled={!uid} onClick={() => uid && dispatch({ type: 'train', uid, stat })}>
+        <button
+          className="btn primary"
+          disabled={!ok}
+          onClick={() =>
+            uid && dispatch(mode === 'power' ? { type: 'train', uid, mode: 'power' } : { type: 'train', uid, mode: 'attr', attr: mode })
+          }
+        >
           特訓する
         </button>
       </div>

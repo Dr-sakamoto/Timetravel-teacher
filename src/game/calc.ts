@@ -1,9 +1,10 @@
 import { CLASS_MAP } from './data/classes';
 import type { SchoolEventDef } from './data/events';
 import { ANIMAL_MULT, ROLES } from './data/roles';
-import { STAT_KEYS, type Player, type RoleId, type Stats, type Student } from './types';
+import { ATTRS, type Attr, type Player, type RoleId, type Student } from './types';
 
 export const MAX_CLASS = 30;
+export const POWER_CAP = 12;
 
 export function roleOf(p: Player, uid: string): RoleId | null {
   if (!p.classCardId) return null;
@@ -11,10 +12,12 @@ export function roleOf(p: Player, uid: string): RoleId | null {
   return idx >= 0 ? CLASS_MAP[p.classCardId].roles[idx] : null;
 }
 
-/** クラス全体のオーラ合計（本人の分は effStats で差し引く） */
-export function auraTotals(p: Player): Stats {
-  const t: Stats = { pe: 0, study: 0, fight: 0, art: 0, charm: 0 };
-  for (const s of p.students) if (s.ability?.kind === 'aura') t[s.ability.stat] += s.ability.amount;
+export type AttrValues = Partial<Record<Attr, number>>;
+
+/** クラス全体のオーラ合計（本人の分は attrValues で差し引く） */
+export function auraTotals(p: Player): AttrValues {
+  const t: AttrValues = {};
+  for (const s of p.students) if (s.ability?.kind === 'aura') t[s.ability.attr] = (t[s.ability.attr] ?? 0) + s.ability.amount;
   return t;
 }
 
@@ -22,35 +25,44 @@ export function isAnimal(s: Student): boolean {
   return s.tags.includes('恐竜') || s.tags.includes('動物');
 }
 
-/** オーラと係の補正を反映した実効能力値 */
-export function effStats(p: Player, s: Student, auras: Stats = auraTotals(p)): Stats {
-  const out = { ...s.base };
-  for (const k of STAT_KEYS) {
-    const own = s.ability?.kind === 'aura' && s.ability.stat === k ? s.ability.amount : 0;
-    out[k] += auras[k] - own;
-  }
+/** 生徒が持つ各属性の実効値（数値＋オーラ、係の倍率込み）。持っていない属性は含まれない */
+export function attrValues(p: Player, s: Student, auras: AttrValues = auraTotals(p)): AttrValues {
   const role = roleOf(p, s.uid);
-  if (role) {
-    const def = ROLES[role];
-    if (def.animal && isAnimal(s)) {
-      for (const k of STAT_KEYS) out[k] *= ANIMAL_MULT;
-    } else {
-      for (const k of STAT_KEYS) {
-        let m = def.mult[k];
-        if (m === undefined) continue;
-        if (s.ability?.kind === 'roleBonus' && s.ability.role === role) m = Math.max(m, s.ability.mult);
-        out[k] *= m;
+  const def = role ? ROLES[role] : null;
+  const out: AttrValues = {};
+  for (const a of s.attrs) {
+    const own = s.ability?.kind === 'aura' && s.ability.attr === a ? s.ability.amount : 0;
+    let v = s.power + (auras[a] ?? 0) - own;
+    if (def) {
+      if (def.animal && isAnimal(s)) v *= ANIMAL_MULT;
+      else {
+        let m = def.mult[a];
+        if (m !== undefined) {
+          if (s.ability?.kind === 'roleBonus' && s.ability.role === role) m = Math.max(m, s.ability.mult);
+          v *= m;
+        }
       }
     }
+    out[a] = Math.round(v * 10) / 10;
   }
   return out;
 }
 
-export function eventValue(s: Student, eff: Stats, ev: SchoolEventDef): number {
-  let v = 0;
-  for (const k of STAT_KEYS) v += (ev.weights[k] ?? 0) * eff[k];
-  if (ev.tagBonus) for (const t of s.tags) v += ev.tagBonus[t] ?? 0;
-  if (s.ability?.kind === 'boost' && s.ability.category === ev.category) v += s.ability.amount;
+/** イベントでの生徒の値。属性を持たなければ null（参加できない） */
+export function eventValue(s: Student, vals: AttrValues, ev: SchoolEventDef): number | null {
+  let v: number;
+  if (ev.attr === 'all') {
+    v = ATTRS.reduce((a, k) => a + (vals[k] ?? 0), 0);
+  } else {
+    const base = vals[ev.attr];
+    if (base === undefined) return null;
+    v = base;
+    if (s.ability?.kind === 'boost' && s.ability.attr === ev.attr) v += s.ability.amount;
+  }
+  for (const e of ev.effects) {
+    if (e.kind === 'tag' && s.tags.includes(e.tag)) v += e.amount;
+    if (e.kind === 'combo' && s.attrs.includes(e.attr)) v += e.amount;
+  }
   return v;
 }
 
@@ -62,23 +74,30 @@ export interface PowerResult {
 export function classPower(p: Player, ev: SchoolEventDef): PowerResult {
   if (p.students.length === 0) return { power: 0, contributors: [] };
   const auras = auraTotals(p);
+  const lacking = ev.effects.find((e) => e.kind === 'lacking');
   const vals = p.students
-    .map((s) => ({ s, v: eventValue(s, effStats(p, s, auras), ev) }))
+    .map((s) => ({ s, v: eventValue(s, attrValues(p, s, auras), ev) }))
+    .filter((x): x is { s: Student; v: number } => x.v !== null)
     .sort((a, b) => b.v - a.v);
-  let power: number;
-  let contributors: Student[];
+  let power = 0;
+  let contributors: Student[] = [];
   if (ev.agg.type === 'top') {
     const top = vals.slice(0, ev.agg.n);
     power = top.reduce((a, x) => a + x.v, 0);
     contributors = top.map((x) => x.s);
   } else if (ev.agg.type === 'avg') {
-    power = vals.reduce((a, x) => a + x.v, 0) / vals.length;
+    const missing = p.students.length - vals.length;
+    const extra = lacking?.kind === 'lacking' ? lacking.amount * missing : 0;
+    power = (vals.reduce((a, x) => a + x.v, 0) + extra) / p.students.length;
     contributors = vals.slice(0, 3).map((x) => x.s);
-  } else {
+  } else if (vals.length) {
     power = vals[0].v;
     contributors = [vals[0].s];
   }
-  return { power: Math.round(power * 10) / 10, contributors };
+  for (const e of ev.effects) {
+    if (e.kind === 'perHolder') power += e.amount * p.students.filter((s) => s.attrs.includes(e.attr)).length;
+  }
+  return { power: Math.max(0, Math.round(power * 10) / 10), contributors };
 }
 
 /** 失点軽減率（保健委員・ガード能力の合計、上限60%） */
@@ -109,6 +128,11 @@ export const RANK_POINTS: Record<number, number[]> = {
   5: [10, 6, 3, 1, 0],
 };
 
+/** 生徒の総合的な強さの目安：数値×属性の数 */
 export function studentTotal(s: Student): number {
-  return STAT_KEYS.reduce((a, k) => a + s.base[k], 0);
+  return s.power * s.attrs.length;
+}
+
+export function countAttr(p: Player, a: Attr): number {
+  return p.students.filter((s) => s.attrs.includes(a)).length;
 }

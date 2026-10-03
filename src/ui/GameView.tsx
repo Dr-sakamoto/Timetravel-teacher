@@ -5,7 +5,7 @@ import { CLASS_MAP, className } from '../game/data/classes';
 import { ERAS } from '../game/data/eras';
 import { ROLES } from '../game/data/roles';
 import { actingPlayer, calendarLabel, MONTHS, termOfMonth } from '../game/engine';
-import type { Action, GameState } from '../game/types';
+import { ATTR_ICON, type Action, type Attr, type GameState } from '../game/types';
 import { GameOver } from './GameOver';
 import { PhasePanel } from './PhasePanel';
 import { StudentCard } from './StudentCard';
@@ -18,7 +18,7 @@ interface Props {
   onRules: () => void;
 }
 
-type SortKey = 'role' | 'pe' | 'study' | 'fight' | 'art' | 'charm' | 'new';
+type SortKey = 'role' | 'new' | 'power' | Attr;
 
 export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const ph = state.phase;
@@ -81,7 +81,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
       return ra - rb;
     }
     if (sortKey === 'new') return b.uid.localeCompare(a.uid, undefined, { numeric: true });
-    return b.base[sortKey] - a.base[sortKey];
+    if (sortKey === 'power') return b.power - a.power;
+    return Number(b.attrs.includes(sortKey)) - Number(a.attrs.includes(sortKey)) || b.power - a.power;
   });
   const month = MONTHS[Math.min(state.monthIdx, 11)];
   const term = termOfMonth(month);
@@ -210,11 +211,12 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
                 [
                   ['role', '係'],
                   ['new', '新しい順'],
-                  ['pe', '運動'],
-                  ['study', '学力'],
-                  ['fight', '喧嘩'],
-                  ['art', '芸術'],
-                  ['charm', '人望'],
+                  ['power', '数値'],
+                  ['study', ATTR_ICON.study],
+                  ['sports', ATTR_ICON.sports],
+                  ['art', ATTR_ICON.art],
+                  ['charm', ATTR_ICON.charm],
+                  ['fight', ATTR_ICON.fight],
                 ] as [SortKey, string][]
               ).map(([k, l]) => (
                 <button key={k} className={`btn small ${sortKey === k ? 'primary' : 'ghost'}`} onClick={() => setSortKey(k)}>

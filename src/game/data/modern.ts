@@ -9,7 +9,9 @@ export interface Archetype {
   icon: string;
   rarity: Rarity;
   group: ArchetypeGroup;
-  stats: [number, number, number, number, number];
+  power: number;
+  /** 属性の略記（s=📚 p=🏃 a=🎨 c=👑 f=👊） */
+  attrs: string;
   tags: Tag[];
   ability?: Ability;
   flavor: string;
@@ -18,43 +20,48 @@ export interface Archetype {
 const Y: Tag[] = ['現代', 'ヤンキー'];
 const M: Tag[] = ['現代'];
 
+function a(id: string, title: string, icon: string, rarity: Rarity, group: ArchetypeGroup, power: number, attrs: string, flavor: string, ability?: Ability): Archetype {
+  return { id, title, icon, rarity, group, power, attrs, tags: attrs.includes('f') ? Y : M, ability, flavor };
+}
+
+// 📚はヤンキー以外ほぼ標準装備。👊はヤンキー専用
 export const ARCHETYPES: Archetype[] = [
-  { id: 'baseball', title: '野球部', icon: '⚾', rarity: 'N', group: 'sports', stats: [7, 3, 4, 2, 5], tags: M, flavor: '坊主頭。声がでかい。' },
-  { id: 'soccer', title: 'サッカー部', icon: '⚽', rarity: 'N', group: 'sports', stats: [7, 3, 3, 2, 6], tags: M, flavor: '昼休みは必ずグラウンド。' },
-  { id: 'basket', title: 'バスケ部', icon: '🏀', rarity: 'N', group: 'sports', stats: [7, 4, 3, 2, 5], tags: M, flavor: '背が高い。' },
-  { id: 'track', title: '陸上部', icon: '🏃', rarity: 'N', group: 'sports', stats: [8, 4, 2, 2, 4], tags: M, flavor: 'とにかく足が速い。' },
-  { id: 'judo', title: '柔道部', icon: '🥋', rarity: 'N', group: 'sports', stats: [6, 3, 7, 1, 4], tags: M, flavor: '受け身が得意。' },
-  { id: 'swim', title: '水泳部', icon: '🏊', rarity: 'N', group: 'sports', stats: [7, 4, 2, 3, 4], tags: M, flavor: 'いつも髪が塩素くさい。' },
-  { id: 'brass', title: '吹奏楽部', icon: '🎺', rarity: 'N', group: 'art', stats: [3, 5, 1, 7, 5], tags: M, flavor: '肺活量はクラス一。' },
-  { id: 'artclub', title: '美術部', icon: '🖌️', rarity: 'N', group: 'art', stats: [2, 5, 1, 8, 3], tags: M, flavor: 'ノートの端が全部イラスト。' },
-  { id: 'lit', title: '文芸部', icon: '📖', rarity: 'N', group: 'art', stats: [2, 6, 1, 6, 3], tags: M, flavor: 'ポエムを書いている。' },
-  { id: 'band', title: '軽音部', icon: '🎸', rarity: 'N', group: 'art', stats: [3, 3, 3, 7, 6], tags: M, flavor: '文化祭のステージが命。' },
-  { id: 'drama', title: '演劇部', icon: '🎭', rarity: 'N', group: 'art', stats: [4, 4, 2, 6, 6], tags: M, flavor: '日常会話がたまに芝居がかる。' },
-  { id: 'dance', title: 'ダンス部', icon: '💃', rarity: 'N', group: 'art', stats: [6, 3, 2, 6, 6], tags: M, flavor: '廊下でステップを踏む。' },
-  { id: 'nerd', title: 'ガリ勉', icon: '🤓', rarity: 'N', group: 'study', stats: [2, 8, 1, 3, 3], tags: M, flavor: '休み時間も単語帳。' },
-  { id: 'science', title: '科学部', icon: '🧪', rarity: 'N', group: 'study', stats: [2, 7, 1, 4, 3], tags: M, flavor: 'たまに理科室が爆発する。' },
-  { id: 'shogi', title: '将棋部', icon: '♟️', rarity: 'N', group: 'study', stats: [1, 7, 2, 3, 3], tags: M, flavor: '50手先まで読む。' },
-  { id: 'otaku', title: 'オタク', icon: '🎮', rarity: 'N', group: 'study', stats: [2, 6, 1, 6, 3], tags: M, flavor: '早口になると止まらない。' },
-  { id: 'council', title: '生徒会役員', icon: '📋', rarity: 'N', group: 'charm', stats: [4, 6, 2, 4, 7], tags: M, flavor: '朝の挨拶運動の常連。' },
-  { id: 'rep', title: '委員長タイプ', icon: '🙋', rarity: 'N', group: 'charm', stats: [4, 6, 2, 3, 7], tags: M, flavor: '「ちょっと男子ー！」' },
-  { id: 'gyaru', title: 'ギャル', icon: '💅', rarity: 'N', group: 'charm', stats: [4, 3, 3, 5, 7], tags: M, flavor: '誰とでもすぐ友達になる。' },
-  { id: 'clown', title: 'お調子者', icon: '🤡', rarity: 'N', group: 'charm', stats: [5, 3, 3, 4, 7], tags: M, flavor: 'クラスのムードメーカー。' },
-  { id: 'tennen', title: '天然', icon: '🌼', rarity: 'N', group: 'charm', stats: [4, 4, 2, 5, 6], tags: M, flavor: '上履きのまま帰る。' },
-  { id: 'kitaku', title: '帰宅部', icon: '🏠', rarity: 'N', group: 'plain', stats: [4, 4, 3, 3, 4], tags: M, flavor: '放課後の帰宅スピードは全国レベル。' },
-  { id: 'quiet', title: '目立たない子', icon: '🙂', rarity: 'N', group: 'plain', stats: [3, 5, 2, 4, 4], tags: M, flavor: '出席を取るまで居たか分からない。' },
-  { id: 'yankee', title: 'ヤンキー', icon: '😎', rarity: 'N', group: 'yankee', stats: [6, 1, 8, 2, 4], tags: Y, flavor: 'リーゼント。根は優しい。' },
-  { id: 'sukeban', title: 'スケバン', icon: '💄', rarity: 'N', group: 'yankee', stats: [5, 2, 7, 3, 5], tags: Y, flavor: 'スカートが長い。' },
-  { id: 'furyo', title: '不良', icon: '👊', rarity: 'N', group: 'yankee', stats: [5, 2, 7, 1, 3], tags: Y, flavor: '授業中はだいたい寝ている。' },
-  { id: 'bosozoku', title: '暴走族見習い', icon: '🏍️', rarity: 'N', group: 'yankee', stats: [6, 1, 8, 2, 3], tags: Y, flavor: 'まだ自転車。' },
+  a('baseball', '野球部', '⚾', 'N', 'sports', 3, 'sp', '坊主頭。声がでかい。'),
+  a('soccer', 'サッカー部', '⚽', 'N', 'sports', 3, 'sp', '昼休みは必ずグラウンド。'),
+  a('basket', 'バスケ部', '🏀', 'N', 'sports', 3, 'sp', '背が高い。'),
+  a('track', '陸上部', '🏃', 'N', 'sports', 5, 'p', 'とにかく足が速い。'),
+  a('judo', '柔道部', '🥋', 'N', 'sports', 4, 'sp', '受け身が得意。'),
+  a('swim', '水泳部', '🏊', 'N', 'sports', 3, 'sp', 'いつも髪が塩素くさい。'),
+  a('brass', '吹奏楽部', '🎺', 'N', 'art', 3, 'sa', '肺活量はクラス一。'),
+  a('artclub', '美術部', '🖌️', 'N', 'art', 4, 'sa', 'ノートの端が全部イラスト。'),
+  a('lit', '文芸部', '📖', 'N', 'art', 3, 'sa', 'ポエムを書いている。'),
+  a('band', '軽音部', '🎸', 'N', 'art', 4, 'ac', '文化祭のステージが命。'),
+  a('drama', '演劇部', '🎭', 'N', 'art', 2, 'sac', '日常会話がたまに芝居がかる。'),
+  a('dance', 'ダンス部', '💃', 'N', 'art', 3, 'pa', '廊下でステップを踏む。'),
+  a('nerd', 'ガリ勉', '🤓', 'N', 'study', 6, 's', '休み時間も単語帳。'),
+  a('science', '科学部', '🧪', 'N', 'study', 5, 's', 'たまに理科室が爆発する。'),
+  a('shogi', '将棋部', '♟️', 'N', 'study', 5, 's', '50手先まで読む。'),
+  a('otaku', 'オタク', '🎮', 'N', 'study', 3, 'sa', '早口になると止まらない。'),
+  a('council', '生徒会役員', '📋', 'N', 'charm', 3, 'sc', '朝の挨拶運動の常連。'),
+  a('rep', '委員長タイプ', '🙋', 'N', 'charm', 4, 'sc', '「ちょっと男子ー！」'),
+  a('gyaru', 'ギャル', '💅', 'N', 'charm', 4, 'ac', '誰とでもすぐ友達になる。'),
+  a('clown', 'お調子者', '🤡', 'N', 'charm', 2, 'spc', 'クラスのムードメーカー。'),
+  a('tennen', '天然', '🌼', 'N', 'charm', 2, 'sac', '上履きのまま帰る。'),
+  a('kitaku', '帰宅部', '🏠', 'N', 'plain', 4, 's', '放課後の帰宅スピードは全国レベル。'),
+  a('quiet', '目立たない子', '🙂', 'N', 'plain', 3, 'sa', '出席を取るまで居たか分からない。'),
+  a('yankee', 'ヤンキー', '😎', 'N', 'yankee', 4, 'pf', 'リーゼント。根は優しい。'),
+  a('sukeban', 'スケバン', '💄', 'N', 'yankee', 4, 'fc', 'スカートが長い。'),
+  a('furyo', '不良', '👊', 'N', 'yankee', 6, 'f', '授業中はだいたい寝ている。'),
+  a('bosozoku', '暴走族見習い', '🏍️', 'N', 'yankee', 3, 'pfc', 'まだ自転車。'),
   // 転校生限定（現代）
-  { id: 'returnee', title: '帰国子女', icon: '✈️', rarity: 'R', group: 'charm', stats: [5, 8, 2, 6, 8], tags: M, flavor: '英語の発音がネイティブ。' },
-  { id: 'childstar', title: '天才子役', icon: '🎬', rarity: 'R', group: 'art', stats: [4, 5, 1, 9, 10], tags: M, flavor: 'ドラマ撮影で早退しがち。' },
-  { id: 'topscore', title: '全国模試1位', icon: '🥇', rarity: 'R', group: 'study', stats: [3, 11, 1, 4, 5], tags: M, flavor: '塾を3つ掛け持ち。' },
-  { id: 'esports', title: 'eスポーツ選手', icon: '🕹️', rarity: 'R', group: 'study', stats: [4, 7, 2, 7, 6], tags: M, flavor: '反射神経はプロ級。' },
-  { id: 'influencer', title: '人気インフルエンサー', icon: '📱', rarity: 'R', group: 'charm', stats: [4, 4, 2, 7, 11], tags: M, flavor: 'フォロワー50万人。' },
-  { id: 'banchou', title: '伝説の番長', icon: '🔱', rarity: 'SR', group: 'yankee', stats: [9, 3, 14, 2, 10], tags: Y, ability: { kind: 'boost', category: 'fight', amount: 2 }, flavor: '隣町まで名前が知れ渡っている。' },
-  { id: 'olympian', title: 'オリンピック候補', icon: '🏅', rarity: 'SR', group: 'sports', stats: [14, 5, 5, 3, 8], tags: M, ability: { kind: 'boost', category: 'sports', amount: 2 }, flavor: '練習で授業をよく休む。' },
-  { id: 'genius', title: '飛び級の天才', icon: '🧠', rarity: 'SR', group: 'study', stats: [3, 15, 1, 7, 5], tags: M, flavor: '実はまだ10歳。' },
+  a('returnee', '帰国子女', '✈️', 'R', 'charm', 4, 'sac', '英語の発音がネイティブ。'),
+  a('childstar', '天才子役', '🎬', 'R', 'art', 6, 'ac', 'ドラマ撮影で早退しがち。'),
+  a('topscore', '全国模試1位', '🥇', 'R', 'study', 9, 's', '塾を3つ掛け持ち。'),
+  a('esports', 'eスポーツ選手', '🕹️', 'R', 'study', 6, 'sa', '反射神経はプロ級。'),
+  a('influencer', '人気インフルエンサー', '📱', 'R', 'charm', 7, 'c', 'フォロワー50万人。', { kind: 'boost', attr: 'charm', amount: 2 }),
+  a('banchou', '伝説の番長', '🔱', 'SR', 'yankee', 7, 'pfc', '隣町まで名前が知れ渡っている。'),
+  a('olympian', 'オリンピック候補', '🏅', 'SR', 'sports', 9, 'sp', '練習で授業をよく休む。'),
+  a('genius', '飛び級の天才', '🧠', 'SR', 'study', 10, 'sa', '実はまだ10歳。'),
 ];
 
 export const STARTER_ARCHETYPES = ARCHETYPES.filter((a) => a.rarity === 'N');
