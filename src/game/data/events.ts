@@ -140,26 +140,28 @@ export function effectText(e: Effect): string {
   const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
   switch (e.kind) {
     case 'tag':
-      return `${e.tag}は${sign(e.amount)}`;
+      return `${e.tag}${sign(e.amount)}`;
     case 'combo':
-      return `${ATTR_ICON[e.attr]}も持つ子は${sign(e.amount)}`;
+      return `${ATTR_ICON[e.attr]}も持つ子${sign(e.amount)}`;
     case 'lacking':
-      return `持っていない子は${sign(e.amount)}扱い`;
+      return `持たない子${sign(e.amount)}`;
     case 'perHolder':
-      return `クラスの${ATTR_ICON[e.attr]}1人につき戦力${sign(e.amount)}`;
+      return `${ATTR_ICON[e.attr]}1人ごと${sign(e.amount)}`;
     case 'firstBonus':
-      return `1位にボーナス+${e.amount}pt`;
+      return `1位+${e.amount}pt`;
     case 'everyone':
-      return `全クラスに参加賞+${e.amount}pt`;
+      return `参加賞+${e.amount}pt`;
     case 'lastPenalty':
-      return `最下位は-${e.amount}pt`;
+      return `最下位-${e.amount}pt`;
   }
 }
 
+/** 勝負の仕方（短い表記） */
 export function aggText(ev: SchoolEventDef): string {
   const icon = attrIcon(ev.attr);
-  if (ev.attr === 'all') return `上位${(ev.agg as { n: number }).n}人の「数値×属性の数」の合計`;
-  if (ev.agg.type === 'top') return `${icon}持ち上位${ev.agg.n}人の数値の合計`;
-  if (ev.agg.type === 'avg') return `${icon}の数値のクラス全員平均（持っていない子は0）`;
-  return `${icon}持ち一番の1人の数値`;
+  const n = ev.agg.type === 'top' ? ev.agg.n : 1;
+  if (ev.attr === 'all') return `${icon} 上位${n}人の総合力`;
+  if (ev.agg.type === 'top') return `${icon} 上位${n}人`;
+  if (ev.agg.type === 'avg') return `${icon} 全員平均`;
+  return `${icon} トップ1人`;
 }

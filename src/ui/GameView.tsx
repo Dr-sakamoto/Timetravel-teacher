@@ -2,14 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { classSummary, cpuAction } from '../game/ai';
 import { MAX_CLASS, classGuard, roleOf } from '../game/calc';
 import { CLASS_MAP, className } from '../game/data/classes';
-import { ERAS } from '../game/data/eras';
-import { ROLES } from '../game/data/roles';
-import { actingPlayer, calendarLabel, MONTHS, termOfMonth } from '../game/engine';
+import { actingPlayer, MONTHS, termOfMonth } from '../game/engine';
 import { ATTR_ICON, type Action, type Attr, type GameState } from '../game/types';
 import { GameOver } from './GameOver';
 import { PhasePanel } from './PhasePanel';
 import { StudentCard } from './StudentCard';
-import { Timeline } from './Timeline';
+import { EraBar } from './Timeline';
 
 interface Props {
   state: GameState;
@@ -62,15 +60,6 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
     return <GameOver state={state} onQuit={onQuit} />;
   }
 
-  const travelSelectable =
-    ph.kind === 'travel' && ph.dice !== null && !cpuTurn
-      ? (i: number) => Math.abs(i - state.players[ph.player].era) <= ph.dice!
-      : ph.kind === 'warp' || ph.kind === 'summerTravel'
-        ? cpuTurn
-          ? undefined
-          : () => true
-        : undefined;
-
   const ranking = [...state.players].sort((a, b) => b.points - a.points);
   const vp = state.players[viewPlayer];
   const card = vp.classCardId ? CLASS_MAP[vp.classCardId] : null;
@@ -90,61 +79,49 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   return (
     <div className="game">
       <header className="topbar">
-        <div className="brand">
-          🏫 時空最強クラス決定戦
-        </div>
         <div className="calendar">
-          <span className="cal-year">{calendarLabel(state)}</span>
-          <span className="cal-progress">
-            {state.year}/{state.years}年 ・ {term === 0 ? '夏休み' : `${term}学期`}
-          </span>
+          <b>{state.year}年生 {month}月</b>
+          <span>{term === 0 ? '夏休み' : `${term}学期`}</span>
+          <small>
+            {state.year}/{state.years}年
+          </small>
         </div>
+        <EraBar state={state} />
         <div className="top-actions">
           {state.players.some((p) => p.isCpu) && (
-            <button className="btn small ghost" onClick={() => setSpeed((s) => (s === 'fast' ? 'normal' : 'fast'))}>
-              CPU {speed === 'fast' ? '⏩ 速い' : '▶ ふつう'}
+            <button className="btn small ghost" title="CPUの速さ" onClick={() => setSpeed((s) => (s === 'fast' ? 'normal' : 'fast'))}>
+              {speed === 'fast' ? '⏩' : '▶'}
             </button>
           )}
-          <button className="btn small ghost" onClick={() => setShowLog((v) => !v)}>
-            📜 ログ
+          <button className="btn small ghost" title="ログ" onClick={() => setShowLog((v) => !v)}>
+            📜
           </button>
-          <button className="btn small ghost" onClick={onRules}>
-            ❓ 遊び方
+          <button className="btn small ghost" title="遊び方" onClick={onRules}>
+            ❓
           </button>
-          <button className="btn small ghost" onClick={onQuit}>
-            ⏏ タイトルへ
+          <button className="btn small ghost" title="タイトルへ" onClick={onQuit}>
+            ⏏
           </button>
         </div>
       </header>
 
-      <Timeline
-        state={state}
-        selectable={travelSelectable}
-        onSelect={(i) => dispatch({ type: 'travel', era: i })}
-        focusPlayer={actor}
-      />
-
       <div className="layout">
         <aside className="scoreboard">
-          {ranking.map((p, i) => (
+          {ranking.map((p) => (
             <button
               key={p.id}
               className={`score-row ${actor === p.id ? 'acting' : ''} ${viewPlayer === p.id ? 'viewing' : ''}`}
               style={{ borderColor: p.color }}
               onClick={() => setViewPlayer(p.id)}
+              title={p.classCardId ? CLASS_MAP[p.classCardId].nick : ''}
             >
-              <span className="score-rank">{i + 1}</span>
-              <span className="score-main">
-                <span className="score-name">
-                  <span className="dot" style={{ background: p.color }} /> {p.name} {p.isCpu && <small>CPU</small>}
-                </span>
-                <span className="score-sub">
-                  {p.classCardId ? `${CLASS_MAP[p.classCardId].icon} ${CLASS_MAP[p.classCardId].nick}` : '—'} ・ {p.students.length}人 ・{' '}
-                  {ERAS[p.era].icon}
-                  {ERAS[p.era].name}
-                </span>
+              <span className="score-icon">{p.classCardId ? CLASS_MAP[p.classCardId].icon : '❔'}</span>
+              <span className="score-name">
+                {p.name}
+                {p.isCpu && <small>🤖</small>}
               </span>
-              <span className="score-pts">{p.points}pt</span>
+              <span className="score-size">👥{p.students.length}</span>
+              <span className="score-pts">{p.points}</span>
             </button>
           ))}
         </aside>
@@ -177,41 +154,32 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
                   style={{ borderColor: p.color }}
                   onClick={() => setViewPlayer(p.id)}
                 >
-                  {p.name}
+                  {p.classCardId && CLASS_MAP[p.classCardId].icon} {p.name}
                 </button>
               ))}
             </div>
-            <div className="roster-title">
-              {card.icon} {className(card.id, state.year)}「{card.nick}」 {vp.students.length}/{MAX_CLASS}人
-              {classGuard(vp) > 0 && <span className="pill">🛡️ 失点-{Math.round(classGuard(vp) * 100)}%</span>}
-            </div>
             <div className="summary-row small">
+              <div className="summary" title={`${className(card.id, state.year)}「${card.nick}」`}>
+                👥<b>{vp.students.length}</b>/{MAX_CLASS}
+              </div>
               {classSummary(vp).map((c) => (
                 <div key={c.label} className="summary" title={c.hint}>
-                  <span>
-                    {c.icon} {c.label}
-                  </span>
+                  {c.icon}
                   <b>{Math.round(c.value * 10) / 10}</b>
                 </div>
               ))}
-            </div>
-            <div className="roster-roles">
-              {card.roles.map((r, i) => {
-                const st = vp.students.find((s) => s.uid === vp.roles[i]);
-                return (
-                  <span key={i} className="pill">
-                    {ROLES[r].icon} {ROLES[r].name}：{st ? st.name : '—'}
-                  </span>
-                );
-              })}
+              {classGuard(vp) > 0 && (
+                <div className="summary" title="失点軽減">
+                  🛡️<b>-{Math.round(classGuard(vp) * 100)}%</b>
+                </div>
+              )}
             </div>
             <div className="sort">
-              並び：
               {(
                 [
-                  ['role', '係'],
-                  ['new', '新しい順'],
-                  ['power', '数値'],
+                  ['role', '🎖️'],
+                  ['new', '🆕'],
+                  ['power', '🔢'],
                   ['study', ATTR_ICON.study],
                   ['sports', ATTR_ICON.sports],
                   ['art', ATTR_ICON.art],
@@ -227,7 +195,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
           </div>
           <div className="card-grid">
             {sorted.map((s) => (
-              <StudentCard key={s.uid} student={s} owner={vp} compact />
+              <StudentCard key={s.uid} student={s} owner={vp} />
             ))}
           </div>
         </section>
