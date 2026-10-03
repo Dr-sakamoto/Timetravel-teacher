@@ -4,8 +4,8 @@ import { attrScore, bestScore, roleSlots, termNo, testScore } from './calc';
 import { CARDS, parseAttrs } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
-import { ARCHETYPES } from './data/modern';
-import { currentEra, newGame, step } from './engine';
+import { ARCHETYPES, MODERN_POOL } from './data/modern';
+import { currentEra, deckBreakdown, newGame, step } from './engine';
 import type { Attr, GameState, Player, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
@@ -157,9 +157,9 @@ describe('engine', () => {
     const era = ERAS[currentEra(s)].id;
     expect(s.eventDeck.some((id) => ERA_CARDS.some((e) => e.id === id && e.era === era))).toBe(true);
     expect(s.eventDeck.some((id) => ERA_CARDS.some((e) => e.id === id && e.era !== era))).toBe(false);
-    const persons = s.eventDeck.filter((id) => id === 'modern' || id.startsWith('person:'));
+    const persons = s.eventDeck.filter((id) => id.startsWith('person:'));
     expect(persons).toHaveLength(PERSON_CARDS_PER_TERM);
-    expect(persons.every((id) => id === 'modern')).toBe(true);
+    expect(persons.every((id) => id.startsWith('person:m:'))).toBe(true);
   });
 
   it('every era has 3-6 figures and 2 era events', () => {
@@ -176,16 +176,39 @@ describe('engine', () => {
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
     const t = structuredClone(s);
-    t.eventDeck.push('modern');
+    const m = `person:${t.pools.present[0]}`;
+    t.eventDeck.push(m);
     const n = t.players[pi].students.length;
     expect(step(t, { type: 'drawEvent' }).players[pi].students).toHaveLength(n + 1);
     const f = structuredClone(s);
     while (f.players[pi].students.length < 12) f.players[pi].students.push({ ...f.players[pi].students[0], uid: `f${f.players[pi].students.length}` });
-    f.eventDeck.push('n_study', 'modern');
+    f.eventDeck.push('n_study', m);
     const full = step(f, { type: 'drawEvent' });
     expect(full.players[pi].students).toHaveLength(12);
-    expect(full.discard.slice(-2)).toEqual(['modern', 'n_study']);
+    expect(full.discard.slice(-2)).toEqual([m, 'n_study']);
     expect(full.phase.kind).toBe('result');
+  });
+
+  it('modern students are a finite pool: drawn students leave it and never duplicate', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 9);
+    const before = s.pools.present.length;
+    expect(before).toBe(MODERN_POOL.length);
+    while (s.phase.kind === 'memberDraw') s = step(s, cpuAction(s)!);
+    expect(s.pools.present).toHaveLength(before - 18);
+    const ids = s.players.flatMap((p) => p.students.map((x) => x.cardId));
+    expect(ids.every((id) => id && !s.pools.present.includes(id))).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('deck breakdown counts every card in the deck and discard pile', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 4);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    for (let i = 0; i < 6; i++) s = step(step(s, cpuAction(s)!), { type: 'continue' });
+    const rows = deckBreakdown(s);
+    const sum = (k: 'left' | 'used') => rows.reduce((a, r) => a + r[k], 0);
+    expect(sum('left')).toBe(s.eventDeck.length);
+    expect(sum('used')).toBe(s.discard.length);
+    expect(rows.filter((r) => r.group === '通常').reduce((a, r) => a + r.left + r.used, 0)).toBe(21);
   });
 
   it('cards carry 1-5 icons, more for rarer students', () => {

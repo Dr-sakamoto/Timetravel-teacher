@@ -1843,3 +1843,11 @@ h3 {
   height: 100%;
   display: block;
 }
+
+/* 山札の内訳 */
+.deck-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.deck-table th, .deck-table td { padding: 3px 6px; text-align: left; }
+.deck-table td:not(:first-child), .deck-table thead th:not(:first-child) { text-align: right; width: 4em; }
+.deck-group th { padding-top: 10px; border-bottom: 1px solid currentColor; }
+.deck-note { margin-left: 8px; font-weight: normal; opacity: 0.7; font-size: 0.85em; }
+.deck-empty { opacity: 0.4; }

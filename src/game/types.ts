@@ -37,7 +37,7 @@ export type EraId =
 /** 生徒カード：属性アイコンだけ。同じアイコンが重なるほど強い（1枚あたり最大5個） */
 export interface Student {
   uid: string;
-  /** 歴史カード由来なら元カードID（時代の山札への返却に使う） */
+  /** カードプールのID（偉人のカードID、現代の生徒は 'm:<アーキタイプ>#<番号>'） */
   cardId?: string;
   name: string;
   title: string;
@@ -111,7 +111,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 10;
+  version: 11;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -125,12 +125,10 @@ export interface GameState {
   queue: number[];
   queueIdx: number;
   phase: Phase;
-  /** イベントの山札（末尾が一番上）。人物カードは 'person:<id>'（偉人）か 'modern'（現代の生徒） */
+  /** イベントの山札（末尾が一番上）。人物カードは 'person:<カードプールのID>' */
   eventDeck: string[];
   /** 捨て札（末尾が一番上） */
   discard: string[];
-  /** 現代の生徒の山札（初期メンバー用。末尾が一番上） */
-  modernDeck: string[];
   pools: Record<EraId, string[]>;
   uidCounter: number;
   logCounter: number;

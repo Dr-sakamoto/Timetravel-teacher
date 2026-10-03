@@ -1,4 +1,5 @@
 import { CARDS } from '../game/data/cards';
+import { ARCHETYPES, MODERN_POOL } from '../game/data/modern';
 import { ERAS } from '../game/data/eras';
 import {
   CONTEST_CARDS,
@@ -37,7 +38,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
 
         <h3>準備</h3>
         <ol className="rule-list">
-          <li>現代の生徒の山札から、全員で順番に1枚ずつ引いて6人そろえる。</li>
+          <li>現代のカードプール（N）から、全員で順番に1枚ずつ引いて6人そろえる。</li>
           <li>
             係は全員共通。最初の学期は3つで、学期が進むごとに1つずつ増える（2年生の1学期で6つ全部）。1人が就ける係は1つまで。係に就いた子は、その係のアイコンが<b>2倍</b>に数えられる（📚の係なら、その子の📚が2倍）。アイコンをたくさん持つ子を就けるほど得。
             <div className="rule-roles">
@@ -53,6 +54,10 @@ export function Rules({ onClose }: { onClose: () => void }) {
         </ol>
 
         <h3>手番：1人1枚ずつ山札をめくる</h3>
+        <p>
+          山札は学期ごとに作り直す。中身は下のカード＋<b>その時代のカードプールから人物カード最大{PERSON_CARDS_PER_TERM}枚</b>。
+          生徒はどの時代も有限（現代もほかの時代と同じ1つのカードプール）。中央の「捨て札・内訳」をタップすると今の山札の内訳が見られる。
+        </p>
         <ul className="rule-list">
           <li>
             <b>通常カード（全員）</b>（{NORMAL_CARDS.map((c) => `${ATTR_ICON[c.attr]}×${c.count}`).join(' ')}）：
@@ -66,7 +71,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             <b>カチコミ（めくった人だけ）</b>（敵の強さ {RAID_CARDS.map((c) => c.threat).join('・')}）：クラスの👊の合計個数が敵の強さに<b>足りない分だけマイナス</b>。プラスはなし。
           </li>
           <li>
-            <b>人物カード</b>（学期ごとに{PERSON_CARDS_PER_TERM}枚）：めくったらその子が<b>そのまま転入</b>。その時代の偉人が足りない分は現代の生徒カード。満席なら捨て札にしてもう1枚めくる。
+            <b>人物カード</b>（学期ごとに最大{PERSON_CARDS_PER_TERM}枚）：めくったらその子が<b>そのまま転入</b>。その時代のカードプールに残っている子しか入らない。満席なら捨て札にしてもう1枚めくる。
           </li>
           {PUSH_CARDS.map((c) => (
             <li key={c.id}>
@@ -84,6 +89,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
           {ERAS.map((era) => (
             <li key={era.id}>
               {era.icon} <b>{era.name}</b>：
+              {era.id === 'present' && <>現代の生徒 {MODERN_POOL.length}枚（{ARCHETYPES.length}種）／</>}
               {era.id !== 'present' && (
                 <>
                   偉人{' '}

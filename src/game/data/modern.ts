@@ -61,7 +61,18 @@ export const ARCHETYPES: Archetype[] = [
   a('genius', '飛び級の天才', '🧠', 'SR', 10, 'sa', '実はまだ10歳。'),
 ];
 
-export const STARTER_ARCHETYPES = ARCHETYPES.filter((a) => a.rarity === 'N');
+export const ARCHETYPE_MAP: Record<string, Archetype> = Object.fromEntries(ARCHETYPES.map((a) => [a.id, a]));
+
+/** 現代のカードプールに入る枚数（Nは2枚ずつ、R以上は1枚ずつ） */
+export const MODERN_COPIES: Record<Rarity, number> = { N: 2, R: 1, SR: 1, SSR: 1 };
+
+/** 現代のカードプール。カードIDは 'm:<アーキタイプ>#<番号>'。初期メンバーと現代の学期の転校生はここから引く */
+export const MODERN_POOL: string[] = ARCHETYPES.flatMap((a) =>
+  Array.from({ length: MODERN_COPIES[a.rarity] }, (_, i) => `m:${a.id}#${i + 1}`),
+);
+
+export const isModernCard = (id: string) => id.startsWith('m:');
+export const archetypeOf = (id: string) => id.slice(2).split('#')[0];
 
 export const SURNAMES = [
   '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '山本', '中村', '小林', '加藤', '吉田', '山田', '佐々木', '山口', '松本',
