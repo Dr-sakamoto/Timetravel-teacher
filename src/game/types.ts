@@ -44,6 +44,8 @@ export interface Student {
   era: EraId;
   rarity: Rarity;
   icon: string;
+  /** イラストのキー（歴史カードID／現代の生徒のアーキタイプID） */
+  art?: string;
   attrs: Attr[];
   flavor: string;
   joined: string;

@@ -1832,3 +1832,14 @@ h3 {
     transform: translateY(-4px);
   }
 }
+
+/* 生徒カードのオリジナルイラスト */
+.tcg-art {
+  overflow: hidden;
+  min-height: 0;
+}
+.tcg-art .portrait {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
