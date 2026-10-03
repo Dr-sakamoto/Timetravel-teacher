@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
-import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
+import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
 import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
@@ -371,5 +371,29 @@ describe('1枚ごとの得点の内訳', () => {
         }
       }
     }
+  });
+});
+
+describe('係の場にカードを置く', () => {
+  const base: RoleSeat[] = [
+    { role: 'leader', uid: 'a' },
+    { role: 'culture', uid: 'b' },
+  ];
+  const sorted = (rs: RoleSeat[]) => [...rs].sort((x, y) => x.role.localeCompare(y.role));
+
+  it('空いている係の場に置くと、その係になる', () => {
+    expect(sorted(moveToRole(base, 'c', 'study'))).toEqual(sorted([...base, { role: 'study', uid: 'c' }]));
+  });
+
+  it('座席の子を埋まっている係の場に置くと、前の子は座席に戻る', () => {
+    expect(sorted(moveToRole(base, 'c', 'leader'))).toEqual(sorted([{ role: 'leader', uid: 'c' }, { role: 'culture', uid: 'b' }]));
+  });
+
+  it('係の子どうしは入れ替わる', () => {
+    expect(sorted(moveToRole(base, 'a', 'culture'))).toEqual(sorted([{ role: 'culture', uid: 'a' }, { role: 'leader', uid: 'b' }]));
+  });
+
+  it('係の子を空いている係の場へ動かすと、元の係は空く', () => {
+    expect(sorted(moveToRole(base, 'a', 'pe'))).toEqual(sorted([{ role: 'pe', uid: 'a' }, { role: 'culture', uid: 'b' }]));
   });
 });

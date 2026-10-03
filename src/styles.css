@@ -123,11 +123,6 @@ button.chip {
 .chip.locked:not(.on) {
   opacity: 0.6;
 }
-.role-kinds {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-}
 .role-warn {
   color: var(--yellow);
   font-weight: bold;
@@ -444,12 +439,9 @@ button.chip {
 .near-seat {
   min-width: 0;
 }
-.playmat.pm-stage .seats {
-  grid-template-columns: repeat(6, minmax(0, 84px));
+.playmat.pm-stage .floor {
+  grid-template-columns: repeat(var(--half), minmax(0, 84px));
   gap: 0.5rem 0.4rem;
-}
-.playmat.pm-stage .roleboard {
-  max-width: 560px;
 }
 .playmat.pm-stage .tcg-type,
 .playmat.pm-stage .tcg-foot,
@@ -818,43 +810,131 @@ button.chip {
     transform: translateX(-50%) scale(1.2);
   }
 }
-.roleboard {
+/* 係の場と座席：係の場に置いたカードの子がその係。右に係に就いていない子の席が並ぶ */
+.floor {
+  --gx: 0.35rem;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.25rem;
-  margin: 0.35rem 0;
+  grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
+  gap: 0.45rem var(--gx);
+  align-items: end;
+  margin-top: 0.45rem;
 }
-.role-slot {
+.role-zone {
+  position: relative;
+  padding-bottom: 6px;
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 0.2rem;
-  background: rgba(36, 69, 58, 0.85);
-  color: var(--chalk);
-  border: 2px dashed rgba(244, 241, 232, 0.45);
-  border-radius: 6px;
-  padding: 0.12rem 0.2rem;
-  font-size: 0.75rem;
-  min-width: 0;
 }
-.role-slot:not(:disabled) {
+/* 係の場：黒板色の敷物に点線の枠 */
+.role-zone::before {
+  content: '';
+  position: absolute;
+  inset: -5px -5px 0;
+  border-radius: 10px;
+  background: rgba(36, 69, 58, 0.92);
+  border: 2px dashed rgba(244, 241, 232, 0.6);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.role-zone > * {
+  position: relative;
+  z-index: 1;
+}
+/* 係の場と座席のあいだの仕切り */
+.role-zone.last::after {
+  content: '';
+  position: absolute;
+  top: 6%;
+  bottom: 6%;
+  right: calc(var(--gx) / -2 - 1.5px);
+  width: 4px;
+  border-radius: 2px;
+  background: rgba(60, 35, 15, 0.55);
+}
+.role-zone.locked::before {
+  opacity: 0.4;
+  border-style: dotted;
+}
+.role-zone.locked .zone-empty {
+  opacity: 0.55;
+}
+.role-zone.unlockable {
   cursor: pointer;
 }
-.role-slot.active {
+.role-zone.unlockable::before {
+  border: 2px solid var(--yellow);
+  animation: glow 1.2s ease-in-out infinite;
+}
+.arranging .role-zone.open {
+  cursor: pointer;
+}
+/* 持っているカードがその係のアイコンを持っている（置くと×2が効く） */
+.role-zone.fit::before {
   border: 2px solid var(--yellow);
   background: #3d5e2c;
 }
-.role-slot.locked {
-  opacity: 0.45;
+.role-zone.over::before {
+  border: 3px solid var(--yellow);
+  background: #4d7a35;
+  inset: -8px -8px -3px;
 }
-.role-name {
-  font-size: 0.68rem;
+.zone-empty {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  color: var(--chalk);
+  text-align: center;
+  line-height: 1.1;
+}
+.zone-badge {
+  font-size: 0.66rem;
+  font-weight: 900;
   white-space: nowrap;
 }
-.seats {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.45rem 0.35rem;
+.zone-icon {
+  font-size: clamp(1.3rem, 2.6vw, 2rem);
+}
+.zone-desc {
+  font-size: 0.72rem;
+  font-weight: bold;
+}
+.zone-note {
+  font-size: 0.55rem;
+  color: var(--chalk-dim);
+}
+.role-zone.unlockable .zone-note {
+  color: var(--yellow);
+  font-weight: 900;
+}
+/* 係の場のカードには係の名札が付いている */
+.role-zone .tcg {
+  max-width: none;
+}
+.arranging .tcg.grabbable {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+.arranging .tcg.grabbable.dim {
+  opacity: 0.25;
+}
+.drag-ghost {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  transform: rotate(-5deg) scale(1.08);
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.5));
+}
+.drag-ghost .tcg {
+  max-width: none;
+  height: 100%;
 }
 .seat {
   position: relative;
@@ -888,31 +968,21 @@ button.chip {
   padding: 0.6rem;
   border-width: 5px;
 }
-.playmat.near .seats {
-  grid-template-columns: repeat(9, minmax(0, 118px));
+.playmat.near .floor {
+  --gx: 0.6rem;
+  grid-template-columns: repeat(var(--cells), minmax(0, 118px));
   justify-content: center;
-  gap: 0.7rem 0.6rem;
+  gap: 0.7rem var(--gx);
 }
 .playmat.near .seat::after {
   height: 14px;
 }
-.playmat.near .roleboard {
-  max-width: 760px;
-  margin: 0.45rem auto;
-}
-.playmat.near .role-slot {
-  font-size: 0.85rem;
-  padding: 0.2rem;
-}
 @media (max-width: 700px) {
-  .playmat.near .seats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .playmat.near .floor {
+    grid-template-columns: repeat(var(--half), minmax(0, 1fr));
   }
-  .playmat.near .role-name {
+  .role-zone.last::after {
     display: none;
-  }
-  .roleboard {
-    grid-template-columns: repeat(3, 1fr);
   }
 }
 .role-editor .role-bar {
@@ -1486,23 +1556,25 @@ button.chip {
     padding: 0.2rem 0.25rem;
     border-width: 2px;
   }
-  .playmat.pm-stage .roleboard {
-    margin: 0.15rem 0;
-    gap: 0.15rem;
-  }
-  .playmat.pm-stage .role-slot {
-    font-size: 0.56rem;
-    padding: 0 0.1rem;
-    border-width: 1px;
-  }
-  .playmat.pm-stage .role-name {
-    display: none;
-  }
-  .playmat.pm-stage .seats {
+  .playmat.pm-stage .floor {
+    --gx: 0.15rem;
     flex: 1;
     min-height: 0;
-    grid-template-columns: repeat(6, minmax(0, 12dvh));
-    gap: 0.15rem;
+    grid-template-columns: repeat(var(--half), minmax(0, 12dvh));
+    gap: 0.35rem var(--gx);
+    margin-top: 0.3rem;
+  }
+  .playmat.pm-stage .role-zone.last::after {
+    display: none;
+  }
+  .playmat.pm-stage :is(.zone-badge, .zone-note) {
+    display: none;
+  }
+  .playmat.pm-stage .zone-icon {
+    font-size: 0.95rem;
+  }
+  .playmat.pm-stage .zone-desc {
+    font-size: 0.45rem;
   }
   .playmat.pm-stage .tcg-head {
     min-height: 0;
@@ -1587,38 +1659,33 @@ button.chip {
   :is(.near-seat, .peek) .playmat {
     padding: 0.25rem 0.3rem 0.15rem;
     border-width: 3px;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'plate roles'
-      'seats seats';
-    column-gap: 0.4rem;
   }
-  :is(.near-seat, .peek) .playmat .plate {
-    grid-area: plate;
-  }
-  :is(.near-seat, .peek) .playmat .roleboard {
-    grid-area: roles;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    max-width: none;
-    margin: 0;
-    gap: 0.2rem;
-  }
-  :is(.near-seat, .peek) .playmat .role-slot {
-    font-size: 0.68rem;
-    padding: 0 0.15rem;
-    border-width: 1px;
-  }
-  :is(.near-seat, .peek) .playmat .role-name {
-    display: inline;
-    font-size: 0.56rem;
-  }
-  :is(.near-seat, .peek) .playmat .seats {
-    grid-area: seats;
-    grid-template-columns: repeat(9, minmax(0, 15dvh));
+  :is(.near-seat, .peek) .playmat .floor {
+    --gx: 0.25rem;
+    grid-template-columns: repeat(var(--cells), minmax(0, 15dvh));
     justify-content: center;
-    gap: 0.2rem;
+    gap: 0.2rem var(--gx);
     margin-top: 0.45rem;
+  }
+  .role-zone {
+    padding-bottom: 3px;
+  }
+  .role-zone::before {
+    inset: -3px -3px 0;
+    border-width: 1px;
+    border-radius: 5px;
+  }
+  .zone-badge {
+    font-size: 0.5rem;
+  }
+  .zone-icon {
+    font-size: 1.1rem;
+  }
+  .zone-desc {
+    font-size: 0.55rem;
+  }
+  .zone-note {
+    font-size: 0.45rem;
   }
   :is(.near-seat, .peek) .playmat .tcg {
     max-width: none;
@@ -1877,14 +1944,6 @@ button.chip {
 
 /* 係の種類のチップ（横向きスマホでは名前を省いて小さく） */
 @media (orientation: landscape) and (max-height: 600px) {
-  .role-editor .role-kinds .chip {
-    font-size: 0.62rem;
-    padding: 0 0.35em;
-    margin: 0 0.05em;
-  }
-  .role-editor .role-kind-name {
-    display: none;
-  }
   .role-editor .role-warn {
     font-size: 0.62rem;
   }
@@ -2159,8 +2218,8 @@ button.chip {
     flex-wrap: wrap;
   }
 }
-.score-demo .playmat.near .seats {
-  grid-template-columns: repeat(6, minmax(0, 92px));
+.score-demo .playmat.near .floor {
+  grid-template-columns: repeat(var(--half), minmax(0, 92px));
 }
 .score-demo .ecard {
   width: 140px;

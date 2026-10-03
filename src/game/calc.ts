@@ -32,6 +32,16 @@ export function validRoles(p: Player, roles: RoleSeat[], kinds: RoleId[]): boole
   return [...new Set(roles.map((r) => r.role))].every((k) => roles.filter((r) => r.role === k).length <= MAX_PER_ROLE);
 }
 
+/** uid の子を係 r の場に置く。そこにいた子は、動かした子が元いた係の場へ（係に就いていなかったなら座席へ）戻る */
+export function moveToRole(roles: RoleSeat[], uid: string, r: RoleId): RoleSeat[] {
+  const from = roles.find((x) => x.uid === uid)?.role;
+  const occupant = roles.find((x) => x.role === r)?.uid;
+  const out = roles.filter((x) => x.uid !== uid && x.role !== r);
+  out.push({ role: r, uid });
+  if (occupant && occupant !== uid && from) out.push({ role: from, uid: occupant });
+  return out;
+}
+
 /** i番目（0始まり）の係の席が解放される学期の名前（例：「1年2学期」）。最初の1席は最初から */
 export function slotUnlockLabel(i: number): string {
   const no = i + 1;
