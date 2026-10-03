@@ -1,7 +1,6 @@
-import { CLASS_MAP, className } from '../game/data/classes';
-import { finalRanking } from '../game/engine';
+import { className, finalRanking } from '../game/engine';
 import type { GameState } from '../game/types';
-import { StudentCard } from './StudentCard';
+import { TcgCard } from './TcgCard';
 
 export function GameOver({ state, onQuit }: { state: GameState; onQuit: () => void }) {
   const ranking = finalRanking(state);
@@ -20,8 +19,7 @@ export function GameOver({ state, onQuit }: { state: GameState; onQuit: () => vo
       <div className="winner" style={{ borderColor: winner.color }}>
         <div className="winner-label">優勝</div>
         <div className="winner-name">
-          {winner.name}の {winner.classCardId && CLASS_MAP[winner.classCardId].icon}{' '}
-          {className(winner.classCardId, state.year)}「{winner.classCardId && CLASS_MAP[winner.classCardId].nick}」
+          {winner.name}の {className(winner.id, state.year)}
         </div>
         <div className="winner-pts">{winner.points}pt</div>
       </div>
@@ -41,7 +39,7 @@ export function GameOver({ state, onQuit }: { state: GameState; onQuit: () => vo
             {mvp && (
               <div className="final-mvp">
                 <div className="mvp-label">クラスMVP（活躍{mvp.mvp}回）</div>
-                <StudentCard student={mvp} owner={p} />
+                <TcgCard student={mvp} owner={p} />
               </div>
             )}
           </div>

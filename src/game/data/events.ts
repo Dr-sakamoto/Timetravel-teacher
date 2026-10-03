@@ -1,167 +1,176 @@
-import { ATTR_ICON, type Attr, type Tag } from '../types';
+import { ATTR_ICON, type Attr, type EraId } from '../types';
 
-export type Aggregate = { type: 'top'; n: number } | { type: 'avg' } | { type: 'max' };
-
-/** イベントの特殊効果 */
-export type Effect =
-  /** そのタグを持つ参加生徒の値+amount */
-  | { kind: 'tag'; tag: Tag; amount: number }
-  /** 別の属性も持っている参加生徒の値+amount */
-  | { kind: 'combo'; attr: Attr; amount: number }
-  /** （平均イベント）属性を持たない生徒を amount として数える */
-  | { kind: 'lacking'; amount: number }
-  /** クラス内のその属性の持ち主1人につき戦力+amount */
-  | { kind: 'perHolder'; attr: Attr; amount: number }
-  /** 1位のクラスに追加ポイント */
-  | { kind: 'firstBonus'; amount: number }
-  /** 全クラスに参加賞 */
-  | { kind: 'everyone'; amount: number }
-  /** 最下位のクラスはポイントを失う */
-  | { kind: 'lastPenalty'; amount: number };
-
-/** 全クラスが参加する学校行事。属性アイコンで勝負し、特殊効果で味付けする */
-export interface SchoolEventDef {
+/** 通常カード：そのアイコンを一番多く持つ子の個数を全クラスに加点。名前と絵柄は時代ごとに変わるだけ */
+export interface NormalCard {
   id: string;
-  kind: 'school';
+  kind: 'normal';
+  attr: Attr;
+  count: number;
+}
+
+/** イベントカード（引いた人だけ）：クラス全員のそのアイコンの合計数。時代カードはその時代の生徒のアイコンが2倍 */
+export interface ContestCard {
+  id: string;
+  kind: 'contest';
   name: string;
   icon: string;
-  /** 'all' は全属性の合計（数値×属性の数） */
-  attr: Attr | 'all';
+  attr: Attr;
+  /** 時代カードなら、その時代の学期だけ山札に入る */
+  era?: EraId;
   desc: string;
-  agg: Aggregate;
-  effects: Effect[];
-  /** 順位点の倍率 */
+  count: number;
+}
+
+/** カチコミ（引いた人だけ）：クラスの👊の数が敵の強さに足りなければ、その差がマイナス。攻めてくる敵は時代ごとに変わる */
+export interface RaidCard {
+  id: string;
+  kind: 'raid';
+  threat: number;
+  count: number;
+}
+
+export interface PushCard {
+  id: string;
+  kind: 'push';
+  name: string;
+  icon: string;
+  desc: string;
+  count: number;
+}
+
+export type EventCard = NormalCard | ContestCard | RaidCard | PushCard;
+
+/** 定期テスト・卒業式（全員参加）の順位点（人数別） */
+export const CONTEST_POINTS: Record<number, number[]> = {
+  2: [5, 2],
+  3: [5, 3, 1],
+  4: [5, 3, 2, 1],
+  5: [5, 3, 2, 1, 0],
+};
+
+/** イベントカード（引いた人だけ）の倍率 */
+export const EVENT_MULT = 1;
+
+/** 学期ごとの山札に入る人物カードの枚数（その時代の偉人が足りなければ現代の生徒で埋める） */
+export const PERSON_CARDS_PER_TERM = 7;
+
+const N = (attr: Attr, count: number): NormalCard => ({ id: `n_${attr}`, kind: 'normal', attr, count });
+export const NORMAL_CARDS: NormalCard[] = [N('study', 3), N('sports', 3), N('art', 3), N('charm', 2), N('fight', 1)];
+
+/** 時代ごとの通常カードの名前と絵柄（効果はどれも同じ） */
+export const ERA_NORMAL_NAMES: Record<EraId, Record<Attr, [string, string]>> = {
+  present: { study: ['授業', '🏫'], sports: ['体育', '🏃'], art: ['音楽', '🎵'], charm: ['学級会', '🙋'], fight: ['番長の縄張り', '😎'] },
+  cretaceous: { study: ['化石の観察', '🦴'], sports: ['恐竜の大移動', '🦕'], art: ['シダの森で写生', '🌿'], charm: ['群れの集会', '🥚'], fight: ['縄張り争い', '🦖'] },
+  egypt: { study: ['ナイルの暦', '🌊'], sports: ['石運び', '🧱'], art: ['壁画を描く', '🎨'], charm: ['ファラオの祭り', '🤴'], fight: ['戦車の訓練', '🐎'] },
+  greece: { study: ['アカデメイアの講義', '📜'], sports: ['円盤投げ', '🥏'], art: ['悲劇の上演', '🎭'], charm: ['アゴラで討論', '🏛️'], fight: ['剣闘士の稽古', '⚔️'] },
+  china: { study: ['論語の素読', '📖'], sports: ['馬術の稽古', '🐴'], art: ['書の練習', '🖌️'], charm: ['宴会', '🥟'], fight: ['武芸の稽古', '🥋'] },
+  heian: { study: ['漢詩の勉強', '📜'], sports: ['蹴鞠', '⚽'], art: ['和歌を詠む', '🌸'], charm: ['宮中の行事', '🏯'], fight: ['検非違使の見回り', '🗡️'] },
+  europe: { study: ['修道院の写本', '📕'], sports: ['騎馬の訓練', '🏇'], art: ['工房の修行', '🖼️'], charm: ['宮廷の舞踏会', '💃'], fight: ['騎士の決闘', '🛡️'] },
+  sengoku: { study: ['寺での学問', '⛩️'], sports: ['早馬', '🐎'], art: ['茶の湯', '🍵'], charm: ['城下町の市', '🏮'], fight: ['鉄砲の稽古', '🔫'] },
+  edo: { study: ['そろばん塾', '🧮'], sports: ['飛脚', '🏃'], art: ['浮世絵を摺る', '🌊'], charm: ['祭りの神輿', '🏮'], fight: ['道場破り', '🥋'] },
+  modern: { study: ['工場見学', '🏭'], sports: ['自転車レース', '🚲'], art: ['サロンの演奏会', '🎻'], charm: ['社交界デビュー', '🎩'], fight: ['ボクシング', '🥊'] },
+  future: { study: ['VR授業', '🥽'], sports: ['反重力スポーツ', '🛸'], art: ['ホログラム展', '✨'], charm: ['銀河会議', '🪐'], fight: ['ロボバトル', '🤖'] },
+};
+
+/** 時代ごとのカチコミしてくる敵の名前と絵柄 */
+export const ERA_RAIDERS: Record<EraId, [string, string]> = {
+  present: ['他校のヤンキー', '🏍️'],
+  cretaceous: ['肉食恐竜の群れ', '🦖'],
+  egypt: ['墓泥棒の一味', '🏺'],
+  greece: ['ペルシア軍', '🛡️'],
+  china: ['黄巾の乱', '🔥'],
+  heian: ['鬼の軍団', '👹'],
+  europe: ['ヴァイキング', '🏴‍☠️'],
+  sengoku: ['野武士の群れ', '⚔️'],
+  edo: ['浪人の殴り込み', '🗡️'],
+  modern: ['マフィア', '🕴️'],
+  future: ['宇宙海賊', '👾'],
+};
+
+const C = (id: string, name: string, icon: string, attr: Attr, desc: string, era?: EraId): ContestCard => ({
+  id, kind: 'contest', name, icon, attr, desc, era, count: era ? 2 : 1,
+});
+
+export const CONTEST_CARDS: ContestCard[] = [
+  C('sportsday', '体育祭', '🏃', 'sports', 'リレーに綱引き！'),
+  C('ballgame', '球技大会', '⚽', 'sports', 'クラス対抗のサッカーとバレー。'),
+  C('festival', '文化祭', '🎪', 'art', '出し物の人気投票。'),
+  C('chorus', '合唱コンクール', '🎶', 'art', '全員で歌う。'),
+  C('poptest', '抜き打ちテスト', '📝', 'study', '予告なしの小テスト。'),
+  C('election', '生徒会選挙', '🗳️', 'charm', 'クラス代表を擁立。'),
+];
+
+export const RAID_CARDS: RaidCard[] = [3, 5, 7].map((threat) => ({ id: `raid_${threat}`, kind: 'raid', threat, count: 1 }));
+
+export const PUSH_CARDS: PushCard[] = [
+  { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: 'いらない生徒を1人、別のクラスに押しつける', count: 2 },
+];
+
+/** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代出身の生徒はアイコン2倍 */
+export const ERA_CARDS: ContestCard[] = [
+  C('trip', '修学旅行', '🚌', 'charm', '班長がみんなを引率。', 'present'),
+  C('videocon', '動画コンテスト', '📱', 'art', 'クラスで動画を撮って投稿。', 'present'),
+  C('dino_race', '恐竜レース', '🦖', 'sports', '恐竜と並んで走れ！', 'cretaceous'),
+  C('roar', '雄叫びコンテスト', '📢', 'fight', '一番でかい声を出した者の勝ち。', 'cretaceous'),
+  C('pyramid', 'ピラミッド建設', '🔺', 'sports', '石を運んで積み上げろ。', 'egypt'),
+  C('pharaoh', 'ファラオの謁見', '🤴', 'charm', 'ファラオに気に入られた者が勝つ。', 'egypt'),
+  C('olympia', '古代オリンピック', '🏛️', 'sports', '優勝はオリーブの冠。', 'greece'),
+  C('dialogue', '哲学問答', '🧔', 'study', 'ソクラテス式に問い詰められる。', 'greece'),
+  C('keju', '科挙', '📜', 'study', '超難関の官僚試験。', 'china'),
+  C('chibi', '赤壁の戦い', '🔥', 'fight', '火計に気をつけろ。', 'china'),
+  C('utaawase', '歌合せ', '🌸', 'art', '和歌の出来を競う。', 'heian'),
+  C('mononoke', '物の怪退治', '👹', 'charm', '都に出た物の怪を鎮めよ。', 'heian'),
+  C('joust', '馬上槍試合', '🏇', 'fight', '騎士の一騎打ち。', 'europe'),
+  C('renaissance', 'ルネサンス芸術祭', '🖼️', 'art', '巨匠たちの作品展。', 'europe'),
+  C('kassen', '天下分け目の合戦', '⚔️', 'fight', '関ヶ原で全軍激突！', 'sengoku'),
+  C('chakai', '茶の湯の会', '🍵', 'art', 'わびさびの心で一服。', 'sengoku'),
+  C('terakoya', '寺子屋の試験', '🖌️', 'study', '読み書きそろばん。', 'edo'),
+  C('kurofune', '黒船来航', '⚓', 'study', '蒸気船の仕組みを解き明かせ。', 'edo'),
+  C('expo', '万国博覧会', '🎡', 'study', '世界中の発明が集まる。', 'modern'),
+  C('concert', '演奏会', '🎻', 'art', '名曲を披露。', 'modern'),
+  C('robocon', 'ロボコン', '🤖', 'study', 'ロボットを作って競う。', 'future'),
+  C('spacetrip', '宇宙遠足', '🚀', 'sports', '無重力でみんなバテる。', 'future'),
+];
+
+/** 固定イベント（学期末のテストと卒業式） */
+export interface FixedEvent {
+  id: string;
+  name: string;
+  icon: string;
+  rule: 'test' | 'graduation';
   mult: number;
-  /** 指定があるとボーダー判定（threatsの中からランダム） */
-  threshold?: { threats: number[]; win: number; lose: number };
-  count: number;
 }
-
-export type PersonalKind =
-  | 'transfer'
-  | 'rush'
-  | 'train'
-  | 'storm'
-  | 'warp'
-  | 'poach'
-  | 'bonus'
-  | 'inspection'
-  | 'crisis'
-  | 'zoo'
-  | 'parents'
-  | 'lesson'
-  | 'lunch'
-  | 'club'
-  | 'homework'
-  | 'oversleep';
-
-/** 引いたプレイヤーだけに起こるイベント。tone は すごろくの青マス／赤マス／特別マス */
-export interface PersonalEventDef {
-  id: string;
-  kind: PersonalKind;
-  name: string;
-  icon: string;
-  tone: 'blue' | 'red' | 'special';
-  attr?: Attr;
-  desc: string;
-  count: number;
-}
-
-export type EventDef = SchoolEventDef | PersonalEventDef;
-
-export const SCHOOL_EVENTS: SchoolEventDef[] = [
-  { id: 'sportsday', kind: 'school', name: '体育祭', icon: '🏃', attr: 'sports', desc: 'クラス対抗リレーに綱引き！運動自慢の出番だ。', agg: { type: 'top', n: 6 }, effects: [{ kind: 'combo', attr: 'charm', amount: 1 }], mult: 1.5, count: 2 },
-  { id: 'ballgame', kind: 'school', name: '球技大会', icon: '⚽', attr: 'sports', desc: 'サッカーとバレーでクラス対抗戦。ラフプレーも少々。', agg: { type: 'top', n: 5 }, effects: [{ kind: 'combo', attr: 'fight', amount: 1 }], mult: 1, count: 1 },
-  { id: 'marathon', kind: 'school', name: 'マラソン大会', icon: '🏃‍♂️', attr: 'sports', desc: '全員参加の持久走。クラス平均で勝負。完走した全クラスに参加賞。', agg: { type: 'avg' }, effects: [{ kind: 'everyone', amount: 1 }], mult: 1, count: 1 },
-  { id: 'swimming', kind: 'school', name: '水泳大会', icon: '🏊', attr: 'sports', desc: '選抜メンバーによるメドレーリレー。恐竜は泳ぎが得意。', agg: { type: 'top', n: 4 }, effects: [{ kind: 'tag', tag: '恐竜', amount: 2 }], mult: 1, count: 1 },
-  { id: 'festival', kind: 'school', name: '文化祭', icon: '🎪', attr: 'art', desc: '出し物の人気投票。人望のある子が呼び込むと客が増える。', agg: { type: 'top', n: 6 }, effects: [{ kind: 'combo', attr: 'charm', amount: 1 }, { kind: 'firstBonus', amount: 3 }], mult: 1.5, count: 2 },
-  { id: 'chorus', kind: 'school', name: '合唱コンクール', icon: '🎶', attr: 'art', desc: '全員で歌う。歌えない子も混ざる。恐竜の咆哮は台無し。', agg: { type: 'avg' }, effects: [{ kind: 'tag', tag: '恐竜', amount: -3 }], mult: 1, count: 1 },
-  { id: 'sketch', kind: 'school', name: '写生大会', icon: '🖼️', attr: 'art', desc: '上位3作品で競う。本物の芸術家は格が違う。', agg: { type: 'top', n: 3 }, effects: [{ kind: 'tag', tag: '芸術家', amount: 3 }], mult: 1, count: 1 },
-  { id: 'poptest', kind: 'school', name: '抜き打ちテスト', icon: '📝', attr: 'study', desc: '予告なしの小テスト。クラス平均点で勝負。勉強しないヤンキーは0点。', agg: { type: 'avg' }, effects: [{ kind: 'lastPenalty', amount: 2 }], mult: 1, count: 2 },
-  { id: 'quiz', kind: 'school', name: 'クイズ大会', icon: '❓', attr: 'study', desc: '代表3人の早押しクイズ。学者は知識量が段違い。', agg: { type: 'top', n: 3 }, effects: [{ kind: 'tag', tag: '学者', amount: 2 }], mult: 1, count: 1 },
-  { id: 'speech', kind: 'school', name: '弁論大会', icon: '🎤', attr: 'charm', desc: 'クラス代表1人の演説。頭も良ければ説得力が増す。', agg: { type: 'max' }, effects: [{ kind: 'combo', attr: 'study', amount: 2 }], mult: 1, count: 1 },
-  { id: 'election', kind: 'school', name: '生徒会選挙', icon: '🗳️', attr: 'charm', desc: '一番人望のある生徒を擁立。王族は演説慣れしている。', agg: { type: 'max' }, effects: [{ kind: 'tag', tag: '王族', amount: 3 }], mult: 1, count: 1 },
-  { id: 'inspect', kind: 'school', name: '校長の視察', icon: '👀', attr: 'charm', desc: '人望のある3人が案内役。ヤンキーが多いと印象が悪い。', agg: { type: 'top', n: 3 }, effects: [{ kind: 'perHolder', attr: 'fight', amount: -1 }], mult: 1, count: 1 },
-  { id: 'excursion', kind: 'school', name: '修学旅行', icon: '🚌', attr: 'charm', desc: '班長5人がそれぞれの班を引率。まとめ役の腕の見せ所。', agg: { type: 'top', n: 5 }, effects: [{ kind: 'combo', attr: 'sports', amount: 1 }], mult: 1.5, count: 1 },
-  { id: 'eating', kind: 'school', name: '給食大食い大会', icon: '🍛', attr: 'sports', desc: '代表1人がカレーを食べまくる。恐竜が圧倒的。', agg: { type: 'max' }, effects: [{ kind: 'tag', tag: '恐竜', amount: 10 }, { kind: 'combo', attr: 'fight', amount: 2 }], mult: 1, count: 1 },
-  { id: 'timan', kind: 'school', name: '番長タイマン勝負', icon: '🥊', attr: 'fight', desc: '各クラスの最強ヤンキー同士が河原でタイマン。勝てば学校中の噂に。', agg: { type: 'max' }, effects: [{ kind: 'tag', tag: '恐竜', amount: 2 }, { kind: 'firstBonus', amount: 2 }], mult: 1, count: 1 },
-  { id: 'sportstest', kind: 'school', name: 'スポーツテスト', icon: '⏱️', attr: 'sports', desc: '全員が測定。クラスの🏃平均で勝負。', agg: { type: 'avg' }, effects: [{ kind: 'firstBonus', amount: 2 }], mult: 1, count: 1 },
-  {
-    id: 'yankee', kind: 'school', name: '他校のヤンキー襲来！', icon: '🏍️', attr: 'fight',
-    desc: '隣町の不良軍団が校門に！👊を持つヤンキー上位3人で迎え撃て。ヤンキーのいないクラスは無防備…。',
-    agg: { type: 'top', n: 3 }, effects: [{ kind: 'tag', tag: '恐竜', amount: 3 }],
-    mult: 1, threshold: { threats: [6, 9, 12, 15], win: 8, lose: -5 }, count: 3,
-  },
+export const FIXED_EVENTS: FixedEvent[] = [
+  { id: 'test1', name: '1学期 期末テスト', icon: '📚', rule: 'test', mult: 2 },
+  { id: 'test2', name: '2学期 期末テスト', icon: '📚', rule: 'test', mult: 2 },
+  { id: 'test3', name: '学年末テスト', icon: '📚', rule: 'test', mult: 2 },
+  { id: 'graduation', name: '卒業式', icon: '🎓', rule: 'graduation', mult: 3 },
 ];
-
-/** 毎学期末に必ず起こる固定イベント */
-const TEST_EFFECTS: Effect[] = [{ kind: 'combo', attr: 'charm', amount: 0.5 }];
-export const FIXED_EVENTS: SchoolEventDef[] = [
-  { id: 'test1', kind: 'school', name: '1学期 期末テスト', icon: '📚', attr: 'study', desc: '学期末の定期テスト。クラス全員の平均で勝負。勉強できる奴が強く、ヤンキーは足を引っ張る。', agg: { type: 'avg' }, effects: TEST_EFFECTS, mult: 1.5, count: 0 },
-  { id: 'test2', kind: 'school', name: '2学期 期末テスト', icon: '📚', attr: 'study', desc: '学期末の定期テスト。クラス全員の平均で勝負。', agg: { type: 'avg' }, effects: TEST_EFFECTS, mult: 1.5, count: 0 },
-  { id: 'test3', kind: 'school', name: '学年末テスト', icon: '📚', attr: 'study', desc: '1年の総まとめ。クラス全員の平均で勝負。', agg: { type: 'avg' }, effects: TEST_EFFECTS, mult: 1.5, count: 0 },
-  { id: 'graduation', kind: 'school', name: '卒業式・時空最強クラス審査', icon: '🎓', attr: 'all', desc: 'クラスの総合力で最終審査。数値が高く属性の幅が広い生徒ほど評価される。', agg: { type: 'top', n: 10 }, effects: [], mult: 3, count: 0 },
-];
-
 /** 月末に固定イベントが起こる月 */
 export const FIXED_BY_MONTH: Record<number, string> = { 7: 'test1', 12: 'test2', 3: 'test3' };
+/** テストでは👊を持つ生徒1人につきこれだけ減点 */
+export const TEST_YANKEE_PENALTY = 1;
 
-export const PERSONAL_EVENTS: PersonalEventDef[] = [
-  // ---- 特別マス ----
-  { id: 'transfer', kind: 'transfer', name: '転校生がやってくる！', icon: '🚪', tone: 'special', desc: 'タイムマシンがいる時代から転校生がやってくる。3人の候補から1人を選んで迎え入れよう。', count: 13 },
-  { id: 'rush', kind: 'rush', name: '転校生ラッシュ！', icon: '🎉', tone: 'special', desc: 'なぜか転校希望者が殺到！4人の候補から2人まで迎え入れられる。', count: 1 },
-  { id: 'train', kind: 'train', name: '放課後の特訓', icon: '💪', tone: 'special', desc: '生徒1人を選んで、数値を+1するか、新しい属性を1つ覚えさせる（👊は覚えられない）。', count: 3 },
-  { id: 'storm', kind: 'storm', name: '時空嵐に巻き込まれた！', icon: '🌀', tone: 'special', desc: 'タイムマシンがランダムな時代に飛ばされた…。ついでに2人の候補から1人連れて帰れる。', count: 2 },
-  { id: 'warp', kind: 'warp', name: '時空ワープ航法', icon: '✨', tone: 'special', desc: 'タイムマシンが好きな時代へひとっ飛び。', count: 1 },
-  { id: 'poach', kind: 'poach', name: '引き抜き工作', icon: '🕵️', tone: 'special', desc: '他クラスの生徒（係についていない子）を1人引き抜ける。相手クラスには移籍金3ptが入る。', count: 1 },
-  { id: 'inspection', kind: 'inspection', name: '抜き打ち持ち物検査', icon: '🎒', tone: 'special', attr: 'fight', desc: '👊持ち1人につき-2pt。1人もいなければ+2pt。', count: 1 },
-  { id: 'crisis', kind: 'crisis', name: '学級崩壊の危機', icon: '💥', tone: 'special', attr: 'charm', desc: 'クラスで一番の👑（係の効果込み）が9以上ならまとめ上げて+5pt、足りなければ-5pt。', count: 1 },
-  { id: 'zoo', kind: 'zoo', name: '飼育小屋の点検', icon: '🐾', tone: 'special', desc: '恐竜・動物が飼育係のお世話を受けていれば1匹につき+3pt、放置されていれば1匹につき-2pt。', count: 1 },
-  { id: 'parents', kind: 'parents', name: '保護者会', icon: '👪', tone: 'special', attr: 'charm', desc: '👑持ちの人数ぶんポイントを得る（最大6pt）。', count: 1 },
-  // ---- 青マス（ちょっと良いこと） ----
-  { id: 'lesson', kind: 'lesson', name: 'いつもの授業', icon: '🏫', tone: 'blue', attr: 'study', desc: '📚持ち3人につき+1pt。', count: 3 },
-  { id: 'club', kind: 'club', name: '部活動', icon: '🥁', tone: 'blue', desc: '🏃持ちと🎨持ち、合わせて4人につき+1pt。', count: 2 },
-  { id: 'lunch', kind: 'lunch', name: '楽しい昼休み', icon: '🍱', tone: 'blue', desc: '平和な一日。+2pt', count: 2 },
-  { id: 'bonus', kind: 'bonus', name: '地域清掃で表彰', icon: '🏆', tone: 'blue', desc: 'クラス全員で町内清掃。地元から感謝状が届いた。+3pt', count: 1 },
-  // ---- 赤マス（ちょっと悪いこと） ----
-  { id: 'homework', kind: 'homework', name: '宿題忘れ', icon: '📄', tone: 'red', attr: 'study', desc: '-2pt。ただし📚持ちが8人以上いれば誰かが見せてくれて±0。', count: 2 },
-  { id: 'oversleep', kind: 'oversleep', name: '寝坊して遅刻', icon: '⏰', tone: 'red', desc: '担任が寝坊。-1pt', count: 2 },
-];
+export const ALL_EVENT_CARDS: EventCard[] = [...NORMAL_CARDS, ...CONTEST_CARDS, ...RAID_CARDS, ...PUSH_CARDS, ...ERA_CARDS];
+export const EVENT_MAP: Record<string, EventCard> = Object.fromEntries(ALL_EVENT_CARDS.map((e) => [e.id, e]));
+export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EVENTS.map((e) => [e.id, e]));
 
-export const EVENT_MAP: Record<string, EventDef> = Object.fromEntries(
-  [...SCHOOL_EVENTS, ...FIXED_EVENTS, ...PERSONAL_EVENTS].map((e) => [e.id, e]),
-);
-
-export function attrIcon(attr: Attr | 'all'): string {
-  return attr === 'all' ? '🌈' : ATTR_ICON[attr];
-}
-
-export function effectText(e: Effect): string {
-  const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
-  switch (e.kind) {
-    case 'tag':
-      return `${e.tag}${sign(e.amount)}`;
-    case 'combo':
-      return `${ATTR_ICON[e.attr]}も持つ子${sign(e.amount)}`;
-    case 'lacking':
-      return `持たない子${sign(e.amount)}`;
-    case 'perHolder':
-      return `${ATTR_ICON[e.attr]}1人ごと${sign(e.amount)}`;
-    case 'firstBonus':
-      return `1位+${e.amount}pt`;
-    case 'everyone':
-      return `参加賞+${e.amount}pt`;
-    case 'lastPenalty':
-      return `最下位-${e.amount}pt`;
+/** カードに書くルール文 */
+export function cardRule(c: EventCard): string {
+  switch (c.kind) {
+    case 'normal':
+      return `全員：${ATTR_ICON[c.attr]}を一番多く持つ子の個数を加点`;
+    case 'contest':
+      return `引いた人：クラス全員の${ATTR_ICON[c.attr]}の数を加点${c.era ? '（この時代の生徒は2倍）' : ''}`;
+    case 'raid':
+      return `引いた人：クラスの👊の数が${c.threat}に足りない分だけマイナス`;
+    default:
+      return c.desc;
   }
 }
 
-/** 勝負の仕方（短い表記） */
-export function aggText(ev: SchoolEventDef): string {
-  const icon = attrIcon(ev.attr);
-  const n = ev.agg.type === 'top' ? ev.agg.n : 1;
-  if (ev.attr === 'all') return `${icon} 上位${n}人の総合力`;
-  if (ev.agg.type === 'top') return `${icon} 上位${n}人`;
-  if (ev.agg.type === 'avg') return `${icon} 全員平均`;
-  return `${icon} トップ1人`;
+export function fixedRule(f: FixedEvent): string {
+  return f.rule === 'test'
+    ? `📚の数−👊を持つ子1人につき${TEST_YANKEE_PENALTY}で勝負（順位点×${f.mult}）`
+    : `クラス全員のアイコンの総数で勝負（順位点×${f.mult}）`;
 }

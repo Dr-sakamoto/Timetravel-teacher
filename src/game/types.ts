@@ -1,4 +1,4 @@
-/** 生徒の属性（パワプロの特殊能力のようなアイコン）。勉強はヤンキー以外ほぼ全員、喧嘩はヤンキー専用 */
+/** 生徒の属性アイコン。勉強はヤンキー以外ほぼ全員、喧嘩はヤンキー専用 */
 export type Attr = 'study' | 'sports' | 'art' | 'charm' | 'fight';
 export const ATTRS: Attr[] = ['study', 'sports', 'art', 'charm', 'fight'];
 export const ATTR_ICON: Record<Attr, string> = {
@@ -19,25 +19,7 @@ export const ATTR_LABEL: Record<Attr, string> = {
 export type Rarity = 'N' | 'R' | 'SR' | 'SSR';
 export type Tag = '現代' | 'ヤンキー' | '恐竜' | '武将' | '忍者' | '学者' | '芸術家' | '王族' | '未来' | '動物';
 
-export type RoleId =
-  | 'leader'
-  | 'vice'
-  | 'pe'
-  | 'cheer'
-  | 'study'
-  | 'library'
-  | 'discipline'
-  | 'culture'
-  | 'broadcast'
-  | 'health'
-  | 'animal';
-
-export type Ability =
-  | { kind: 'aura'; attr: Attr; amount: number }
-  | { kind: 'boost'; attr: Attr; amount: number }
-  | { kind: 'roleBonus'; role: RoleId; mult: number }
-  | { kind: 'income'; amount: number }
-  | { kind: 'guard'; ratio: number };
+export type RoleId = 'study' | 'pe' | 'culture' | 'leader' | 'discipline' | 'library';
 
 export type EraId =
   | 'cretaceous'
@@ -52,20 +34,17 @@ export type EraId =
   | 'present'
   | 'future';
 
+/** 生徒カード：属性アイコンだけ。同じアイコンが重なるほど強い（1枚あたり最大5個） */
 export interface Student {
   uid: string;
-  /** 歴史カード由来なら元カードID（時代プールへの返却に使う） */
+  /** 歴史カード由来なら元カードID（時代の山札への返却に使う） */
   cardId?: string;
   name: string;
   title: string;
   era: EraId;
   rarity: Rarity;
   icon: string;
-  /** 生徒の数値（強さ）。属性を持つイベントでこの数値が戦力になる */
-  power: number;
   attrs: Attr[];
-  tags: Tag[];
-  ability?: Ability;
   flavor: string;
   joined: string;
   /** 得点に貢献した回数 */
@@ -77,57 +56,48 @@ export interface Player {
   name: string;
   isCpu: boolean;
   color: string;
-  classCardId: string | null;
   students: Student[];
-  /** クラスカードの係スロット順に、担当する生徒uid */
+  /** ROLE_ORDER の順に、担当する生徒uid */
   roles: (string | null)[];
   points: number;
 }
 
 export interface ResultRow {
   player: number;
-  power?: number;
+  /** 数えたアイコン数（係ボーナス込み） */
+  count?: number;
   rank?: number;
   delta: number;
-  top?: string[];
   note?: string;
+  /** 点に関わった生徒（相手のカードはこれだけ表向きにして見せる） */
+  uids?: string[];
 }
+
+/** 'normal'=通常カード 'contest'=勝負カード 'era'=時代カード 'fixed'=固定イベント 'personal'=個人 */
+export type CardTone = 'normal' | 'contest' | 'era' | 'fixed' | 'personal';
 
 export interface EventResult {
   title: string;
   icon: string;
   attr?: Attr | 'all';
-  effects?: string[];
-  tone?: 'blue' | 'red' | 'special';
+  tone: CardTone;
   desc: string;
-  scoring?: string;
+  /** カードに書かれたルール（短文） */
+  rule?: string;
   rows: ResultRow[];
   lines?: string[];
   students?: Student[];
-  threat?: number;
-  school?: boolean;
 }
 
 export type ResultCtx = 'turn' | 'summer' | 'monthEnd' | 'yearEnd' | 'final';
 
 export type Phase =
-  | { kind: 'classDraw'; player: number; drawn: boolean }
+  /** 初期メンバーを全員で順番に1枚ずつ引く */
+  | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
   | { kind: 'roles'; player: number }
   | { kind: 'draw'; player: number }
-  | {
-      kind: 'transfer';
-      player: number;
-      options: Student[];
-      picks: number;
-      added: Student[];
-      title: string;
-      reason: string;
-      ctx: ResultCtx;
-    }
-  | { kind: 'train'; player: number }
-  | { kind: 'poach'; player: number }
-  | { kind: 'warp'; player: number }
-  | { kind: 'summerTravel'; player: number }
+  /** 転校：いらない生徒を別のクラスに押しつける */
+  | { kind: 'push'; player: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
   | { kind: 'gameOver' };
 
@@ -139,10 +109,10 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 3;
+  version: 9;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
-  /** まだ使っていない時代の山（毎学期ここから引く） */
+  /** まだ使っていない時代の山（毎年ここから引く） */
   eraDeck: number[];
   rng: number;
   players: Player[];
@@ -153,20 +123,22 @@ export interface GameState {
   queue: number[];
   queueIdx: number;
   phase: Phase;
+  /** イベントの山札（末尾が一番上）。人物カードは 'person:<id>'（偉人）か 'modern'（現代の生徒） */
   eventDeck: string[];
+  /** 捨て札（末尾が一番上） */
+  discard: string[];
+  /** 現代の生徒の山札（初期メンバー用。末尾が一番上） */
+  modernDeck: string[];
   pools: Record<EraId, string[]>;
-  usedClassCards: string[];
   uidCounter: number;
   logCounter: number;
   log: LogEntry[];
 }
 
 export type Action =
-  | { type: 'drawClass' }
+  | { type: 'drawMember' }
+  | { type: 'drawAllMembers' }
   | { type: 'continue' }
   | { type: 'setRoles'; roles: (string | null)[] }
-  | { type: 'travel'; era: number }
   | { type: 'drawEvent' }
-  | { type: 'pickTransfer'; index: number | null; releaseUid?: string }
-  | { type: 'train'; uid: string; mode: 'power' } | { type: 'train'; uid: string; mode: 'attr'; attr: Attr }
-  | { type: 'poach'; uid: string | null };
+  | { type: 'push'; uid: string | null; target?: number };

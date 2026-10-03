@@ -5,14 +5,14 @@ import type { Action, GameState } from './game/types';
 import { GameView } from './ui/GameView';
 import { Rules } from './ui/Rules';
 
-const SAVE_KEY = 'timetravel-teacher-save-v3';
+const SAVE_KEY = 'timetravel-teacher-save-v9';
 
 function loadSave(): GameState | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as GameState;
-    return s.version === 3 ? s : null;
+    return s.version === 9 ? s : null;
   } catch {
     return null;
   }
