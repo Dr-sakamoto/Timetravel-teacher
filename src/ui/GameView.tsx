@@ -173,7 +173,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               player={me}
               year={state.year}
               slots={slots}
-              onConfirm={(roles) => dispatch({ type: 'setRoles', roles })}
+              onConfirm={(roles, unlock) => dispatch({ type: 'setRoles', roles, unlock })}
             />
           ) : (
             <Playmat

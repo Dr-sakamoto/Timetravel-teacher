@@ -120,6 +120,9 @@ button.chip {
 .chip.used:not(.on) {
   border-color: var(--yellow);
 }
+.chip.locked:not(.on) {
+  opacity: 0.6;
+}
 .role-kinds {
   display: flex;
   flex-wrap: wrap;

@@ -19,7 +19,7 @@ export const ATTR_LABEL: Record<Attr, string> = {
 export type Rarity = 'N' | 'R' | 'SR' | 'SSR';
 export type Tag = '現代' | 'ヤンキー' | '恐竜' | '武将' | '忍者' | '学者' | '芸術家' | '王族' | '未来' | '動物';
 
-export type RoleId = 'study' | 'pe' | 'culture' | 'leader' | 'discipline';
+export type RoleId = 'study' | 'pe' | 'culture' | 'leader';
 
 /** 係の席：どの係に誰が就いているか */
 export interface RoleSeat {
@@ -75,7 +75,9 @@ export interface Player {
   isCpu: boolean;
   color: string;
   students: Student[];
-  /** 係の席（学期で使える数まで。1つの係に2人まで、係の種類は3つまで） */
+  /** 解放した係の種類（解放した順。学期の頭に1種ずつ、自分で選んで増やす） */
+  unlocked: RoleId[];
+  /** 係に就いている生徒（解放した係に1人ずつ） */
   roles: RoleSeat[];
   points: number;
 }
@@ -133,7 +135,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 13;
+  version: 15;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -163,7 +165,7 @@ export type Action =
   | { type: 'drawMember' }
   | { type: 'drawAllMembers' }
   | { type: 'continue' }
-  | { type: 'setRoles'; roles: RoleSeat[] }
+  | { type: 'setRoles'; roles: RoleSeat[]; unlock?: RoleId[] }
   | { type: 'drawEvent' }
   | { type: 'push'; uid: string | null; target?: number }
   | { type: 'kachikomi'; target: number | null }
