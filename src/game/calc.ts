@@ -28,8 +28,13 @@ export function hasRoleBonus(p: Player, s: Student, a: Attr): boolean {
   return r !== null && ROLES[r].attr === a && s.attrs.includes(a);
 }
 
+/** その生徒が持つアイコンaの数 */
+export function iconsOf(s: Student, a: Attr): number {
+  return s.attrs.filter((x) => x === a).length;
+}
+
 export interface AttrScore {
-  /** アイコンを持つ生徒の数値の合計 */
+  /** アイコンの合計数 */
   sum: number;
   /** 係ボーナス（+1ずつ） */
   bonus: number;
@@ -37,7 +42,7 @@ export interface AttrScore {
   holders: Student[];
 }
 
-/** そのアイコンでの得点：持っている生徒の数値の合計＋係ボーナス。doubleEra の生徒は数値2倍 */
+/** イベントカードの点：クラス全員のアイコンaの合計数＋係ボーナス。doubleEra の生徒のアイコンは2倍 */
 export function attrScore(p: Player, a: Attr, doubleEra?: EraId): AttrScore {
   let sum = 0;
   let bonus = 0;
@@ -45,18 +50,18 @@ export function attrScore(p: Player, a: Attr, doubleEra?: EraId): AttrScore {
   for (const s of p.students) {
     if (!s.attrs.includes(a)) continue;
     holders.push(s);
-    sum += s.era === doubleEra ? s.power * 2 : s.power;
+    sum += s.era === doubleEra ? iconsOf(s, a) * 2 : iconsOf(s, a);
     if (hasRoleBonus(p, s, a)) bonus += 1;
   }
   return { sum, bonus, total: sum + bonus, holders };
 }
 
-/** 通常カードの点：そのアイコンを持つ子の中で一番高い数値＋（係のアイコンを持つ子が係に就いていれば）+1 */
+/** 通常カードの点：そのアイコンを一番多く持つ子の個数＋（係のアイコンを持つ子が係に就いていれば）+1 */
 export function bestScore(p: Player, a: Attr): AttrScore {
   const holders = p.students.filter((s) => s.attrs.includes(a));
-  const best = holders.reduce((m, s) => Math.max(m, s.power), 0);
+  const best = holders.reduce((m, s) => Math.max(m, iconsOf(s, a)), 0);
   const bonus = holders.some((s) => hasRoleBonus(p, s, a)) ? 1 : 0;
-  const top = holders.filter((s) => s.power === best).slice(0, 1);
+  const top = holders.filter((s) => iconsOf(s, a) === best).slice(0, 1);
   return { sum: best, bonus, total: best + bonus, holders: top };
 }
 
@@ -64,14 +69,14 @@ export function countAttr(p: Player, a: Attr): number {
   return p.students.filter((s) => s.attrs.includes(a)).length;
 }
 
-/** 定期テストの点：📚の合計−👊を持つ生徒1人につきpenalty */
+/** 定期テストの点：📚の合計数−👊を持つ生徒1人につきpenalty */
 export function testScore(p: Player, penalty: number): number {
   return attrScore(p, 'study').total - countAttr(p, 'fight') * penalty;
 }
 
-/** 卒業式の点：全員の数値の合計 */
+/** 卒業式の点：クラス全員のアイコンの総数 */
 export function totalPower(p: Player): number {
-  return p.students.reduce((a, s) => a + s.power, 0);
+  return p.students.reduce((a, s) => a + s.attrs.length, 0);
 }
 
 /** 順位（同点は同じ順位） */

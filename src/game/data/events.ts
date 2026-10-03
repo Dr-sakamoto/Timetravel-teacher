@@ -1,6 +1,6 @@
 import { ATTR_ICON, type Attr, type EraId } from '../types';
 
-/** 通常カード：そのアイコンを持つ子の中で一番高い数値を全クラスに加点。名前と絵柄は時代ごとに変わるだけ */
+/** 通常カード：そのアイコンを一番多く持つ子の個数を全クラスに加点。名前と絵柄は時代ごとに変わるだけ */
 export interface NormalCard {
   id: string;
   kind: 'normal';
@@ -8,7 +8,7 @@ export interface NormalCard {
   count: number;
 }
 
-/** イベントカード（引いた人だけ）：そのアイコンを持つ生徒の数値の合計。時代カードはその時代の生徒の数値が2倍 */
+/** イベントカード（引いた人だけ）：クラス全員のそのアイコンの合計数。時代カードはその時代の生徒のアイコンが2倍 */
 export interface ContestCard {
   id: string;
   kind: 'contest';
@@ -21,7 +21,7 @@ export interface ContestCard {
   count: number;
 }
 
-/** カチコミ（引いた人だけ）：👊の合計が敵の強さに足りなければ、その差がマイナス。攻めてくる敵は時代ごとに変わる */
+/** カチコミ（引いた人だけ）：クラスの👊の数が敵の強さに足りなければ、その差がマイナス。攻めてくる敵は時代ごとに変わる */
 export interface RaidCard {
   id: string;
   kind: 'raid';
@@ -106,7 +106,7 @@ export const PUSH_CARDS: PushCard[] = [
   { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: 'いらない生徒を1人、別のクラスに押しつける', count: 2 },
 ];
 
-/** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代出身の生徒は数値2倍 */
+/** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代出身の生徒はアイコン2倍 */
 export const ERA_CARDS: ContestCard[] = [
   C('trip', '修学旅行', '🚌', 'charm', '班長がみんなを引率。', 'present'),
   C('videocon', '動画コンテスト', '📱', 'art', 'クラスで動画を撮って投稿。', 'present'),
@@ -159,11 +159,11 @@ export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EV
 export function cardRule(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
-      return `全員：${ATTR_ICON[c.attr]}を持つ子の一番高い数値を加点`;
+      return `全員：${ATTR_ICON[c.attr]}を一番多く持つ子の個数を加点`;
     case 'contest':
-      return `引いた人：${ATTR_ICON[c.attr]}の数値の合計を加点${c.era ? '（この時代の生徒は数値2倍）' : ''}`;
+      return `引いた人：クラス全員の${ATTR_ICON[c.attr]}の数を加点${c.era ? '（この時代の生徒は2倍）' : ''}`;
     case 'raid':
-      return `引いた人：👊の数値の合計が${c.threat}に足りない分だけマイナス`;
+      return `引いた人：クラスの👊の数が${c.threat}に足りない分だけマイナス`;
     default:
       return c.desc;
   }
@@ -171,6 +171,6 @@ export function cardRule(c: EventCard): string {
 
 export function fixedRule(f: FixedEvent): string {
   return f.rule === 'test'
-    ? `📚の数値の合計−👊1人につき${TEST_YANKEE_PENALTY}で勝負（順位点×${f.mult}）`
-    : `全員の数値の合計で勝負（順位点×${f.mult}）`;
+    ? `📚の数−👊を持つ子1人につき${TEST_YANKEE_PENALTY}で勝負（順位点×${f.mult}）`
+    : `クラス全員のアイコンの総数で勝負（順位点×${f.mult}）`;
 }

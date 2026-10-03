@@ -15,7 +15,7 @@ interface Props {
 
 const RARITY_MARK = { N: '●', R: '◆', SR: '★', SSR: '✦' } as const;
 
-/** TCG風の生徒カード：左上に数値、中央にイラスト、下段に属性アイコン */
+/** TCG風の生徒カード：中央にイラスト、下段に属性アイコン（重なるほど強い） */
 export function TcgCard({ student, owner, size = 'full', selected, dim, onClick }: Props) {
   const era = ERAS.find((e) => e.id === student.era)!;
   const role = owner ? roleOf(owner, student.uid) : null;
@@ -27,11 +27,10 @@ export function TcgCard({ student, owner, size = 'full', selected, dim, onClick 
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
-      title={`${student.name}（${era.name}・${student.title}）\n数値 ${student.power} ／ ${student.attrs.map((a) => ATTR_LABEL[a]).join('・')}\n${student.flavor}`}
+      title={`${student.name}（${era.name}・${student.title}）\n${student.attrs.map((a) => ATTR_LABEL[a]).join('・')}\n${student.flavor}`}
     >
       <div className="tcg-inner">
         <div className="tcg-head">
-          <span className="tcg-power">{student.power}</span>
           <span className="tcg-name">{student.name}</span>
         </div>
         <div className="tcg-art">
@@ -42,9 +41,9 @@ export function TcgCard({ student, owner, size = 'full', selected, dim, onClick 
             {era.icon} {student.title}
           </div>
         )}
-        <div className="tcg-attrs">
-          {student.attrs.map((a) => (
-            <span key={a} className={`tcg-attr a-${a} ${owner && hasRoleBonus(owner, student, a) ? 'bonus' : ''}`}>
+        <div className={`tcg-attrs n${student.attrs.length}`}>
+          {student.attrs.map((a, i) => (
+            <span key={i} className={`tcg-attr a-${a} ${owner && hasRoleBonus(owner, student, a) ? 'bonus' : ''}`}>
               {ATTR_ICON[a]}
             </span>
           ))}

@@ -6,7 +6,7 @@ export interface Archetype {
   title: string;
   icon: string;
   rarity: Rarity;
-  /** 強さの目安（1〜10）。カードには1〜5に変換して印刷する */
+  /** 強さの目安（1〜10）。アイコンの数に変換して印刷する */
   power: number;
   /** 属性の略記（s=📚 p=🏃 a=🎨 c=👑 f=👊） */
   attrs: string;

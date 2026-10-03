@@ -34,7 +34,7 @@ export type EraId =
   | 'present'
   | 'future';
 
-/** 生徒カード：数値（1〜3）と属性アイコン。アイコンが合えば数値ぶんクラスポイントが入る */
+/** 生徒カード：属性アイコンだけ。同じアイコンが重なるほど強い（1枚あたり最大5個） */
 export interface Student {
   uid: string;
   /** 歴史カード由来なら元カードID（時代の山札への返却に使う） */
@@ -44,7 +44,6 @@ export interface Student {
   era: EraId;
   rarity: Rarity;
   icon: string;
-  power: number;
   attrs: Attr[];
   flavor: string;
   joined: string;
@@ -65,7 +64,7 @@ export interface Player {
 
 export interface ResultRow {
   player: number;
-  /** 合計した数値（係ボーナス込み） */
+  /** 数えたアイコン数（係ボーナス込み） */
   count?: number;
   rank?: number;
   delta: number;
@@ -108,7 +107,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 8;
+  version: 9;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */

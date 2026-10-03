@@ -1,4 +1,4 @@
-import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, roleSlots } from './calc';
+import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, iconsOf, roleSlots } from './calc';
 import { ALL_EVENT_CARDS, TEST_YANKEE_PENALTY } from './data/events';
 import { ROLES, ROLE_ORDER } from './data/roles';
 import { pushTargets } from './engine';
@@ -33,7 +33,7 @@ export function classSummary(p: Player): CategorySummary[] {
   return ATTRS.map((a) => ({ attr: a, icon: ATTR_ICON[a], value: attrScore(p, a).total }));
 }
 
-/** 係のおまかせ編成：係のアイコンを持つ中で数値が一番高い子を順に */
+/** 係のおまかせ編成：係のアイコンを一番多く持つ子を順に */
 export function autoRoles(p: Player): (string | null)[] {
   const k = roleSlots(p);
   const used = new Set<string>();
@@ -41,7 +41,7 @@ export function autoRoles(p: Player): (string | null)[] {
     if (i >= k) return null;
     const cand = p.students
       .filter((s) => !used.has(s.uid) && s.attrs.includes(ROLES[r].attr))
-      .sort((x, y) => y.power - x.power)[0];
+      .sort((x, y) => iconsOf(y, ROLES[r].attr) - iconsOf(x, ROLES[r].attr))[0];
     if (!cand) return null;
     used.add(cand.uid);
     return cand.uid;

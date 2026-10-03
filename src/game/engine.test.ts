@@ -26,8 +26,8 @@ function playOut(players: number, years: number, seed: number): GameState {
   return s;
 }
 
-const mk = (uid: string, power: number, attrs: Attr[], era: Student['era'] = 'present'): Student => ({
-  uid, name: uid, title: '', era, rarity: 'N', icon: '', power, attrs, flavor: '', joined: '', mvp: 0,
+const mk = (uid: string, attrs: Attr[], era: Student['era'] = 'present'): Student => ({
+  uid, name: uid, title: '', era, rarity: 'N', icon: '', attrs, flavor: '', joined: '', mvp: 0,
 });
 const player = (students: Student[], roles: (string | null)[] = []): Player => ({
   id: 0, name: 'A', isCpu: false, color: '', students, roles: [...roles, ...Array(6 - roles.length).fill(null)], points: 0,
@@ -63,40 +63,40 @@ describe('engine', () => {
     expect(s.phase.kind).toBe('roles');
     for (const p of s.players) {
       expect(p.students).toHaveLength(6);
-      expect(p.students.every((x) => x.era === 'present' && x.power >= 1 && x.power <= 3)).toBe(true);
+      expect(p.students.every((x) => x.era === 'present' && x.attrs.length >= 1 && x.attrs.length <= 3)).toBe(true);
     }
   });
 
   it('normal cards score the best value among holders, +1 if a matching role holder exists', () => {
-    const p = player([mk('a', 1, ['study']), mk('b', 3, ['study', 'art']), mk('c', 2, ['sports'])], ['a']);
+    const p = player([mk('a', ['study']), mk('b', ['study', 'study', 'study', 'art']), mk('c', ['sports', 'sports'])], ['a']);
     expect(bestScore(p, 'study')).toMatchObject({ sum: 3, bonus: 1, total: 4 });
     expect(bestScore(p, 'fight').total).toBe(0);
   });
 
   it('event cards score the sum of values of students with the icon, +1 per matching role', () => {
-    const p = player([mk('a', 3, ['study']), mk('b', 2, ['study', 'art']), mk('c', 4, ['sports'])], ['a']);
+    const p = player([mk('a', ['study', 'study', 'study']), mk('b', ['study', 'study', 'art']), mk('c', ['sports'])], ['a']);
     expect(attrScore(p, 'study')).toMatchObject({ sum: 5, bonus: 1, total: 6 });
     expect(attrScore(p, 'fight').total).toBe(0);
     // 係のアイコンを持っていない子が就いても +1 は付かない
-    const q = player([mk('c', 4, ['sports'])], ['c']);
+    const q = player([mk('c', ['sports'])], ['c']);
     expect(attrScore(q, 'study').total).toBe(0);
   });
 
   it('era cards double students from that era', () => {
-    const p = player([mk('a', 2, ['sports'], 'sengoku'), mk('b', 2, ['sports'])]);
+    const p = player([mk('a', ['sports', 'sports'], 'sengoku'), mk('b', ['sports', 'sports'])]);
     expect(attrScore(p, 'sports', 'sengoku').total).toBe(6);
   });
 
   it('yankees defend against raids but hurt tests', () => {
-    const y = player([mk('a', 3, ['sports', 'fight']), mk('b', 3, ['fight'])]);
-    const n = player([mk('a', 3, ['study']), mk('b', 3, ['study'])]);
+    const y = player([mk('a', ['sports', 'fight']), mk('b', ['fight', 'fight'])]);
+    const n = player([mk('a', ['study']), mk('b', ['study', 'study'])]);
     expect(attrScore(y, 'fight').total).toBeGreaterThan(attrScore(n, 'fight').total);
     expect(testScore(n, 1)).toBeGreaterThan(testScore(y, 1));
     expect(testScore(y, 1)).toBeLessThan(0);
   });
 
   it('unlocks role slots as the class grows (6→3, 8→4, 10→5, 12→6)', () => {
-    const sized = (n: number) => player(Array.from({ length: n }, (_, i) => mk(`x${i}`, 1, ['study'])));
+    const sized = (n: number) => player(Array.from({ length: n }, (_, i) => mk(`x${i}`, ['study'])));
     expect([6, 7, 8, 10, 12].map((n) => roleSlots(sized(n)))).toEqual([3, 3, 4, 5, 6]);
   });
 
@@ -165,12 +165,13 @@ describe('engine', () => {
     expect(full.phase.kind).toBe('result');
   });
 
-  it('every card value is 1-3, SSR are always 3', () => {
+  it('cards carry 1-5 icons, more for rarer students', () => {
     for (const c of CARDS) {
-      expect(c.power).toBeGreaterThanOrEqual(1);
-      expect(c.power).toBeLessThanOrEqual(3);
-      if (c.rarity === 'SSR') expect(c.power, c.name).toBe(3);
+      expect(c.attrs.length).toBeGreaterThanOrEqual(2);
+      expect(c.attrs.length).toBeLessThanOrEqual(5);
+      if (c.rarity === 'SSR') expect(c.attrs.length, c.name).toBeGreaterThanOrEqual(4);
     }
+    expect(CARDS.find((c) => c.id === 'einstein')!.attrs).toEqual(['study', 'study', 'study', 'art', 'art']);
   });
 
   it('raids only take away the shortfall', () => {
@@ -178,12 +179,12 @@ describe('engine', () => {
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
     const t = structuredClone(s);
-    t.players[pi].students = [mk('y', 2, ['fight'])];
+    t.players[pi].students = [mk('y', ['fight', 'fight'])];
     t.players[pi].roles = Array(6).fill(null);
     t.eventDeck.push('raid_7');
     expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(-5);
     const u = structuredClone(t);
-    u.players[pi].students = [mk('y', 3, ['fight']), mk('z', 3, ['fight']), mk('w', 1, ['fight'])];
+    u.players[pi].students = [mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight']), mk('w', ['fight'])];
     expect(step(u, { type: 'drawEvent' }).players[pi].points).toBe(u.players[pi].points);
   });
 

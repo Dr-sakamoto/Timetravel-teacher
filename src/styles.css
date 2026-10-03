@@ -1174,3 +1174,38 @@ h3 {
     font-size: 0.66rem;
   }
 }
+/* アイコン数＝強さ：アイコン欄を主役に */
+.tcg-head {
+  justify-content: center;
+  min-height: 1.6em;
+}
+.tcg-name {
+  text-align: center;
+}
+.tcg-attrs {
+  flex-wrap: wrap;
+  gap: 1px 2px;
+  padding: 3px 2px;
+  min-height: 1.9em;
+}
+.tcg-attr {
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+.tcg-attrs.n4 .tcg-attr,
+.tcg-attrs.n5 .tcg-attr {
+  font-size: 0.85rem;
+}
+.tcg.mini .tcg-head {
+  display: none;
+}
+.tcg.mini .tcg-attrs {
+  min-height: 0;
+  padding: 1px 0;
+}
+.tcg.mini .tcg-attr {
+  font-size: 0.5rem;
+  background: none;
+  box-shadow: none;
+}

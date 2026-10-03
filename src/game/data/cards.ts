@@ -8,8 +8,7 @@ export interface CardDef {
   era: EraId;
   rarity: Rarity;
   icon: string;
-  /** 数値（1〜3）。アイコンが合えばこの数だけクラスポイントが入る */
-  power: number;
+  /** 属性アイコン（同じアイコンが重なるほど強い。1枚あたり最大5個） */
   attrs: Attr[];
   tags: Tag[];
   flavor: string;
@@ -22,14 +21,21 @@ export function parseAttrs(code: string): Attr[] {
 }
 
 /**
- * 元データの強さ（1〜10）を、カードに印刷する数値（1〜3）に変換する。
- * 実物のボードゲームで暗算しやすいよう幅は小さく。SSRは必ず3、SRは2以上。
+ * レア度と強さ（power 1〜10）から、カードに印刷するアイコンを決める。強い子ほど同じアイコンが重なる。
+ * N=1〜2個、R=2〜3個、SR=3〜4個、SSR=4〜5個。足りない分は得意な属性（先頭）を重ねる。
  */
-export function toValue(power: number, rarity: Rarity): number {
-  const v = power <= 3 ? 1 : power <= 7 ? 2 : 3;
-  if (rarity === 'SSR') return 3;
-  if (rarity === 'SR') return Math.max(2, v);
-  return v;
+export function toIcons(code: string, rarity: Rarity, power: number): Attr[] {
+  const base = parseAttrs(code);
+  const target =
+    rarity === 'N' ? (power >= 5 ? 2 : Math.min(2, base.length))
+    : rarity === 'R' ? (power >= 8 ? 3 : 2)
+    : rarity === 'SR' ? (power >= 9 ? 4 : 3)
+    : power >= 10 ? 5 : 4;
+  const out = base.slice(0, target);
+  // 👊はヤンキーの印なので削らない
+  if (base.includes('fight') && !out.includes('fight')) out[out.length - 1] = 'fight';
+  for (let i = 0; out.length < target; i++) out.push(base[i % base.length]);
+  return out.sort((x, y) => base.indexOf(x) - base.indexOf(y));
 }
 
 type Row = [id: string, name: string, title: string, rarity: Rarity, icon: string, power: number, attrs: string, tags: Tag[], flavor: string];
@@ -42,14 +48,13 @@ function era(eraId: EraId, list: Row[]): CardDef[] {
     era: eraId,
     rarity,
     icon,
-    power: toValue(power, rarity),
-    attrs: parseAttrs(attrs),
+    attrs: toIcons(attrs, rarity, power),
     tags,
     flavor,
   }));
 }
 
-// 行の数値は強さの目安（1〜10）。カードには toValue で1〜3にして印刷する
+// 行の数値は強さの目安（1〜10）。toIcons でアイコンの数に変換して印刷する
 // 👊（喧嘩）を持つのはヤンキー気質の者だけで、彼らは📚（勉強）を持たない
 export const CARDS: CardDef[] = [
   ...era('cretaceous', [

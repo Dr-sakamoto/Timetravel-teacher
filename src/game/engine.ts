@@ -1,5 +1,5 @@
 import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, bestScore, ranks, roleSlots, testScore, totalPower } from './calc';
-import { CARDS, CARD_MAP, parseAttrs, toValue } from './data/cards';
+import { CARDS, CARD_MAP, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
   ALL_EVENT_CARDS,
@@ -99,7 +99,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   const s: GameState = {
-    version: 8,
+    version: 9,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -156,8 +156,7 @@ function fromArchetype(s: GameState, a: Archetype, joined: string): Student {
     era: 'present',
     rarity: a.rarity,
     icon: a.icon,
-    power: toValue(a.power, a.rarity),
-    attrs: parseAttrs(a.attrs),
+    attrs: toIcons(a.attrs, a.rarity, a.power),
     flavor: a.flavor,
     joined,
     mvp: 0,
@@ -174,7 +173,6 @@ function fromCard(s: GameState, cardId: string, joined: string): Student {
     era: c.era,
     rarity: c.rarity,
     icon: c.icon,
-    power: c.power,
     attrs: [...c.attrs],
     flavor: c.flavor,
     joined,
@@ -398,7 +396,7 @@ function logRows(s: GameState, title: string, rows: ResultRow[]) {
   log(s, `【${title}】 ` + rows.map((r) => `${s.players[r.player].name} ${r.delta >= 0 ? '+' : ''}${r.delta}`).join(' / '));
 }
 
-/** 通常カード：アイコンを持つ子の中で一番高い数値（＋係ボーナス）を全クラスに加点。名前と絵柄は時代で変わる */
+/** 通常カード：そのアイコンを一番多く持つ子1人の個数（＋係ボーナス）を全クラスに加点。名前と絵柄は時代で変わる */
 function resolveNormal(s: GameState, c: NormalCard): EventResult {
   const [name, icon] = ERA_NORMAL_NAMES[ERAS[currentEra(s)].id][c.attr];
   const rows = s.players.map((p, i) => {
@@ -412,7 +410,7 @@ function resolveNormal(s: GameState, c: NormalCard): EventResult {
   return { title: name, icon, attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), rows };
 }
 
-/** イベントカード（引いた人だけ）：そのアイコンの合計（数値＋係ボーナス）×EVENT_MULT。時代カードはその時代の生徒の数値が2倍 */
+/** イベントカード（引いた人だけ）：クラスのそのアイコンの合計個数（＋係ボーナス）×EVENT_MULT。時代カードはその時代の生徒のアイコンが2倍 */
 function resolveContest(s: GameState, c: ContestCard, pi: number): EventResult {
   const p = s.players[pi];
   const sc = attrScore(p, c.attr, c.era);
