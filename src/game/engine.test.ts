@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
-import { attrScore, bestScore, roleSlots, testScore } from './calc';
+import { attrScore, bestScore, roleSlots, termNo, testScore } from './calc';
 import { CARDS, parseAttrs } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
@@ -95,9 +95,18 @@ describe('engine', () => {
     expect(testScore(y, 1)).toBeLessThan(0);
   });
 
-  it('unlocks role slots as the class grows (6→3, 8→4, 10→5, 12→6)', () => {
-    const sized = (n: number) => player(Array.from({ length: n }, (_, i) => mk(`x${i}`, ['study'])));
-    expect([6, 7, 8, 10, 12].map((n) => roleSlots(sized(n)))).toEqual([3, 3, 4, 5, 6]);
+  it('unlocks one role slot per term, starting with 3 (1年1学期→3 … 2年1学期→6)', () => {
+    const slots = (year: number, term: number) => roleSlots(termNo(year, term));
+    expect([[1, 1], [1, 0], [1, 2], [1, 3], [2, 1], [2, 2], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([3, 3, 4, 5, 6, 6, 6]);
+  });
+
+  it('a student can hold only one role, and locked roles stay empty', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 5);
+    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
+    const [a, b] = s.players[0].students;
+    expect(step(s, { type: 'setRoles', roles: [a.uid, a.uid, null, null, null, null] })).toBe(s);
+    const next = step(s, { type: 'setRoles', roles: [a.uid, b.uid, null, null, null, b.uid === a.uid ? null : s.players[0].students[2].uid] });
+    expect(next.players[0].roles.slice(3)).toEqual([null, null, null]);
   });
 
   it('fight icons belong only to yankees, and about half of them are fight-only', () => {

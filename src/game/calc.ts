@@ -7,19 +7,26 @@ export const MAX_CLASS = 12;
 export const MIN_CLASS = 4;
 export const STARTING_MEMBERS = 6;
 
-/** 使える係の数：6人で3つ、8人で4つ、10人で5つ、12人で6つ */
-export function roleSlots(p: Player): number {
-  return Math.max(3, Math.min(ROLE_ORDER.length, 3 + Math.floor((p.students.length - 6) / 2)));
+/** ゲーム開始からの通算学期（1年1学期＝1、1年2学期＝2、…）。夏休みは直前の1学期として数える */
+export function termNo(year: number, term: number): number {
+  return (year - 1) * 3 + Math.max(term, 1);
 }
 
-/** i番目の係が解放される人数 */
-export function slotUnlockAt(i: number): number {
-  return i < 3 ? 0 : 6 + (i - 2) * 2;
+/** 使える係の数：最初の学期は3つで、学期が進むごとに1つずつ増える（最大6つ） */
+export function roleSlots(no: number): number {
+  return Math.max(3, Math.min(ROLE_ORDER.length, 2 + no));
 }
 
+/** i番目の係が解放される学期の名前（例：「1年2学期」） */
+export function slotUnlockLabel(i: number): string {
+  const no = i - 1;
+  return `${Math.ceil(no / 3)}年${((no - 1) % 3) + 1}学期`;
+}
+
+/** 係は1人につき1つまで（係に就いていない生徒はnull）。席が解放前の係は決定時にnullへ落としてある */
 export function roleOf(p: Player, uid: string): RoleId | null {
   const idx = p.roles.indexOf(uid);
-  return idx >= 0 && idx < roleSlots(p) ? ROLE_ORDER[idx] : null;
+  return idx >= 0 ? ROLE_ORDER[idx] : null;
 }
 
 /** 係ボーナスが付いているか（係のアイコンを本人が持っている） */

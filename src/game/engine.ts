@@ -1,4 +1,4 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, bestScore, ranks, roleSlots, testScore, totalPower } from './calc';
+import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, bestScore, ranks, roleSlots, termNo, testScore, totalPower } from './calc';
 import { CARDS, CARD_MAP, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
@@ -45,6 +45,11 @@ export function termOfMonth(m: number): number {
   if (m === 8) return 0;
   if (m >= 9) return 2;
   return 3;
+}
+
+/** 今の学期に使える係の数 */
+export function slotsNow(s: GameState): number {
+  return roleSlots(termNo(s.year, termOfMonth(MONTHS[Math.min(s.monthIdx, 11)])));
 }
 
 export function calendarLabel(s: GameState): string {
@@ -568,7 +573,7 @@ export function step(prev: GameState, a: Action): GameState {
       const ids = new Set(p.students.map((x) => x.uid));
       const used = a.roles.filter((r): r is string => r !== null);
       if (used.some((u) => !ids.has(u)) || new Set(used).size !== used.length) return prev;
-      const k = roleSlots(p);
+      const k = slotsNow(s);
       p.roles = a.roles.map((r, i) => (i < k ? r : null));
       const desc = ROLE_ORDER.slice(0, k)
         .map((r, i) => `${ROLES[r].name}:${p.students.find((x) => x.uid === p.roles[i])?.name ?? 'なし'}`)
