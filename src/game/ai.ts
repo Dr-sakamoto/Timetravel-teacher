@@ -1,7 +1,7 @@
-import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, iconsOf, roleSlots } from './calc';
+import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, iconsOf } from './calc';
 import { ALL_EVENT_CARDS, TEST_YANKEE_PENALTY } from './data/events';
 import { ROLES, ROLE_ORDER } from './data/roles';
-import { pushTargets } from './engine';
+import { pushTargets, slotsNow } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード／勝負カード） */
@@ -34,8 +34,7 @@ export function classSummary(p: Player): CategorySummary[] {
 }
 
 /** 係のおまかせ編成：係のアイコンを一番多く持つ子を順に */
-export function autoRoles(p: Player): (string | null)[] {
-  const k = roleSlots(p);
+export function autoRoles(p: Player, k: number): (string | null)[] {
   const used = new Set<string>();
   return ROLE_ORDER.map((r, i) => {
     if (i >= k) return null;
@@ -58,7 +57,7 @@ export function cpuAction(s: GameState): Action | null {
     case 'memberDraw':
       return { type: 'drawMember' };
     case 'roles':
-      return { type: 'setRoles', roles: autoRoles(s.players[ph.player]) };
+      return { type: 'setRoles', roles: autoRoles(s.players[ph.player], slotsNow(s)) };
     case 'draw':
       return { type: 'drawEvent' };
     case 'push': {

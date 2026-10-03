@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { cpuAction } from '../game/ai';
 import { MIN_CLASS } from '../game/calc';
-import { MONTHS, actingPlayer, pushTargets, termOfMonth } from '../game/engine';
+import { MONTHS, actingPlayer, pushTargets, slotsNow, termOfMonth } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 import { Center } from './Center';
 import { GameOver } from './GameOver';
@@ -77,6 +77,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   }
   const month = MONTHS[Math.min(state.monthIdx, 11)];
   const term = termOfMonth(month);
+  const slots = slotsNow(state);
 
   const pushing = ph.kind === 'push' && !cpuTurn && ph.player === focus;
   const targets = pushing ? pushTargets(state, ph.player) : [];
@@ -138,6 +139,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               key={stage}
               player={state.players[stage]}
               year={state.year}
+              slots={slots}
               variant="stage"
               acting
               delta={deltas.get(stage)}
@@ -152,12 +154,14 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               key={`${state.year}-${state.monthIdx}-${focus}`}
               player={me}
               year={state.year}
+              slots={slots}
               onConfirm={(roles) => dispatch({ type: 'setRoles', roles })}
             />
           ) : (
             <Playmat
               player={me}
               year={state.year}
+              slots={slots}
               variant="near"
               acting={actor === focus}
               delta={deltas.get(focus)}
@@ -175,7 +179,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
             <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
               ✕
             </button>
-            <Playmat player={state.players[peek]} year={state.year} variant="peek" delta={deltas.get(peek)} lit={lit} />
+            <Playmat player={state.players[peek]} year={state.year} slots={slots} variant="peek" delta={deltas.get(peek)} lit={lit} />
           </div>
         </div>
       )}

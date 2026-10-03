@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { MAX_CLASS, roleSlots, slotUnlockAt } from '../game/calc';
+import { MAX_CLASS, slotUnlockLabel } from '../game/calc';
 import { ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
 import { ERAS } from '../game/data/eras';
 import { className } from '../game/engine';
@@ -9,6 +9,8 @@ import { TcgCard } from './TcgCard';
 interface Props {
   player: Player;
   year: number;
+  /** 今の学期に使える係の数 */
+  slots: number;
   /** near＝手前の自分の教室／stage＝手番の人の教室（卓の中央）／peek＝タップで開いた教室 */
   variant: 'near' | 'stage' | 'peek';
   acting?: boolean;
@@ -29,7 +31,7 @@ interface Props {
 export function Playmat(props: Props) {
   const { player, year, variant, acting, delta } = props;
   const view: Player = props.roles ? { ...player, roles: props.roles } : player;
-  const k = roleSlots(view);
+  const k = props.slots;
   const seats = Array.from({ length: MAX_CLASS }, (_, i) => view.students[i] ?? null);
   return (
     <div className={`playmat near pm-${variant} ${acting ? 'acting' : ''}`} style={{ '--pc': player.color } as CSSProperties}>
@@ -62,10 +64,10 @@ export function Playmat(props: Props) {
                 e.stopPropagation();
                 props.onSlotClick?.(i);
               }}
-              title={locked ? `${slotUnlockAt(i)}人で解放` : `${ROLES[r].name}：${roleDesc(r)}`}
+              title={locked ? `${slotUnlockLabel(i)}で解放` : `${ROLES[r].name}：${roleDesc(r)}`}
             >
               <span>{locked ? '🔒' : ROLES[r].icon}</span>
-              <span className="role-name">{locked ? `${slotUnlockAt(i)}人` : roleDesc(r)}</span>
+              <span className="role-name">{locked ? slotUnlockLabel(i).replace('年', '-') : roleDesc(r)}</span>
               {!locked && <span className="role-who">{st ? st.icon : '·'}</span>}
             </button>
           );

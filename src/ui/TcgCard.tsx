@@ -29,7 +29,7 @@ export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onC
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
-      title={`${student.name}（${era.name}・${student.title}）\n${student.attrs.map((a) => ATTR_LABEL[a]).join('・')}\n${student.flavor}`}
+      title={`${student.name}（${era.name}${student.title ? `・${student.title}` : ''}）\n${student.attrs.map((a) => ATTR_LABEL[a]).join('・')}\n${student.flavor}`}
     >
       <div className="tcg-inner">
         <div className="tcg-head">
@@ -40,7 +40,7 @@ export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onC
         </div>
         {size === 'full' && (
           <div className="tcg-type">
-            {era.icon} {student.title}
+            {era.icon} {student.title || era.name}
           </div>
         )}
         <div className={`tcg-attrs n${student.attrs.length}`}>
