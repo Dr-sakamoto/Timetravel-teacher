@@ -1983,10 +1983,7 @@ h3 {
   color: var(--up);
 }
 .fx-counter {
-  position: absolute;
-  left: 50%;
-  bottom: -0.9rem;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   white-space: nowrap;
   background: #0d2a1c;
   border: 3px solid var(--yellow);
@@ -1995,7 +1992,6 @@ h3 {
   padding: 0.05rem 0.8rem;
   font-weight: 900;
   font-size: 1.15rem;
-  z-index: 2;
 }
 .fx-counter.big {
   font-size: 1.6rem;
@@ -2010,7 +2006,7 @@ h3 {
 }
 @keyframes counter-tick {
   from {
-    transform: translateX(-50%) scale(1.25);
+    scale: 1.25;
   }
 }
 .fx-icon {
@@ -2109,4 +2105,35 @@ h3 {
 }
 .score-demo .ecard {
   width: 140px;
+}
+/* スマホ横向き：演出も小さめに */
+@media (max-height: 500px) {
+  .fx-receipt {
+    width: 220px;
+    font-size: 0.68rem;
+    padding: 0.3rem 0.5rem 0.4rem;
+  }
+  .fx-row-pts {
+    font-size: 0.85rem;
+  }
+  .fx-row.total .fx-row-pts {
+    font-size: 1.05rem;
+  }
+  .fx-bubble b,
+  .fx-stamp b {
+    font-size: 1.15rem;
+  }
+  .fx-bubble small,
+  .fx-stamp small {
+    font-size: 0.55rem;
+  }
+  .fx-total {
+    font-size: 1.8rem;
+  }
+  .fx-counter {
+    font-size: 0.9rem;
+  }
+  .fx-counter.big {
+    font-size: 1.1rem;
+  }
 }

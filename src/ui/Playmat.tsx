@@ -34,7 +34,7 @@ export function Playmat(props: Props) {
   const k = props.slots;
   const seats = Array.from({ length: MAX_CLASS }, (_, i) => view.students[i] ?? null);
   return (
-    <div className={`playmat near pm-${variant} ${acting ? 'acting' : ''}`} style={{ '--pc': player.color } as CSSProperties}>
+    <div data-pid={player.id} className={`playmat near pm-${variant} ${acting ? 'acting' : ''}`} style={{ '--pc': player.color } as CSSProperties}>
       <div className="plate">
         <span className="plate-name">
           {player.name}
@@ -111,6 +111,7 @@ interface SeatProps {
 export function OpponentSeat({ player, year, acting, delta, litIcons, targetable, targeted, onClick }: SeatProps) {
   return (
     <button
+      data-pid={player.id}
       className={`opp ${acting ? 'acting' : ''} ${targetable ? 'targetable' : ''} ${targeted ? 'targeted' : ''}`}
       style={{ '--pc': player.color } as CSSProperties}
       onClick={onClick}

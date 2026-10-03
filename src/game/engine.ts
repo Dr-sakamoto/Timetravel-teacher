@@ -430,7 +430,7 @@ function resolveContest(s: GameState, c: ContestCard, pi: number): EventResult {
   sc.holders.forEach((h) => h.mvp++);
   const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, uids: sc.holders.map((h) => h.uid) }];
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: c.attr, tone: c.era ? 'era' : 'contest', desc: c.desc, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, attr: c.attr, tone: c.era ? 'era' : 'contest', era: c.era, desc: c.desc, rule: cardRule(c), rows };
 }
 
 /** カチコミ（引いた人だけ）：👊の合計が敵の強さに足りなければ、その差がそのままマイナス */
@@ -443,7 +443,7 @@ function resolveRaid(s: GameState, c: RaidCard, pi: number): EventResult {
   if (delta === 0) sc.holders.forEach((h) => h.mvp++);
   const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, note: delta === 0 ? '撃退' : sc.total ? '突破' : '無防備', uids: sc.holders.map((h) => h.uid) }];
   logRows(s, `カチコミ（${name}）`, rows);
-  return { title: `カチコミ！${name}`, icon, attr: 'fight', tone: 'contest', desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
+  return { title: `カチコミ！${name}`, icon, attr: 'fight', tone: 'contest', threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
 }
 
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {

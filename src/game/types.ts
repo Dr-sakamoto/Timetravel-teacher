@@ -86,6 +86,10 @@ export interface EventResult {
   desc: string;
   /** カードに書かれたルール（短文） */
   rule?: string;
+  /** 時代イベント：この時代の生徒は×2（得点演出用） */
+  era?: EraId;
+  /** カチコミ：敵の強さ（得点演出用） */
+  threat?: number;
   rows: ResultRow[];
   lines?: string[];
   students?: Student[];

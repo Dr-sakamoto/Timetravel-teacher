@@ -1,5 +1,5 @@
 import { ERAS } from '../game/data/eras';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { currentEra, pushTargets } from '../game/engine';
 import { DeckInfo } from './DeckInfo';
 import type { Action, GameState } from '../game/types';
@@ -12,10 +12,12 @@ interface Props {
   cpuBusy: boolean;
   /** 転校：手前のマットで選んだ生徒と、押しつけ先 */
   push: { uid: string | null; target: number | null };
+  /** 得点演出の明細（カチコミ）。あれば点数表の代わりに出す */
+  side?: ReactNode;
 }
 
 /** 卓の中央：山札・捨て札・めくったカードと手番の操作 */
-export function Center({ state, dispatch, cpuBusy, push }: Props) {
+export function Center({ state, dispatch, cpuBusy, push, side }: Props) {
   const ph = state.phase;
   const era = ERAS[currentEra(state)];
   const actor = ph.kind !== 'gameOver' && ph.player !== null ? state.players[ph.player] : null;
@@ -64,13 +66,14 @@ export function Center({ state, dispatch, cpuBusy, push }: Props) {
           dispatch={dispatch}
           cpuBusy={cpuBusy}
           push={push}
+          side={side}
         />
       </div>
     </div>
   );
 }
 
-function Action({ state, dispatch, cpuBusy, push }: Props) {
+function Action({ state, dispatch, cpuBusy, push, side }: Props) {
   const ph = state.phase;
   if (ph.kind === 'gameOver') return null;
   const actor = ph.player !== null ? state.players[ph.player] : null;
@@ -129,7 +132,8 @@ function Action({ state, dispatch, cpuBusy, push }: Props) {
         <div className="reveal">
           <EventCardView result={r} />
           <div className="reveal-side">
-            {r.rows.length > 0 && (
+            {side}
+            {!side && r.rows.length > 0 && (
               <div className="tally">
                 {r.rows.map((row) => {
                   const p = state.players[row.player];
