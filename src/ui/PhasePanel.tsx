@@ -4,7 +4,7 @@ import { MAX_CLASS, POWER_CAP, roleOf } from '../game/calc';
 import { CLASS_MAP } from '../game/data/classes';
 import { ERAS } from '../game/data/eras';
 import { roleDesc, ROLES } from '../game/data/roles';
-import { HISTORY_ERAS, MONTHS, canLearn, currentEra, poachable, termOfMonth } from '../game/engine';
+import { HISTORY_ERAS, MONTHS, STARTING_MEMBERS, canLearn, currentEra, poachable, termOfMonth } from '../game/engine';
 import { ATTRS, ATTR_ICON, ATTR_LABEL, type Action, type Attr, type GameState } from '../game/types';
 import { ResultView } from './ResultView';
 import { RoleEditor } from './RoleEditor';
@@ -45,30 +45,63 @@ export function PhasePanel({ state, dispatch, cpuBusy }: Props) {
       }
       const card = CLASS_MAP[p.classCardId!];
       return (
-        <div className="panel">
-          <div className="panel-head">
-            <div className="class-card flip-in" style={{ borderColor: card.color }} title={card.desc}>
-              <span className="class-icon">{card.icon}</span>
-              <div>
-                <h2 className="class-nick">{card.nick}</h2>
-                <div className="class-roles">
-                  {card.roles.map((r, i) => (
-                    <span key={i} className="pill" title={roleDesc(r)}>
-                      {ROLES[r].icon}
-                      {ROLES[r].name}
-                    </span>
-                  ))}
-                </div>
+        <div className="panel center">
+          <div className="class-card flip-in" style={{ borderColor: card.color }} title={card.desc}>
+            <span className="class-icon">{card.icon}</span>
+            <div>
+              <h2 className="class-nick">{card.nick}</h2>
+              <div className="class-roles">
+                {card.roles.map((r, i) => (
+                  <span key={i} className="pill" title={roleDesc(r)}>
+                    {ROLES[r].icon}
+                    {ROLES[r].name}
+                  </span>
+                ))}
               </div>
             </div>
+          </div>
+          <div className="actions">
             <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
               次へ
             </button>
           </div>
-          <div className="card-grid">
-            {p.students.map((s) => (
-              <StudentCard key={s.uid} student={s} owner={p} />
-            ))}
+        </div>
+      );
+    }
+    case 'memberDraw': {
+      const p = state.players[ph.player];
+      const last = ph.last;
+      return (
+        <div className="panel">
+          <div className="panel-head">
+            <h2>
+              {p.name}の番 — 初期メンバー {p.students.length}/{STARTING_MEMBERS}
+            </h2>
+            <button className="btn small ghost" onClick={() => dispatch({ type: 'drawAllMembers' })} title="自分の残りをまとめて引く">
+              まとめて引く
+            </button>
+          </div>
+          <div className="member-draw">
+            <button className="deck-card" onClick={() => dispatch({ type: 'drawMember' })}>
+              <span className="deck-back">🎴</span>
+              <span>1枚引く</span>
+            </button>
+            <div className="last-draws">
+              {state.players.map((pl) => {
+                const st = pl.students[pl.students.length - 1];
+                if (!st) return null;
+                return (
+                  <div className={`last-draw ${last?.student.uid === st.uid ? 'latest' : ''}`} key={pl.id}>
+                    <div className="last-who">
+                      <span className="dot" style={{ background: pl.color }} /> {pl.name}
+                    </div>
+                    <div className={last?.student.uid === st.uid ? 'flip-in' : ''} key={st.uid}>
+                      <StudentCard student={st} owner={pl} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       );

@@ -112,6 +112,8 @@ export type ResultCtx = 'turn' | 'summer' | 'monthEnd' | 'yearEnd' | 'final';
 
 export type Phase =
   | { kind: 'classDraw'; player: number; drawn: boolean }
+  /** 初期メンバーを全員で順番に1枚ずつ引く */
+  | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
   | { kind: 'roles'; player: number }
   | { kind: 'draw'; player: number }
   | {
@@ -139,7 +141,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 3;
+  version: 4;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎学期ここから引く） */
@@ -163,6 +165,8 @@ export interface GameState {
 
 export type Action =
   | { type: 'drawClass' }
+  | { type: 'drawMember' }
+  | { type: 'drawAllMembers' }
   | { type: 'continue' }
   | { type: 'setRoles'; roles: (string | null)[] }
   | { type: 'travel'; era: number }

@@ -1670,3 +1670,31 @@ h3 {
     font-size: 0.58rem;
   }
 }
+.member-draw {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  min-height: 210px;
+}
+.last-draw {
+  width: 190px;
+}
+.last-who {
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+.last-draws {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.last-draw {
+  width: 170px;
+  opacity: 0.75;
+}
+.last-draw.latest {
+  opacity: 1;
+}

@@ -45,11 +45,24 @@ describe('engine', () => {
     }
   }
 
-  it('starts each class with 12 modern students', () => {
+  it('deals the 12 starting members one card at a time, alternating between players', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 1);
     s = step(s, { type: 'drawClass' });
     s = step(s, { type: 'continue' });
     s = step(s, { type: 'drawClass' });
+    s = step(s, { type: 'continue' });
+    expect(s.players.every((p) => p.students.length === 0)).toBe(true);
+    const order: number[] = [];
+    while (s.phase.kind === 'memberDraw') {
+      order.push(s.phase.player);
+      const before = s.players[s.phase.player].students.length;
+      const who = s.phase.player;
+      s = step(s, { type: 'drawMember' });
+      expect(s.players[who].students.length).toBe(before + 1);
+    }
+    expect(order.slice(0, 4)).toEqual([0, 1, 0, 1]);
+    expect(order).toHaveLength(24);
+    expect(s.phase.kind).toBe('roles');
     for (const p of s.players) {
       expect(p.students).toHaveLength(12);
       expect(p.students.every((x) => x.era === 'present')).toBe(true);

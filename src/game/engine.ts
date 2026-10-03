@@ -104,7 +104,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   const s: GameState = {
-    version: 3,
+    version: 4,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -247,14 +247,40 @@ function drawClass(s: GameState, pi: number) {
   s.usedClassCards.push(card.id);
   p.classCardId = card.id;
   p.roles = card.roles.map(() => null);
-  const joined = '初期メンバー';
-  const members: Student[] = card.guaranteed.map((id) => fromArchetype(s, ARCHETYPES.find((a) => a.id === id)!, joined));
-  while (members.length < 12) {
-    const w = STARTER_ARCHETYPES.map((a) => card.bias[a.group] ?? 0.3);
-    members.push(fromArchetype(s, STARTER_ARCHETYPES[weightedIndex(s, w)], joined));
-  }
-  p.students = shuffle(s, members);
+  p.students = [];
   log(s, `${p.name}は「${card.nick}」（${className(card.id, s.year)}）を引いた！`, pi);
+}
+
+export const STARTING_MEMBERS = 12;
+
+/** 初期メンバーを1人引く（クラスカードの傾向で出やすい生徒が変わる） */
+function drawMember(s: GameState, pi: number): Student {
+  const p = s.players[pi];
+  const card = CLASS_MAP[p.classCardId!];
+  const w = STARTER_ARCHETYPES.map((a) => card.bias[a.group] ?? 0.3);
+  const st = fromArchetype(s, STARTER_ARCHETYPES[weightedIndex(s, w)], '初期メンバー');
+  p.students.push(st);
+  return st;
+}
+
+/** 次に初期メンバーを引くプレイヤー（人数の少ない順・同数なら席順）。全員揃ったら null */
+function nextMemberDrawer(s: GameState): number | null {
+  let best: number | null = null;
+  for (const p of s.players) {
+    if (p.students.length >= STARTING_MEMBERS) continue;
+    if (best === null || p.students.length < s.players[best].students.length) best = p.id;
+  }
+  return best;
+}
+
+function afterMemberDraw(s: GameState, last: { player: number; student: Student } | null) {
+  const next = nextMemberDrawer(s);
+  if (next === null) {
+    log(s, '全クラスの初期メンバーがそろった！');
+    startTerm(s);
+  } else {
+    s.phase = { kind: 'memberDraw', player: next, last };
+  }
 }
 
 /** その年の3学期ぶんの時代をランダムに決める（ゲーム中はなるべく被らない） */
@@ -654,10 +680,23 @@ export function step(prev: GameState, a: Action): GameState {
       ph.drawn = true;
       return s;
     }
+    case 'drawMember': {
+      if (ph.kind !== 'memberDraw') return prev;
+      const st = drawMember(s, ph.player);
+      afterMemberDraw(s, { player: ph.player, student: st });
+      return s;
+    }
+    case 'drawAllMembers': {
+      if (ph.kind !== 'memberDraw') return prev;
+      let last: { player: number; student: Student } | null = null;
+      while (s.players[ph.player].students.length < STARTING_MEMBERS) last = { player: ph.player, student: drawMember(s, ph.player) };
+      afterMemberDraw(s, last);
+      return s;
+    }
     case 'continue': {
       if (ph.kind === 'classDraw' && ph.drawn) {
         if (ph.player + 1 < s.players.length) s.phase = { kind: 'classDraw', player: ph.player + 1, drawn: false };
-        else startTerm(s);
+        else afterMemberDraw(s, null);
         return s;
       }
       if (ph.kind !== 'result') return prev;

@@ -114,6 +114,8 @@ export function cpuAction(s: GameState): Action | null {
   switch (ph.kind) {
     case 'classDraw':
       return ph.drawn ? { type: 'continue' } : { type: 'drawClass' };
+    case 'memberDraw':
+      return { type: 'drawMember' };
     case 'roles':
       return { type: 'setRoles', roles: autoRoles(s.players[ph.player]) };
     case 'draw':
