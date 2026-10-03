@@ -92,22 +92,6 @@ function Action({ state, dispatch, cpuBusy, push }: Props) {
       return <div className="say">{who} の係決め — 手前の教室で係を選び、生徒をタップ</div>;
     case 'draw':
       return <div className="say">{who} の番 — イベントの山札をめくろう</div>;
-    case 'release':
-      return (
-        <div className="say">
-          🚪 {who} のクラスに転入生！ でも満席 — 手前の教室から帰ってもらう子をタップ
-          <div className="deal">
-            <div className="deal-in">
-              <TcgCard student={ph.incoming} />
-            </div>
-          </div>
-          <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'release', uid: ph.incoming.uid })}>
-              転入を断る
-            </button>
-          </div>
-        </div>
-      );
     case 'push': {
       const targets = pushTargets(state, ph.player);
       return (

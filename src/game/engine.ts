@@ -1,9 +1,10 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, iconCount, ranks, roleSlots, testScore, totalPower } from './calc';
+import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, bestScore, ranks, roleSlots, testScore, totalPower } from './calc';
 import { CARDS, CARD_MAP, parseAttrs, toValue } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
   ALL_EVENT_CARDS,
   CONTEST_POINTS,
+  EVENT_MULT,
   ERA_NORMAL_NAMES,
   ERA_RAIDERS,
   EVENT_MAP,
@@ -98,7 +99,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   const s: GameState = {
-    version: 7,
+    version: 8,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -155,7 +156,7 @@ function fromArchetype(s: GameState, a: Archetype, joined: string): Student {
     era: 'present',
     rarity: a.rarity,
     icon: a.icon,
-    power: toValue(a.power),
+    power: toValue(a.power, a.rarity),
     attrs: parseAttrs(a.attrs),
     flavor: a.flavor,
     joined,
@@ -397,11 +398,11 @@ function logRows(s: GameState, title: string, rows: ResultRow[]) {
   log(s, `【${title}】 ` + rows.map((r) => `${s.players[r.player].name} ${r.delta >= 0 ? '+' : ''}${r.delta}`).join(' / '));
 }
 
-/** 通常カード：アイコンを持つ生徒1人につき+1（係ボーナスでさらに+1）を全クラスに加点。名前と絵柄は時代で変わる */
+/** 通常カード：アイコンを持つ子の中で一番高い数値（＋係ボーナス）を全クラスに加点。名前と絵柄は時代で変わる */
 function resolveNormal(s: GameState, c: NormalCard): EventResult {
   const [name, icon] = ERA_NORMAL_NAMES[ERAS[currentEra(s)].id][c.attr];
   const rows = s.players.map((p, i) => {
-    const sc = iconCount(p, c.attr);
+    const sc = bestScore(p, c.attr);
     p.points += sc.total;
     for (const h of sc.holders) h.mvp++;
     return { player: i, count: sc.total, delta: sc.total };
@@ -411,13 +412,14 @@ function resolveNormal(s: GameState, c: NormalCard): EventResult {
   return { title: name, icon, attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), rows };
 }
 
-/** イベントカード（引いた人だけ）：そのアイコンを持つ子の数値の合計＋係ボーナスが入る。時代カードはその時代の生徒が2倍 */
+/** イベントカード（引いた人だけ）：そのアイコンの合計（数値＋係ボーナス）×EVENT_MULT。時代カードはその時代の生徒の数値が2倍 */
 function resolveContest(s: GameState, c: ContestCard, pi: number): EventResult {
   const p = s.players[pi];
   const sc = attrScore(p, c.attr, c.era);
-  p.points += sc.total;
+  const delta = sc.total * EVENT_MULT;
+  p.points += delta;
   sc.holders.forEach((h) => h.mvp++);
-  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta: sc.total }];
+  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta }];
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: c.attr, tone: c.era ? 'era' : 'contest', desc: c.desc, rule: cardRule(c), rows };
 }
@@ -446,13 +448,9 @@ function setResult(s: GameState, pi: number | null, result: EventResult, ctx: Re
   s.phase = { kind: 'result', player: pi, result, ctx };
 }
 
-/** 人物カードを引いた：そのまま転入。満席なら誰に帰ってもらうか選ぶ */
+/** 人物カードを引いた：そのまま転入 */
 function welcome(s: GameState, pi: number, st: Student, ctx: ResultCtx) {
   const p = s.players[pi];
-  if (p.students.length >= MAX_CLASS) {
-    s.phase = { kind: 'release', player: pi, incoming: st, ctx };
-    return;
-  }
   addStudent(s, p, st);
   log(s, `${p.name}のクラスに${st.name}が転入！`, pi);
   setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc: `${st.icon}${st.name}がやってきた！`, rows: [], students: [st] }, ctx);
@@ -463,16 +461,28 @@ export function pushTargets(s: GameState, pi: number): number[] {
   return s.players.filter((p) => p.id !== pi && p.students.length < MAX_CLASS).map((p) => p.id);
 }
 
-function resolveDraw(s: GameState, pi: number) {
+function popCard(s: GameState): string {
   if (s.eventDeck.length === 0) {
     s.eventDeck = shuffle(s, s.discard);
     s.discard = [];
     log(s, '捨て札をシャッフルして山札に戻した。');
   }
-  const id = s.eventDeck.pop()!;
+  return s.eventDeck.pop()!;
+}
+
+const isPerson = (id: string) => id === 'modern' || id.startsWith('person:');
+
+function resolveDraw(s: GameState, pi: number) {
   const p = s.players[pi];
+  let id = popCard(s);
+  // 満席なら人物カードは捨てて、もう1枚めくる
+  for (let guard = 0; isPerson(id) && p.students.length >= MAX_CLASS && guard < 50; guard++) {
+    s.discard.push(id);
+    log(s, `${p.name}のクラスは満席。人物カードを捨ててもう1枚めくる。`, pi);
+    id = popCard(s);
+  }
   // 人物カード：引いたらそのまま転入
-  if (id === 'modern' || id.startsWith('person:')) {
+  if (isPerson(id) && p.students.length < MAX_CLASS) {
     const cardId = id.slice('person:'.length);
     const st = id !== 'modern' && s.pools[CARD_MAP[cardId].era].includes(cardId) ? fromCard(s, cardId, joinedLabel(s)) : randomModern(s);
     welcome(s, pi, st, 'turn');
@@ -569,27 +579,6 @@ export function step(prev: GameState, a: Action): GameState {
     case 'drawEvent': {
       if (ph.kind !== 'draw') return prev;
       resolveDraw(s, ph.player);
-      return s;
-    }
-    case 'release': {
-      if (ph.kind !== 'release') return prev;
-      const p = s.players[ph.player];
-      const st = ph.incoming;
-      if (a.uid === st.uid) {
-        log(s, `${p.name}は満席のため${st.name}の転入を断った。`, ph.player);
-        setResult(s, ph.player, { title: '転入', icon: '🙅', tone: 'personal', desc: `満席のため${st.name}は元の時代へ帰った。`, rows: [] }, ph.ctx);
-        return s;
-      }
-      const gone = removeStudent(s, p, a.uid, true);
-      if (!gone) return prev;
-      addStudent(s, p, st);
-      log(s, `${gone.name}が帰り、${st.name}が転入！`, ph.player);
-      setResult(
-        s,
-        ph.player,
-        { title: '転入', icon: '🚪', tone: 'personal', desc: `${gone.icon}${gone.name}と入れ替わりで${st.icon}${st.name}がやってきた！`, rows: [], students: [st] },
-        ph.ctx,
-      );
       return s;
     }
     case 'push': {

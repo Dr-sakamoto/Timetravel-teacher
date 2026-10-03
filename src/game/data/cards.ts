@@ -8,7 +8,7 @@ export interface CardDef {
   era: EraId;
   rarity: Rarity;
   icon: string;
-  /** 数値（1〜5）。アイコンが合えばこの数だけクラスポイントが入る */
+  /** 数値（1〜3）。アイコンが合えばこの数だけクラスポイントが入る */
   power: number;
   attrs: Attr[];
   tags: Tag[];
@@ -21,9 +21,15 @@ export function parseAttrs(code: string): Attr[] {
   return code.split('').map((ch) => ATTR_CODE[ch]);
 }
 
-/** 元データの強さ（1〜10）を、カードに印刷する数値（1〜5）に変換する */
-export function toValue(power: number): number {
-  return Math.max(1, Math.min(5, Math.ceil(power / 2)));
+/**
+ * 元データの強さ（1〜10）を、カードに印刷する数値（1〜3）に変換する。
+ * 実物のボードゲームで暗算しやすいよう幅は小さく。SSRは必ず3、SRは2以上。
+ */
+export function toValue(power: number, rarity: Rarity): number {
+  const v = power <= 3 ? 1 : power <= 7 ? 2 : 3;
+  if (rarity === 'SSR') return 3;
+  if (rarity === 'SR') return Math.max(2, v);
+  return v;
 }
 
 type Row = [id: string, name: string, title: string, rarity: Rarity, icon: string, power: number, attrs: string, tags: Tag[], flavor: string];
@@ -36,14 +42,14 @@ function era(eraId: EraId, list: Row[]): CardDef[] {
     era: eraId,
     rarity,
     icon,
-    power: toValue(power),
+    power: toValue(power, rarity),
     attrs: parseAttrs(attrs),
     tags,
     flavor,
   }));
 }
 
-// 行の数値は強さの目安（1〜10）。カードには toValue で1〜5にして印刷する
+// 行の数値は強さの目安（1〜10）。カードには toValue で1〜3にして印刷する
 // 👊（喧嘩）を持つのはヤンキー気質の者だけで、彼らは📚（勉強）を持たない
 export const CARDS: CardDef[] = [
   ...era('cretaceous', [

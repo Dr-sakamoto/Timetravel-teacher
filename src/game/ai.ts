@@ -1,4 +1,4 @@
-import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, iconCount, roleSlots } from './calc';
+import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, roleSlots } from './calc';
 import { ALL_EVENT_CARDS, TEST_YANKEE_PENALTY } from './data/events';
 import { ROLES, ROLE_ORDER } from './data/roles';
 import { pushTargets } from './engine';
@@ -15,9 +15,9 @@ const CONTEST_WEIGHT = weight('contest');
 /** クラスの強さの目安（CPUの判断用） */
 export function classScore(p: Player): number {
   let v = 0;
-  for (const a of ATTRS) v += (iconCount(p, a).total * NORMAL_WEIGHT[a] + attrScore(p, a).total * CONTEST_WEIGHT[a] * 0.6);
+  for (const a of ATTRS) v += attrScore(p, a).total * (NORMAL_WEIGHT[a] + CONTEST_WEIGHT[a] * 0.6);
   // カチコミ（3枚）と定期テスト
-  v += Math.min(attrScore(p, 'fight').total, 11) * 3;
+  v += Math.min(attrScore(p, 'fight').total, 7) * 3;
   v += (attrScore(p, 'study').total - countAttr(p, 'fight') * TEST_YANKEE_PENALTY) * 4;
   return v;
 }
@@ -61,17 +61,6 @@ export function cpuAction(s: GameState): Action | null {
       return { type: 'setRoles', roles: autoRoles(s.players[ph.player]) };
     case 'draw':
       return { type: 'drawEvent' };
-    case 'release': {
-      // 満席：転入生も含めて、いなくなっても一番損しない子に帰ってもらう
-      const p = s.players[ph.player];
-      const all = [...p.students, ph.incoming];
-      let best = { uid: ph.incoming.uid, score: -Infinity };
-      for (const out of all) {
-        const sc = classScore(withStudents(p, all.filter((x) => x.uid !== out.uid)));
-        if (sc > best.score) best = { uid: out.uid, score: sc };
-      }
-      return { type: 'release', uid: best.uid };
-    }
     case 'push': {
       const p = s.players[ph.player];
       const targets = pushTargets(s, ph.player);

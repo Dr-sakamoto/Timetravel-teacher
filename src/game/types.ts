@@ -34,7 +34,7 @@ export type EraId =
   | 'present'
   | 'future';
 
-/** 生徒カード：数値（1〜5）と属性アイコン。アイコンが合えば数値ぶんクラスポイントが入る */
+/** 生徒カード：数値（1〜3）と属性アイコン。アイコンが合えば数値ぶんクラスポイントが入る */
 export interface Student {
   uid: string;
   /** 歴史カード由来なら元カードID（時代の山札への返却に使う） */
@@ -95,8 +95,6 @@ export type Phase =
   | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
   | { kind: 'roles'; player: number }
   | { kind: 'draw'; player: number }
-  /** 満席で転入生が来た：誰か1人（転入生本人でもよい）に帰ってもらう */
-  | { kind: 'release'; player: number; incoming: Student; ctx: ResultCtx }
   /** 転校：いらない生徒を別のクラスに押しつける */
   | { kind: 'push'; player: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
@@ -110,7 +108,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 7;
+  version: 8;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -142,5 +140,4 @@ export type Action =
   | { type: 'continue' }
   | { type: 'setRoles'; roles: (string | null)[] }
   | { type: 'drawEvent' }
-  | { type: 'release'; uid: string }
   | { type: 'push'; uid: string | null; target?: number };

@@ -51,11 +51,13 @@ export function attrScore(p: Player, a: Attr, doubleEra?: EraId): AttrScore {
   return { sum, bonus, total: sum + bonus, holders };
 }
 
-/** 通常カードの点：そのアイコンを持つ生徒1人につき1＋係ボーナス */
-export function iconCount(p: Player, a: Attr): AttrScore {
+/** 通常カードの点：そのアイコンを持つ子の中で一番高い数値＋（係のアイコンを持つ子が係に就いていれば）+1 */
+export function bestScore(p: Player, a: Attr): AttrScore {
   const holders = p.students.filter((s) => s.attrs.includes(a));
-  const bonus = holders.filter((s) => hasRoleBonus(p, s, a)).length;
-  return { sum: holders.length, bonus, total: holders.length + bonus, holders };
+  const best = holders.reduce((m, s) => Math.max(m, s.power), 0);
+  const bonus = holders.some((s) => hasRoleBonus(p, s, a)) ? 1 : 0;
+  const top = holders.filter((s) => s.power === best).slice(0, 1);
+  return { sum: best, bonus, total: best + bonus, holders: top };
 }
 
 export function countAttr(p: Player, a: Attr): number {

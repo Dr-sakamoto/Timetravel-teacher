@@ -1,6 +1,6 @@
 import { ATTR_ICON, type Attr, type EraId } from '../types';
 
-/** 通常カード：そのアイコンを持つ生徒1人につき+1を全クラスに加点。名前と絵柄は時代ごとに変わるだけ */
+/** 通常カード：そのアイコンを持つ子の中で一番高い数値を全クラスに加点。名前と絵柄は時代ごとに変わるだけ */
 export interface NormalCard {
   id: string;
   kind: 'normal';
@@ -8,7 +8,7 @@ export interface NormalCard {
   count: number;
 }
 
-/** イベントカード（引いた人だけ）：そのアイコンを持つ生徒の数値の合計が入る。時代カードはその時代の生徒が2倍 */
+/** イベントカード（引いた人だけ）：そのアイコンを持つ生徒の数値の合計。時代カードはその時代の生徒の数値が2倍 */
 export interface ContestCard {
   id: string;
   kind: 'contest';
@@ -42,11 +42,14 @@ export type EventCard = NormalCard | ContestCard | RaidCard | PushCard;
 
 /** 定期テスト・卒業式（全員参加）の順位点（人数別） */
 export const CONTEST_POINTS: Record<number, number[]> = {
-  2: [8, 3],
-  3: [10, 5, 2],
-  4: [10, 6, 3, 1],
-  5: [10, 6, 3, 1, 0],
+  2: [5, 2],
+  3: [5, 3, 1],
+  4: [5, 3, 2, 1],
+  5: [5, 3, 2, 1, 0],
 };
+
+/** イベントカード（引いた人だけ）の倍率 */
+export const EVENT_MULT = 1;
 
 /** 学期ごとの山札に入る人物カードの枚数（その時代の偉人が足りなければ現代の生徒で埋める） */
 export const PERSON_CARDS_PER_TERM = 7;
@@ -97,7 +100,7 @@ export const CONTEST_CARDS: ContestCard[] = [
   C('election', '生徒会選挙', '🗳️', 'charm', 'クラス代表を擁立。'),
 ];
 
-export const RAID_CARDS: RaidCard[] = [4, 6, 8].map((threat) => ({ id: `raid_${threat}`, kind: 'raid', threat, count: 1 }));
+export const RAID_CARDS: RaidCard[] = [3, 5, 7].map((threat) => ({ id: `raid_${threat}`, kind: 'raid', threat, count: 1 }));
 
 export const PUSH_CARDS: PushCard[] = [
   { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: 'いらない生徒を1人、別のクラスに押しつける', count: 2 },
@@ -146,7 +149,7 @@ export const FIXED_EVENTS: FixedEvent[] = [
 /** 月末に固定イベントが起こる月 */
 export const FIXED_BY_MONTH: Record<number, string> = { 7: 'test1', 12: 'test2', 3: 'test3' };
 /** テストでは👊を持つ生徒1人につきこれだけ減点 */
-export const TEST_YANKEE_PENALTY = 2;
+export const TEST_YANKEE_PENALTY = 1;
 
 export const ALL_EVENT_CARDS: EventCard[] = [...NORMAL_CARDS, ...CONTEST_CARDS, ...RAID_CARDS, ...PUSH_CARDS, ...ERA_CARDS];
 export const EVENT_MAP: Record<string, EventCard> = Object.fromEntries(ALL_EVENT_CARDS.map((e) => [e.id, e]));
@@ -156,9 +159,9 @@ export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EV
 export function cardRule(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
-      return `全員：${ATTR_ICON[c.attr]}を持つ子1人につき+1`;
+      return `全員：${ATTR_ICON[c.attr]}を持つ子の一番高い数値を加点`;
     case 'contest':
-      return `引いた人：${ATTR_ICON[c.attr]}の数値の合計を加点${c.era ? '（この時代の生徒は2倍）' : ''}`;
+      return `引いた人：${ATTR_ICON[c.attr]}の数値の合計を加点${c.era ? '（この時代の生徒は数値2倍）' : ''}`;
     case 'raid':
       return `引いた人：👊の数値の合計が${c.threat}に足りない分だけマイナス`;
     default:

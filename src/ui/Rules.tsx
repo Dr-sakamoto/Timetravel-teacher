@@ -25,11 +25,12 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <h2>遊び方</h2>
         <p>
           あなたは担任の先生。歴史上の偉人や恐竜を転入させて教室の12席を埋め、<b>クラスポイント</b>を一番集めた先生の勝ち！
+          点は盤の外周のスコアトラック（0〜100）でコマを進めて数える想定（1年でだいたい1周）。
         </p>
 
         <h3>生徒カード</h3>
         <p>
-          左上の<b>数値（1〜5）</b>と、下の<b>属性アイコン</b>だけ。
+          左上の<b>数値（1〜3）</b>と、下の<b>属性アイコン</b>だけ（SSRの偉人は必ず3）。
           {ATTRS.map((a) => `${ATTR_ICON[a]}${ATTR_LABEL[a]}`).join('・')}。
           👊はヤンキーだけが持ち、ヤンキーは📚を持たない。
         </p>
@@ -38,7 +39,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <ol className="rule-list">
           <li>現代の生徒の山札から、全員で順番に1枚ずつ引いて6人そろえる。</li>
           <li>
-            係は全員共通。6人で3つ、8人で4つ、10人で5つ、12人で6つ使える。係のアイコンを持つ子を就けると、そのアイコンで点が入るたび<b>+1</b>。
+            係は全員共通。6人で3つ、8人で4つ、10人で5つ、12人で6つ使える。係のアイコンを持つ子を就けると、そのアイコンで点が入るたび<b>+1</b>（イベントカードでは係1人につき+1）。
             <div className="rule-roles">
               {ROLE_ORDER.map((r) => (
                 <span key={r} className="chip">
@@ -55,7 +56,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <ul className="rule-list">
           <li>
             <b>通常カード（全員）</b>（{NORMAL_CARDS.map((c) => `${ATTR_ICON[c.attr]}×${c.count}`).join(' ')}）：
-            そのアイコンを持つ子1人につき<b>+1</b>。名前と絵柄は時代で変わるだけ。
+            そのアイコンを持つ子の中で<b>一番高い数値</b>（＋係ボーナス）が入る。名前と絵柄は時代で変わるだけ。
           </li>
           <li>
             <b>イベントカード（めくった人だけ）</b>（{CONTEST_CARDS.map((c) => c.icon + c.name).join('・')}＋時代の固有イベント）：
@@ -65,7 +66,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             <b>カチコミ（めくった人だけ）</b>（敵の強さ {RAID_CARDS.map((c) => c.threat).join('・')}）：👊の数値の合計が敵の強さに<b>足りない分だけマイナス</b>。プラスはなし。
           </li>
           <li>
-            <b>人物カード</b>（学期ごとに{PERSON_CARDS_PER_TERM}枚）：めくったらその子が<b>そのまま転入</b>。その時代の偉人が足りない分は現代の生徒カード。満席なら誰か1人（転入生本人でもいい）に帰ってもらう。
+            <b>人物カード</b>（学期ごとに{PERSON_CARDS_PER_TERM}枚）：めくったらその子が<b>そのまま転入</b>。その時代の偉人が足りない分は現代の生徒カード。満席なら捨て札にしてもう1枚めくる。
           </li>
           {PUSH_CARDS.map((c) => (
             <li key={c.id}>
@@ -107,7 +108,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <ul className="rule-list">
           {FIXED_EVENTS.map((f) => (
             <li key={f.id}>
-              {f.icon} <b>{f.name}</b>（全員）：{fixedRule(f)}。順位点は10／6／3／1点×倍率。
+              {f.icon} <b>{f.name}</b>（全員）：{fixedRule(f)}。順位点は5／3／2／1点×倍率。
             </li>
           ))}
           <li>🌻 8月 夏休み合宿（全員）：2学期の時代から1人ずつランダムに転入。</li>
