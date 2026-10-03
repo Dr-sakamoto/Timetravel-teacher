@@ -1,44 +1,24 @@
 import type { CSSProperties } from 'react';
 import { ERAS } from '../game/data/eras';
+import { MONTHS, termOfMonth } from '../game/engine';
 import type { GameState } from '../game/types';
 
-interface Props {
-  state: GameState;
-  selectable?: (i: number) => boolean;
-  onSelect?: (i: number) => void;
-  focusPlayer?: number | null;
-}
-
-export function Timeline({ state, selectable, onSelect, focusPlayer }: Props) {
+/** その年の3学期の時代。今の学期を強調する */
+export function EraBar({ state }: { state: GameState }) {
+  const term = termOfMonth(MONTHS[Math.min(state.monthIdx, 11)]);
   return (
-    <div className="timeline">
-      <div className="timeline-rail" />
-      {ERAS.map((era, i) => {
-        const can = selectable?.(i) ?? false;
-        const here = state.players.filter((p) => p.era === i);
-        const left = era.id === 'present' ? '∞' : state.pools[era.id].length;
-        const isFocus = focusPlayer !== null && focusPlayer !== undefined && state.players[focusPlayer].era === i;
+    <div className="erabar">
+      {state.yearEras.map((ei, i) => {
+        const era = ERAS[ei];
+        const t = i + 1;
+        const status = t === term ? 'now' : t < term ? 'past' : 'next';
         return (
-          <button
-            key={era.id}
-            className={`era ${can ? 'can' : ''} ${isFocus ? 'focus' : ''}`}
-            style={{ '--era': era.color } as CSSProperties}
-            disabled={!can}
-            onClick={() => can && onSelect?.(i)}
-            title={`${era.name}（${era.when}）残り${left}人`}
-          >
+          <div key={i} className={`era-chip ${status}`} style={{ '--era': era.color } as CSSProperties} title={era.when}>
+            <span className="era-term">{t}学期</span>
             <span className="era-icon">{era.icon}</span>
             <span className="era-name">{era.name}</span>
-            <span className="era-when">{era.when}</span>
-            <span className="era-left">残{left}</span>
-            <span className="era-tokens">
-              {here.map((p) => (
-                <span key={p.id} className="token" style={{ background: p.color }} title={p.name}>
-                  {p.name.slice(0, 1)}
-                </span>
-              ))}
-            </span>
-          </button>
+            <span className="era-left">残{state.pools[era.id].length}</span>
+          </div>
         );
       })}
     </div>

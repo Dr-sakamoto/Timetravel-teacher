@@ -41,7 +41,7 @@ export function GameOver({ state, onQuit }: { state: GameState; onQuit: () => vo
             {mvp && (
               <div className="final-mvp">
                 <div className="mvp-label">クラスMVP（活躍{mvp.mvp}回）</div>
-                <StudentCard student={mvp} owner={p} compact />
+                <StudentCard student={mvp} owner={p} />
               </div>
             )}
           </div>

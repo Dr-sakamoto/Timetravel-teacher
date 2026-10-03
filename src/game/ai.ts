@@ -3,7 +3,7 @@ import { CARD_MAP } from './data/cards';
 import { CLASS_MAP } from './data/classes';
 import { ERAS } from './data/eras';
 import { EVENT_MAP, type SchoolEventDef } from './data/events';
-import { canLearn, poachable } from './engine';
+import { HISTORY_ERAS, canLearn, poachable } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type Student } from './types';
 
 /** クラスの強さを測る代表イベント（scaleで正規化、wは重要度） */
@@ -103,17 +103,9 @@ function eraValue(s: GameState, idx: number): number {
   return top.reduce((a, b) => a + b, 0) / top.length;
 }
 
-function bestEra(s: GameState, from: number, range: number): number {
-  let best = from;
-  let bestV = eraValue(s, from) + 0.5;
-  for (let i = 0; i < ERAS.length; i++) {
-    if (Math.abs(i - from) > range) continue;
-    const v = eraValue(s, i);
-    if (v > bestV) {
-      bestV = v;
-      best = i;
-    }
-  }
+function bestEra(s: GameState, candidates: number[]): number {
+  let best = candidates[0];
+  for (const i of candidates) if (eraValue(s, i) > eraValue(s, best)) best = i;
   return best;
 }
 
@@ -124,11 +116,6 @@ export function cpuAction(s: GameState): Action | null {
       return ph.drawn ? { type: 'continue' } : { type: 'drawClass' };
     case 'roles':
       return { type: 'setRoles', roles: autoRoles(s.players[ph.player]) };
-    case 'travel': {
-      if (ph.dice === null) return { type: 'rollDice' };
-      const p = s.players[ph.player];
-      return { type: 'travel', era: bestEra(s, p.era, ph.dice) };
-    }
     case 'draw':
       return { type: 'drawEvent' };
     case 'transfer': {
@@ -177,10 +164,9 @@ export function cpuAction(s: GameState): Action | null {
       return { type: 'poach', uid: best.uid };
     }
     case 'warp':
-    case 'summerTravel': {
-      const p = s.players[ph.player];
-      return { type: 'travel', era: bestEra(s, p.era, ERAS.length) };
-    }
+      return { type: 'travel', era: bestEra(s, HISTORY_ERAS) };
+    case 'summerTravel':
+      return { type: 'travel', era: bestEra(s, s.yearEras) };
     case 'result':
       return { type: 'continue' };
     case 'gameOver':

@@ -82,7 +82,6 @@ export interface Player {
   /** クラスカードの係スロット順に、担当する生徒uid */
   roles: (string | null)[];
   points: number;
-  era: number;
 }
 
 export interface ResultRow {
@@ -114,7 +113,6 @@ export type ResultCtx = 'turn' | 'summer' | 'monthEnd' | 'yearEnd' | 'final';
 export type Phase =
   | { kind: 'classDraw'; player: number; drawn: boolean }
   | { kind: 'roles'; player: number }
-  | { kind: 'travel'; player: number; dice: number | null }
   | { kind: 'draw'; player: number }
   | {
       kind: 'transfer';
@@ -141,7 +139,11 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 2;
+  version: 3;
+  /** その年の3学期それぞれの時代（ERASのindex） */
+  yearEras: number[];
+  /** まだ使っていない時代の山（毎学期ここから引く） */
+  eraDeck: number[];
   rng: number;
   players: Player[];
   years: number;
@@ -163,7 +165,6 @@ export type Action =
   | { type: 'drawClass' }
   | { type: 'continue' }
   | { type: 'setRoles'; roles: (string | null)[] }
-  | { type: 'rollDice' }
   | { type: 'travel'; era: number }
   | { type: 'drawEvent' }
   | { type: 'pickTransfer'; index: number | null; releaseUid?: string }

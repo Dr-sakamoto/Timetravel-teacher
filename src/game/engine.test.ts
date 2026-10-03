@@ -4,7 +4,8 @@ import { attrValues, classPower } from './calc';
 import { CARDS, parseAttrs } from './data/cards';
 import { ARCHETYPES } from './data/modern';
 import { EVENT_MAP, type SchoolEventDef } from './data/events';
-import { newGame, step } from './engine';
+import { currentEra, newGame, step } from './engine';
+import { ERAS, PRESENT_INDEX } from './data/eras';
 import type { Attr, GameState, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): { s: GameState; steps: number } {
@@ -100,5 +101,22 @@ describe('engine', () => {
     const modernNonYankee = ARCHETYPES.filter((a) => !a.attrs.includes('f'));
     const studying = modernNonYankee.filter((a) => a.attrs.includes('s'));
     expect(studying.length / modernNonYankee.length).toBeGreaterThan(0.7);
+  });
+
+  it('picks 3 distinct historical eras each year, one per term, and transfers come from the term era', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 2, 42);
+    const seen: number[][] = [];
+    while (s.phase.kind !== 'gameOver') {
+      if (!seen.some((y) => y.join() === s.yearEras.join())) seen.push([...s.yearEras]);
+      expect(new Set(s.yearEras).size).toBe(3);
+      expect(s.yearEras).not.toContain(PRESENT_INDEX);
+      const ph = s.phase;
+      if (ph.kind === 'transfer' && ph.title === '転校生がやってくる！') {
+        const era = ERAS[currentEra(s)].id;
+        for (const o of ph.options) expect(o.era).toBe(era);
+      }
+      s = step(s, cpuAction(s)!);
+    }
+    expect(seen.length).toBe(2);
   });
 });

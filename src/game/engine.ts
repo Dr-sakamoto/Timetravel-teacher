@@ -12,6 +12,9 @@ import {
 import { CARDS, CARD_MAP, parseAttrs } from './data/cards';
 import { CLASS_CARDS, CLASS_MAP, className } from './data/classes';
 import { ERAS, PRESENT_INDEX } from './data/eras';
+
+/** 転校生がやってくる歴史上の時代（現代以外） */
+export const HISTORY_ERAS = ERAS.map((_, i) => i).filter((i) => i !== PRESENT_INDEX);
 import {
   EVENT_MAP,
   FIXED_BY_MONTH,
@@ -101,7 +104,9 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   const s: GameState = {
-    version: 2,
+    version: 3,
+    yearEras: [],
+    eraDeck: [],
     rng: seed | 0,
     players: setup.map((p, i) => ({
       id: i,
@@ -112,7 +117,6 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
       students: [],
       roles: [],
       points: 0,
-      era: PRESENT_INDEX,
     })),
     years,
     year: 1,
@@ -129,6 +133,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     log: [],
   };
   s.eventDeck = buildDeck(s);
+  drawYearEras(s);
   log(s, `時空最強クラス決定戦、開幕！ ${years}年間の勝負です。`);
   return s;
 }
@@ -252,11 +257,28 @@ function drawClass(s: GameState, pi: number) {
   log(s, `${p.name}は「${card.nick}」（${className(card.id, s.year)}）を引いた！`, pi);
 }
 
+/** その年の3学期ぶんの時代をランダムに決める（ゲーム中はなるべく被らない） */
+function drawYearEras(s: GameState) {
+  s.yearEras = [];
+  while (s.yearEras.length < 3) {
+    if (s.eraDeck.length === 0) s.eraDeck = shuffle(s, [...HISTORY_ERAS]);
+    const e = s.eraDeck.pop()!;
+    if (!s.yearEras.includes(e)) s.yearEras.push(e);
+  }
+}
+
+/** 今の学期の時代（夏休み中は2学期の時代） */
+export function currentEra(s: GameState): number {
+  const t = termOfMonth(MONTHS[Math.min(s.monthIdx, 11)]);
+  return s.yearEras[Math.max(1, t) - 1];
+}
+
 function startTerm(s: GameState) {
   s.queue = order(s);
   s.queueIdx = 0;
   const t = termOfMonth(MONTHS[s.monthIdx]);
-  log(s, `${t}学期が始まった。係を編成しよう！`);
+  const era = ERAS[currentEra(s)];
+  log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name}。`);
   s.phase = { kind: 'roles', player: s.queue[0] };
 }
 
@@ -275,7 +297,7 @@ function startTurn(s: GameState) {
     p.points += inc;
     log(s, `${p.name}のクラスにお小遣い収入 +${inc}pt`, pi);
   }
-  s.phase = { kind: 'travel', player: pi, dice: null };
+  s.phase = { kind: 'draw', player: pi };
 }
 
 function endTurn(s: GameState) {
@@ -324,10 +346,8 @@ function nextSummer(s: GameState) {
 function yearEnd(s: GameState) {
   s.monthIdx = MONTHS.length - 1;
   if (s.year < s.years) {
-    const lines: string[] = [];
     for (const p of s.players) {
       for (const st of p.students) st.power = Math.min(POWER_CAP, st.power + 1);
-      lines.push(`${p.name}のクラス：全員の数値+1`);
     }
     log(s, `${s.year}年生が終わった。進級！みんな少し成長した。`);
     s.phase = {
@@ -337,9 +357,9 @@ function yearEnd(s: GameState) {
       result: {
         title: `進級！ ${s.year + 1}年生へ`,
         icon: '🌸',
-        desc: '春休みを経てクラスのみんなが少しずつ成長した。',
+        desc: '全員の数値+1',
         rows: [],
-        lines,
+        lines: [],
       },
     };
   } else {
@@ -350,6 +370,7 @@ function yearEnd(s: GameState) {
 
 function newYear(s: GameState) {
   s.year++;
+  drawYearEras(s);
   s.monthIdx = 0;
   s.rotation++;
   startTerm(s);
@@ -373,11 +394,11 @@ export function resolveSchool(s: GameState, ev: SchoolEventDef, drawer: number |
       const p = s.players[r.player];
       if (r.power! >= threat) {
         r.delta = applyDelta(p, ev.threshold.win);
-        r.note = '撃退！';
+        r.note = '撃退';
         for (const c of powers[r.player].contributors) c.mvp++;
       } else {
         r.delta = applyDelta(p, ev.threshold.lose);
-        r.note = r.power ? '突破された…' : '無防備…';
+        r.note = r.power ? '突破' : '無防備';
       }
     }
   } else {
@@ -410,7 +431,7 @@ export function resolveSchool(s: GameState, ev: SchoolEventDef, drawer: number |
     attr: ev.attr,
     tone: 'special',
     desc: ev.desc,
-    scoring: aggText(ev) + (ev.threshold ? ` ／ 撃退で+${ev.threshold.win}pt・突破されると${ev.threshold.lose}pt` : ` ／ 順位点×${ev.mult}`),
+    scoring: aggText(ev) + (ev.threshold ? `　撃退+${ev.threshold.win} / 突破${ev.threshold.lose}` : ev.mult !== 1 ? `　得点×${ev.mult}` : ''),
     effects: ev.effects.map(effectText),
     rows,
     threat,
@@ -438,13 +459,14 @@ function setResult(s: GameState, pi: number | null, result: EventResult, ctx: Re
 function startTransfer(
   s: GameState,
   pi: number,
+  eraIdx: number,
   count: number,
   picks: number,
   title: string,
   reason: string,
   ctx: ResultCtx,
 ) {
-  const options = drawOptions(s, s.players[pi].era, count);
+  const options = drawOptions(s, eraIdx, count);
   if (options.length === 0) {
     setResult(
       s,
@@ -470,24 +492,24 @@ function resolveDraw(s: GameState, pi: number) {
   const id = s.eventDeck.pop()!;
   const ev = EVENT_MAP[id];
   const p = s.players[pi];
-  const era = ERAS[p.era];
+  const eraIdx = currentEra(s);
+  const era = ERAS[eraIdx];
   if (ev.kind === 'school') {
     setResult(s, pi, resolveSchool(s, ev, pi), 'turn');
     return;
   }
   switch (ev.kind) {
     case 'transfer':
-      startTransfer(s, pi, 3, 1, ev.name, `${era.icon} ${era.name}から転校生候補が3人。1人を選んで迎え入れよう。`, 'turn');
+      startTransfer(s, pi, eraIdx, 3, 1, ev.name, `${era.icon} ${era.name}から`, 'turn');
       return;
     case 'rush':
-      startTransfer(s, pi, 4, 2, ev.name, `${era.icon} ${era.name}から候補が4人！2人まで迎え入れられる。`, 'turn');
+      startTransfer(s, pi, eraIdx, 4, 2, ev.name, `${era.icon} ${era.name}から`, 'turn');
       return;
     case 'storm': {
-      let to = p.era;
-      while (to === p.era) to = randInt(s, ERAS.length);
-      p.era = to;
-      log(s, `${p.name}のタイムマシンが時空嵐で${ERAS[to].name}へ飛ばされた！`, pi);
-      startTransfer(s, pi, 2, 1, ev.name, `${ERAS[to].icon} ${ERAS[to].name}に不時着。2人の候補から1人連れて帰れる。`, 'turn');
+      let to = eraIdx;
+      while (to === eraIdx) to = pick(s, HISTORY_ERAS);
+      log(s, `${p.name}のクラスが時空嵐で${ERAS[to].name}へ飛ばされた！`, pi);
+      startTransfer(s, pi, to, 2, 1, ev.name, `${ERAS[to].icon} ${ERAS[to].name}から`, 'turn');
       return;
     }
     case 'warp':
@@ -677,42 +699,19 @@ export function step(prev: GameState, a: Action): GameState {
       else startTurns(s);
       return s;
     }
-    case 'rollDice': {
-      if (ph.kind !== 'travel' || ph.dice !== null) return prev;
-      ph.dice = randInt(s, 6) + 1;
-      return s;
-    }
     case 'travel': {
       if (a.era < 0 || a.era >= ERAS.length) return prev;
-      if (ph.kind === 'travel') {
-        if (ph.dice === null) return prev;
-        const p = s.players[ph.player];
-        if (Math.abs(a.era - p.era) > ph.dice) return prev;
-        if (a.era !== p.era) log(s, `${p.name}のタイムマシンが${ERAS[a.era].name}へ移動（出目${ph.dice}）`, ph.player);
-        p.era = a.era;
-        s.phase = { kind: 'draw', player: ph.player };
-        return s;
-      }
+      if (a.era === PRESENT_INDEX) return prev;
       if (ph.kind === 'warp') {
-        const p = s.players[ph.player];
-        p.era = a.era;
         const ev = EVENT_MAP.warp as PersonalEventDef;
-        setResult(s, ph.player, personalResult(s, ph.player, ev, 0, [`${ERAS[a.era].icon} ${ERAS[a.era].name}へワープした！`]), 'turn');
+        startTransfer(s, ph.player, a.era, 3, 1, ev.name, `${ERAS[a.era].icon} ${ERAS[a.era].name}から`, 'turn');
         return s;
       }
       if (ph.kind === 'summerTravel') {
+        if (!s.yearEras.includes(a.era)) return prev;
         const p = s.players[ph.player];
-        p.era = a.era;
         log(s, `${p.name}は夏休みに${ERAS[a.era].name}へタイムトラベル！`, ph.player);
-        startTransfer(
-          s,
-          ph.player,
-          3,
-          1,
-          '夏休みタイムトラベル合宿',
-          `${ERAS[a.era].icon} ${ERAS[a.era].name}で3人と仲良くなった。1人をスカウトしよう。`,
-          'summer',
-        );
+        startTransfer(s, ph.player, a.era, 3, 1, '夏休み合宿', `${ERAS[a.era].icon} ${ERAS[a.era].name}から`, 'summer');
         return s;
       }
       return prev;
