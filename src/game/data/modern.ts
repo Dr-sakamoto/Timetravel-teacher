@@ -12,13 +12,18 @@ export interface Archetype {
   attrs: string;
   tags: Tag[];
   flavor: string;
+  /** 女子生徒（名前を女子の名前から選ぶ） */
+  female: boolean;
 }
+
+/** 絵柄が女子のアーキタイプ */
+const FEMALE_IDS = new Set(['lit', 'rep', 'brass', 'dance', 'gyaru', 'sukeban', 'returnee', 'childstar', 'influencer']);
 
 const Y: Tag[] = ['現代', 'ヤンキー'];
 const M: Tag[] = ['現代'];
 
 function a(id: string, title: string, icon: string, rarity: Rarity, power: number, attrs: string, flavor: string): Archetype {
-  return { id, title, icon, rarity, power, attrs, tags: attrs.includes('f') ? Y : M, flavor };
+  return { id, title, icon, rarity, power, attrs, tags: attrs.includes('f') ? Y : M, flavor, female: FEMALE_IDS.has(id) };
 }
 
 // 部活は優劣をつけないので、部活系の通常生徒は肩書きなし（個人名＋絵柄だけ）。
@@ -69,8 +74,13 @@ export const SURNAMES = [
   '後藤', '長谷川', '村上', '近藤', '石井', '遠藤', '青木', '藤井', '西村', '福田', '太田', '三浦', '岡本', '松田', '中川',
 ];
 
-export const GIVEN_NAMES = [
-  '翔太', '蓮', '陽翔', '大翔', '悠真', '湊', '結衣', '陽菜', '美咲', 'さくら', '葵', '凛', '結菜', '莉子', '芽依',
-  '健太', '拓海', '颯太', '大輝', '優斗', '美月', '心春', '楓', '七海', '花', '樹', '蒼', '律', '碧', 'ひなた',
-  '彩花', '遥', '千尋', '光', '誠', '紬', '朝陽', '杏', '剛', '真央',
+/** 男女どちらでも自然な名前 */
+const NEUTRAL_NAMES = ['葵', '凛', '湊', '楓', '樹', '蒼', '律', '碧', 'ひなた', '遥', '千尋', '光', '朝陽'];
+
+export const BOY_NAMES = [
+  '翔太', '蓮', '陽翔', '大翔', '悠真', '健太', '拓海', '颯太', '大輝', '優斗', '誠', '剛', ...NEUTRAL_NAMES,
+];
+
+export const GIRL_NAMES = [
+  '結衣', '陽菜', '美咲', 'さくら', '結菜', '莉子', '芽依', '美月', '心春', '七海', '花', '彩花', '紬', '杏', '真央', ...NEUTRAL_NAMES,
 ];

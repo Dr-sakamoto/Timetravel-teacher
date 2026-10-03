@@ -19,7 +19,7 @@ import {
   type RaidCard,
   type SwingCard,
 } from './data/events';
-import { ARCHETYPE_MAP, GIVEN_NAMES, MODERN_POOL, STARTER_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
+import { ARCHETYPE_MAP, BOY_NAMES, GIRL_NAMES, MODERN_POOL, STARTER_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
 import { ROLES } from './data/roles';
 import {
   type Action,
@@ -145,7 +145,7 @@ function fromArchetype(s: GameState, cardId: string, a: Archetype, joined: strin
   return {
     uid: `u${s.uidCounter++}`,
     cardId,
-    name: `${pick(s, SURNAMES)} ${pick(s, GIVEN_NAMES)}`,
+    name: `${pick(s, SURNAMES)} ${pick(s, a.female ? GIRL_NAMES : BOY_NAMES)}`,
     title: a.title,
     era: 'present',
     rarity: a.rarity,
