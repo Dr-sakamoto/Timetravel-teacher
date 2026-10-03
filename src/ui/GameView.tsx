@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { cpuAction } from '../game/ai';
 import { MIN_CLASS } from '../game/calc';
-import { MONTHS, actingPlayer, pushTargets, slotsNow, termOfMonth } from '../game/engine';
+import { MONTHS, actingPlayer, equippable, exchangeTargets, kachikomiTargets, pushTargets, slotsNow, termOfMonth, tradeable } from '../game/engine';
 import type { Action, GameState } from '../game/types';
+import type { Pick } from './Center';
 import { Center } from './Center';
 import { GameOver } from './GameOver';
 import { OpponentSeat, Playmat } from './Playmat';
@@ -26,7 +27,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   /** タップして中身を見ている相手 */
   const [peek, setPeek] = useState<number | null>(null);
   const [focus, setFocus] = useState(() => state.players.find((p) => !p.isCpu)?.id ?? 0);
-  const [push, setPush] = useState<{ uid: string | null; target: number | null }>({ uid: null, target: null });
+  const [pick, setPick] = useState<Pick>({ uid: null, target: null, theirUid: null });
   const logRef = useRef<HTMLDivElement>(null);
   const cpuTurn = actor !== null && state.players[actor].isCpu && ph.kind !== 'result';
 
@@ -36,18 +37,17 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   }, [actor, state.players]);
 
   useEffect(() => {
-    if (ph.kind !== 'push') setPush({ uid: null, target: null });
+    setPick({ uid: null, target: null, theirUid: null });
   }, [ph.kind]);
 
-  // CPUの自動進行（通常カードの結果は人間の番でも自動で流す）
+  // CPUの自動進行
   useEffect(() => {
     if (ph.kind === 'gameOver') return;
     const mul = speed === 'fast' ? 0.35 : 1;
     if (ph.kind === 'result') {
-      const normal = ph.result.tone === 'normal';
-      const auto = (ph.player !== null && state.players[ph.player].isCpu) || allCpu || normal;
+      const auto = (ph.player !== null && state.players[ph.player].isCpu) || allCpu;
       if (!auto) return;
-      const t = setTimeout(() => dispatch({ type: 'continue' }), (normal ? 1800 : 2600) * mul);
+      const t = setTimeout(() => dispatch({ type: 'continue' }), 2400 * mul);
       return () => clearTimeout(t);
     }
     if (!cpuTurn) return;
@@ -79,8 +79,26 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const term = termOfMonth(month);
   const slots = slotsNow(state);
 
-  const pushing = ph.kind === 'push' && !cpuTurn && ph.player === focus;
-  const targets = pushing ? pushTargets(state, ph.player) : [];
+  // 転校・カチコミ・交換留学・グッズ：手前の教室の生徒と、相手のクラスを選ぶ
+  const choosing = (ph.kind === 'push' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip') && !cpuTurn && ph.player === focus ? ph.kind : null;
+  const targets =
+    choosing === 'push' ? pushTargets(state, focus)
+    : choosing === 'kachikomi' ? kachikomiTargets(state, focus)
+    : choosing === 'exchange' ? exchangeTargets(state, focus)
+    : [];
+  const meNow = state.players[focus];
+  const selectable =
+    choosing === 'push' ? (meNow.students.length > MIN_CLASS ? meNow.students : [])
+    : choosing === 'exchange' ? tradeable(meNow)
+    : choosing === 'equip' ? equippable(meNow)
+    : [];
+  const pickOpponent = (pi: number) => {
+    if (!targets.includes(pi)) return setPeek(pi);
+    setPick((x) => ({ ...x, target: pi, theirUid: x.target === pi ? x.theirUid : null }));
+    // 交換留学は相手の教室を開いて、交換する生徒を選ぶ
+    if (choosing === 'exchange') setPeek(pi);
+  };
+  const peekPicking = choosing === 'exchange' && peek !== null && peek === pick.target;
   // 手番の人が相手なら、その人の教室を卓の中央に出す
   const stage = actor !== null && actor !== focus ? actor : null;
   const me = state.players[focus];
@@ -128,8 +146,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               delta={deltas.get(pi)}
               litIcons={state.players[pi].students.filter((st) => lit.has(st.uid)).map((st) => st.icon)}
               targetable={targets.includes(pi)}
-              targeted={push.target === pi}
-              onClick={() => (targets.includes(pi) ? setPush((x) => ({ ...x, target: pi })) : setPeek(pi))}
+              targeted={pick.target === pi}
+              onClick={() => pickOpponent(pi)}
             />
           ))}
         </div>
@@ -146,7 +164,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               lit={lit}
             />
           )}
-          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn} push={push} />
+          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn} pick={pick} />
         </div>
         <div className="near-seat">
           {editingRoles ? (
@@ -166,8 +184,9 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               acting={actor === focus}
               delta={deltas.get(focus)}
               lit={lit}
-              onSeatClick={pushing && me.students.length > MIN_CLASS ? (uid) => setPush((x) => ({ ...x, uid })) : undefined}
-              selectedUid={pushing ? push.uid : null}
+              onSeatClick={selectable.length ? (uid) => selectable.some((x) => x.uid === uid) && setPick((x) => ({ ...x, uid })) : undefined}
+              selectedUid={choosing ? pick.uid : null}
+              dimUid={selectable.length ? (uid) => !selectable.some((x) => x.uid === uid) : undefined}
             />
           )}
         </div>
@@ -179,7 +198,26 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
             <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
               ✕
             </button>
-            <Playmat player={state.players[peek]} year={state.year} slots={slots} variant="peek" delta={deltas.get(peek)} lit={lit} />
+            {peekPicking && <div className="peek-hint">🔁 交換してもらう生徒をタップ（係の子は選べない）</div>}
+            <Playmat
+              player={state.players[peek]}
+              year={state.year}
+              slots={slots}
+              variant="peek"
+              delta={deltas.get(peek)}
+              lit={lit}
+              onSeatClick={
+                peekPicking
+                  ? (uid) => {
+                      if (!tradeable(state.players[peek]).some((x) => x.uid === uid)) return;
+                      setPick((x) => ({ ...x, theirUid: uid }));
+                      setPeek(null);
+                    }
+                  : undefined
+              }
+              selectedUid={peekPicking ? pick.theirUid : null}
+              dimUid={peekPicking ? (uid) => !tradeable(state.players[peek]).some((x) => x.uid === uid) : undefined}
+            />
           </div>
         </div>
       )}

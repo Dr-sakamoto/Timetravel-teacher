@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
-import { attrScore, bestScore, roleSlots, termNo, testScore } from './calc';
+import { MAX_CLASS, STARTING_MEMBERS, attrScore, roleSlots, termNo, testScore, validRoles } from './calc';
 import { CARDS, parseAttrs } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
 import { currentEra, deckBreakdown, newGame, step } from './engine';
-import type { Attr, GameState, Player, Student } from './types';
+import type { Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
   let s = newGame(
@@ -29,8 +29,8 @@ function playOut(players: number, years: number, seed: number): GameState {
 const mk = (uid: string, attrs: Attr[], era: Student['era'] = 'present'): Student => ({
   uid, name: uid, title: '', era, rarity: 'N', icon: '', attrs, flavor: '', joined: '', mvp: 0,
 });
-const player = (students: Student[], roles: (string | null)[] = []): Player => ({
-  id: 0, name: 'A', isCpu: false, color: '', students, roles: [...roles, ...Array(6 - roles.length).fill(null)], points: 0,
+const player = (students: Student[], roles: RoleSeat[] = []): Player => ({
+  id: 0, name: 'A', isCpu: false, color: '', students, roles, points: 0,
 });
 
 describe('engine', () => {
@@ -41,8 +41,8 @@ describe('engine', () => {
         expect(s.year).toBe(years);
         for (const p of s.players) {
           expect(Number.isFinite(p.points)).toBe(true);
-          expect(p.students.length).toBeGreaterThanOrEqual(4);
-          expect(p.students.length).toBeLessThanOrEqual(12);
+          expect(p.students.length).toBeGreaterThanOrEqual(2);
+          expect(p.students.length).toBeLessThanOrEqual(MAX_CLASS);
           expect(new Set(p.students.map((x) => x.uid)).size).toBe(p.students.length);
         }
         const cards = s.players.flatMap((p) => p.students.map((x) => x.cardId).filter(Boolean));
@@ -51,7 +51,7 @@ describe('engine', () => {
     }
   }
 
-  it('deals 6 random modern students one card at a time, alternating', () => {
+  it('deals 3 random modern students one card at a time, alternating', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 1);
     const order: number[] = [];
     while (s.phase.kind === 'memberDraw') {
@@ -59,32 +59,20 @@ describe('engine', () => {
       s = step(s, { type: 'drawMember' });
     }
     expect(order.slice(0, 4)).toEqual([0, 1, 0, 1]);
-    expect(order).toHaveLength(12);
+    expect(order).toHaveLength(6);
     expect(s.phase.kind).toBe('roles');
     for (const p of s.players) {
-      expect(p.students).toHaveLength(6);
+      expect(p.students).toHaveLength(3);
       expect(p.students.every((x) => x.era === 'present' && x.attrs.length >= 1 && x.attrs.length <= 3)).toBe(true);
     }
   });
 
-  it('normal cards score the best holder, and a role holder counts double', () => {
-    const p = player([mk('a', ['study']), mk('b', ['study', 'study', 'study', 'art']), mk('c', ['sports', 'sports'])], ['a']);
-    // 係の子は1個×2=2 < 3個の子 → 3
-    expect(bestScore(p, 'study')).toMatchObject({ sum: 3, bonus: 0, total: 3 });
-    const q = player([mk('a', ['study', 'study']), mk('b', ['study', 'study', 'study'])], ['a']);
-    // 係の子は2個×2=4 > 3個の子
-    expect(bestScore(q, 'study')).toMatchObject({ sum: 2, bonus: 2, total: 4 });
-    // 係の子がアイコンを1つも持っていなければ効果なし
-    expect(bestScore(player([mk('a', ['sports']), mk('b', ['study'])], ['a']), 'study').total).toBe(1);
-    expect(bestScore(p, 'fight').total).toBe(0);
-  });
-
-  it('event cards sum all holders, and a role holder counts double', () => {
-    const p = player([mk('a', ['study', 'study', 'study']), mk('b', ['study', 'study', 'art']), mk('c', ['sports'])], ['a']);
+  it('cards sum all holders, and a role holder counts double', () => {
+    const p = player([mk('a', ['study', 'study', 'study']), mk('b', ['study', 'study', 'art']), mk('c', ['sports'])], [{ role: 'study', uid: 'a' }]);
     expect(attrScore(p, 'study')).toMatchObject({ sum: 5, bonus: 3, total: 8 });
     expect(attrScore(p, 'fight').total).toBe(0);
     // 係のアイコンを持っていない子が就いても +1 は付かない
-    const q = player([mk('c', ['sports'])], ['c']);
+    const q = player([mk('c', ['sports'])], [{ role: 'study', uid: 'c' }]);
     expect(attrScore(q, 'study').total).toBe(0);
   });
 
@@ -101,9 +89,9 @@ describe('engine', () => {
     expect(testScore(y, 1)).toBeLessThan(0);
   });
 
-  it('unlocks one role slot per term, starting with 3 (1年1学期→3 … 2年1学期→6)', () => {
+  it('unlocks one role seat per term, starting with 1 (1年1学期→1 … 2年3学期→6)', () => {
     const slots = (year: number, term: number) => roleSlots(termNo(year, term));
-    expect([[1, 1], [1, 0], [1, 2], [1, 3], [2, 1], [2, 2], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([3, 3, 4, 5, 6, 6, 6]);
+    expect([[1, 1], [1, 0], [1, 2], [1, 3], [2, 1], [2, 2], [2, 3], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([1, 1, 2, 3, 4, 5, 6, 6]);
   });
 
   it('regular modern students have 1 icon about 70% of the time and 2 icons otherwise', () => {
@@ -114,13 +102,15 @@ describe('engine', () => {
     expect(ones / regular.length).toBeLessThanOrEqual(0.75);
   });
 
-  it('a student can hold only one role, and locked roles stay empty', () => {
-    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 5);
-    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
-    const [a, b] = s.players[0].students;
-    expect(step(s, { type: 'setRoles', roles: [a.uid, a.uid, null, null, null, null] })).toBe(s);
-    const next = step(s, { type: 'setRoles', roles: [a.uid, b.uid, null, null, null, b.uid === a.uid ? null : s.players[0].students[2].uid] });
-    expect(next.players[0].roles.slice(3)).toEqual([null, null, null]);
+  it('roles: one per student, at most 2 per role and 3 kinds, within the seat count', () => {
+    const p = player(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((u) => mk(u, ['study'])));
+    const r = (role: RoleSeat['role'], uid: string): RoleSeat => ({ role, uid });
+    expect(validRoles(p, [r('study', 'a'), r('study', 'b')], 6)).toBe(true);
+    expect(validRoles(p, [r('study', 'a'), r('study', 'b'), r('study', 'c')], 6)).toBe(false);
+    expect(validRoles(p, [r('study', 'a'), r('pe', 'a')], 6)).toBe(false);
+    expect(validRoles(p, [r('study', 'a'), r('pe', 'b'), r('culture', 'c'), r('leader', 'd')], 6)).toBe(false);
+    expect(validRoles(p, [r('study', 'a'), r('pe', 'b')], 1)).toBe(false);
+    expect(validRoles(p, [r('study', 'zz')], 6)).toBe(false);
   });
 
   it('fight icons belong only to yankees, and about half of them are fight-only', () => {
@@ -181,10 +171,10 @@ describe('engine', () => {
     const n = t.players[pi].students.length;
     expect(step(t, { type: 'drawEvent' }).players[pi].students).toHaveLength(n + 1);
     const f = structuredClone(s);
-    while (f.players[pi].students.length < 12) f.players[pi].students.push({ ...f.players[pi].students[0], uid: `f${f.players[pi].students.length}` });
+    while (f.players[pi].students.length < MAX_CLASS) f.players[pi].students.push({ ...f.players[pi].students[0], uid: `f${f.players[pi].students.length}` });
     f.eventDeck.push('n_study', m);
     const full = step(f, { type: 'drawEvent' });
-    expect(full.players[pi].students).toHaveLength(12);
+    expect(full.players[pi].students).toHaveLength(MAX_CLASS);
     expect(full.discard.slice(-2)).toEqual([m, 'n_study']);
     expect(full.phase.kind).toBe('result');
   });
@@ -194,7 +184,7 @@ describe('engine', () => {
     const before = s.pools.present.length;
     expect(before).toBe(MODERN_POOL.length);
     while (s.phase.kind === 'memberDraw') s = step(s, cpuAction(s)!);
-    expect(s.pools.present).toHaveLength(before - 18);
+    expect(s.pools.present).toHaveLength(before - 3 * STARTING_MEMBERS);
     const ids = s.players.flatMap((p) => p.students.map((x) => x.cardId));
     expect(ids.every((id) => id && !s.pools.present.includes(id))).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
@@ -208,7 +198,7 @@ describe('engine', () => {
     const sum = (k: 'left' | 'used') => rows.reduce((a, r) => a + r[k], 0);
     expect(sum('left')).toBe(s.eventDeck.length);
     expect(sum('used')).toBe(s.discard.length);
-    expect(rows.filter((r) => r.group === '通常').reduce((a, r) => a + r.left + r.used, 0)).toBe(21);
+    expect(rows.filter((r) => r.group === '通常').reduce((a, r) => a + r.left + r.used, 0)).toBe(19);
   });
 
   it('cards carry 1-5 icons, more for rarer students', () => {
@@ -220,18 +210,84 @@ describe('engine', () => {
     expect(CARDS.find((c) => c.id === 'einstein')!.attrs).toEqual(['study', 'study', 'study', 'art', 'art']);
   });
 
-  it('raids only take away the shortfall', () => {
+  it('era raids add or take away the difference between 👊 and the threat', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
     const t = structuredClone(s);
     t.players[pi].students = [mk('y', ['fight', 'fight'])];
-    t.players[pi].roles = Array(6).fill(null);
-    t.eventDeck.push('raid_7');
-    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(-5);
+    t.players[pi].roles = [];
+    t.eventDeck.push('raid_present');
+    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(2 * 2 - 4);
     const u = structuredClone(t);
-    u.players[pi].students = [mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight']), mk('w', ['fight'])];
-    expect(step(u, { type: 'drawEvent' }).players[pi].points).toBe(u.players[pi].points);
+    u.players[pi].students = [mk('y', ['fight', 'fight', 'fight'], 'sengoku')];
+    expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(3 - 4);
+  });
+
+  it('kachikomi takes the drawer\'s 👊 count from the chosen school', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    const target = (pi + 1) % 3;
+    const t = structuredClone(s);
+    t.players[pi].students = [mk('y', ['fight', 'fight']), mk('z', ['fight', 'study'])];
+    t.players[pi].roles = [];
+    t.eventDeck.push('kachikomi');
+    const k = step(t, { type: 'drawEvent' });
+    expect(k.phase.kind).toBe('kachikomi');
+    const done = step(k, { type: 'kachikomi', target });
+    expect(done.players[target].points - t.players[target].points).toBe(-3);
+    expect(done.players[pi].points).toBe(t.players[pi].points);
+    // 👊がいなければカチコミに行けない
+    const u = structuredClone(t);
+    u.players[pi].students = [mk('a', ['study'])];
+    expect(step(u, { type: 'drawEvent' }).phase.kind).toBe('result');
+  });
+
+  it('swing events can go negative', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    const t = structuredClone(s);
+    t.players[pi].students = [mk('y', ['fight', 'fight']), mk('z', ['study'])];
+    t.players[pi].roles = [];
+    t.eventDeck.push('poptest');
+    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(1 - 2);
+    const u = structuredClone(t);
+    u.eventDeck.push('marathon');
+    expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(0 - 2);
+  });
+
+  it('goods add an icon to one student, one item each', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    s.eventDeck.push('g_book');
+    s = step(s, { type: 'drawEvent' });
+    expect(s.phase.kind).toBe('equip');
+    const uid = s.players[pi].students[0].uid;
+    const before = s.players[pi].students[0].attrs.length;
+    const next = step(s, { type: 'equip', uid });
+    const st = next.players[pi].students.find((x) => x.uid === uid)!;
+    expect(st.attrs).toHaveLength(before + 1);
+    expect(st.goods?.attr).toBe('study');
+    // もう装備している子にはつけられない
+    const again = structuredClone(next);
+    again.phase = { kind: 'equip', player: pi, card: 'g_shoes' };
+    expect(step(again, { type: 'equip', uid })).toBe(again);
+  });
+
+  it('exchange swaps students without a role', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
+    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
+    const [a0, a1] = s.players[0].students;
+    const b0 = s.players[1].students[0];
+    s.players[0].roles = [{ role: 'study', uid: a0.uid }];
+    s.phase = { kind: 'exchange', player: 0 };
+    expect(step(s, { type: 'exchange', uid: a0.uid, target: 1, theirUid: b0.uid })).toBe(s);
+    const next = step(s, { type: 'exchange', uid: a1.uid, target: 1, theirUid: b0.uid });
+    expect(next.players[0].students.map((x) => x.uid)).toContain(b0.uid);
+    expect(next.players[1].students.map((x) => x.uid)).toContain(a1.uid);
   });
 
   it('drawn event cards go to the discard pile', () => {
@@ -248,11 +304,11 @@ describe('engine', () => {
     s.phase = { kind: 'push', player: 0 };
     const uid = s.players[0].students[0].uid;
     const next = step(s, { type: 'push', uid, target: 1 });
-    expect(next.players[0].students).toHaveLength(5);
+    expect(next.players[0].students).toHaveLength(2);
     expect(next.players[1].students.map((x) => x.uid)).toContain(uid);
   });
 
-  it('normal cards score for everyone, event cards only for the drawer', () => {
+  it('every card scores only for the drawer (kachikomi only hurts the target)', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 21);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const drawer = s.phase.player;
@@ -263,12 +319,6 @@ describe('engine', () => {
       const after = step(t, { type: 'drawEvent' }).players.map((p) => p.points);
       return after.map((v, i) => v - before[i]);
     };
-    const normal = run('n_study');
-    expect(normal.filter((d) => d > 0).length).toBeGreaterThan(1);
-    const contest = run('sportsday');
-    contest.forEach((d, i) => i !== drawer && expect(d).toBe(0));
-    const raid = run('raid_7');
-    raid.forEach((d, i) => i !== drawer && expect(d).toBe(0));
-    expect(raid[drawer]).toBeLessThanOrEqual(0);
+    for (const id of ['n_study', 'n_sports', 'poptest', 'trip', 'raid_present']) run(id).forEach((d, i) => i !== drawer && expect(d, id).toBe(0));
   });
 });

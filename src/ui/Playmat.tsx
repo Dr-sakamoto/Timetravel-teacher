@@ -1,33 +1,32 @@
 import type { CSSProperties } from 'react';
 import { MAX_CLASS, slotUnlockLabel } from '../game/calc';
-import { ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
+import { MAX_ROLE_SEATS, ROLES, roleDesc } from '../game/data/roles';
 import { ERAS } from '../game/data/eras';
 import { className } from '../game/engine';
-import type { Player } from '../game/types';
+import type { Player, RoleSeat } from '../game/types';
 import { TcgCard } from './TcgCard';
 
 interface Props {
   player: Player;
   year: number;
-  /** 今の学期に使える係の数 */
+  /** 今の学期に使える係の席の数 */
   slots: number;
   /** near＝手前の自分の教室／stage＝手番の人の教室（卓の中央）／peek＝タップで開いた教室 */
   variant: 'near' | 'stage' | 'peek';
   acting?: boolean;
   /** 直前のイベントでの得点 */
   delta?: number;
-  activeSlot?: number;
   onSlotClick?: (i: number) => void;
   onSeatClick?: (uid: string) => void;
   selectedUid?: string | null;
   dimUid?: (uid: string) => boolean;
   /** 係決めの下書き */
-  roles?: (string | null)[];
+  roles?: RoleSeat[];
   /** 今のイベントに関わった生徒（光らせる） */
   lit?: Set<string>;
 }
 
-/** 教室プレイマット：名札・係ボード・12の座席 */
+/** 教室プレイマット：名札・係ボード・9つの座席 */
 export function Playmat(props: Props) {
   const { player, year, variant, acting, delta } = props;
   const view: Player = props.roles ? { ...player, roles: props.roles } : player;
@@ -52,22 +51,23 @@ export function Playmat(props: Props) {
         )}
       </div>
       <div className="roleboard">
-        {ROLE_ORDER.map((r, i) => {
+        {Array.from({ length: MAX_ROLE_SEATS }, (_, i) => {
           const locked = i >= k;
-          const st = view.students.find((s) => s.uid === view.roles[i]);
+          const seat = view.roles[i];
+          const st = seat && view.students.find((s) => s.uid === seat.uid);
           return (
             <button
-              key={r}
-              className={`role-slot ${locked ? 'locked' : ''} ${props.activeSlot === i ? 'active' : ''}`}
-              disabled={locked || !props.onSlotClick}
+              key={i}
+              className={`role-slot ${locked ? 'locked' : ''}`}
+              disabled={locked || !seat || !props.onSlotClick}
               onClick={(e) => {
                 e.stopPropagation();
                 props.onSlotClick?.(i);
               }}
-              title={locked ? `${slotUnlockLabel(i)}で解放` : `${ROLES[r].name}：${roleDesc(r)}`}
+              title={locked ? `${slotUnlockLabel(i)}で解放` : seat ? `${ROLES[seat.role].name}：${roleDesc(seat.role)}` : '空き'}
             >
-              <span>{locked ? '🔒' : ROLES[r].icon}</span>
-              <span className="role-name">{locked ? slotUnlockLabel(i).replace('年', '-') : roleDesc(r)}</span>
+              <span>{locked ? '🔒' : seat ? ROLES[seat.role].icon : '🪑'}</span>
+              <span className="role-name">{locked ? slotUnlockLabel(i).replace('年', '-') : seat ? roleDesc(seat.role) : '空き'}</span>
               {!locked && <span className="role-who">{st ? st.icon : '·'}</span>}
             </button>
           );

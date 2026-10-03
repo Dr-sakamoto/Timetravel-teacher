@@ -111,6 +111,24 @@ h3 {
   background: var(--yellow);
   color: #2b2410;
 }
+button.chip {
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+}
+.chip.used:not(.on) {
+  border-color: var(--yellow);
+}
+.role-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.role-warn {
+  color: var(--yellow);
+  font-weight: bold;
+}
 
 /* ---------- タイトル・設定 ---------- */
 .title-screen {
@@ -359,7 +377,7 @@ h3 {
 .opp-seats {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(9, 1fr);
   gap: 2px;
   padding: 0 0.1rem;
 }
@@ -868,7 +886,7 @@ h3 {
   border-width: 5px;
 }
 .playmat.near .seats {
-  grid-template-columns: repeat(6, minmax(0, 118px));
+  grid-template-columns: repeat(9, minmax(0, 118px));
   justify-content: center;
   gap: 0.7rem 0.6rem;
 }
@@ -1294,7 +1312,8 @@ h3 {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 .tcg-attrs.n4 .tcg-attr,
-.tcg-attrs.n5 .tcg-attr {
+.tcg-attrs.n5 .tcg-attr,
+.tcg-attrs.n6 .tcg-attr {
   font-size: 0.85rem;
 }
 .tcg.mini .tcg-head {
@@ -1501,7 +1520,8 @@ h3 {
   }
   .playmat.pm-stage .tcg-attr,
   .playmat.pm-stage .tcg-attrs.n4 .tcg-attr,
-  .playmat.pm-stage .tcg-attrs.n5 .tcg-attr {
+  .playmat.pm-stage .tcg-attrs.n5 .tcg-attr,
+  .playmat.pm-stage .tcg-attrs.n6 .tcg-attr {
     font-size: 0.5rem;
     padding: 0;
   }
@@ -1592,7 +1612,7 @@ h3 {
   }
   :is(.near-seat, .peek) .playmat .seats {
     grid-area: seats;
-    grid-template-columns: repeat(12, minmax(0, 15dvh));
+    grid-template-columns: repeat(9, minmax(0, 15dvh));
     justify-content: center;
     gap: 0.2rem;
     margin-top: 0.45rem;
@@ -1851,3 +1871,39 @@ h3 {
 .deck-group th { padding-top: 10px; border-bottom: 1px solid currentColor; }
 .deck-note { margin-left: 8px; font-weight: normal; opacity: 0.7; font-size: 0.85em; }
 .deck-empty { opacity: 0.4; }
+
+/* 係の種類のチップ（横向きスマホでは名前を省いて小さく） */
+@media (orientation: landscape) and (max-height: 600px) {
+  .role-editor .role-kinds .chip {
+    font-size: 0.62rem;
+    padding: 0 0.35em;
+    margin: 0 0.05em;
+  }
+  .role-editor .role-kind-name {
+    display: none;
+  }
+  .role-editor .role-warn {
+    font-size: 0.62rem;
+  }
+}
+
+.peek-hint {
+  text-align: center;
+  font-weight: bold;
+  color: var(--yellow);
+  margin-bottom: 0.3rem;
+}
+
+/* 装備しているグッズ */
+.tcg-goods {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  z-index: 2;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}

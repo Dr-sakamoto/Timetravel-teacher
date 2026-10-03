@@ -19,7 +19,21 @@ export const ATTR_LABEL: Record<Attr, string> = {
 export type Rarity = 'N' | 'R' | 'SR' | 'SSR';
 export type Tag = '現代' | 'ヤンキー' | '恐竜' | '武将' | '忍者' | '学者' | '芸術家' | '王族' | '未来' | '動物';
 
-export type RoleId = 'study' | 'pe' | 'culture' | 'leader' | 'discipline' | 'library';
+export type RoleId = 'study' | 'pe' | 'culture' | 'leader' | 'discipline';
+
+/** 係の席：どの係に誰が就いているか */
+export interface RoleSeat {
+  role: RoleId;
+  uid: string;
+}
+
+/** 生徒に装備したグッズ（アイコンが1つ増える） */
+export interface Goods {
+  id: string;
+  name: string;
+  icon: string;
+  attr: Attr;
+}
 
 export type EraId =
   | 'cretaceous'
@@ -49,6 +63,8 @@ export interface Student {
   attrs: Attr[];
   flavor: string;
   joined: string;
+  /** 装備しているグッズ（1人1つまで。そのアイコンは attrs にも足してある） */
+  goods?: Goods;
   /** 得点に貢献した回数 */
   mvp: number;
 }
@@ -59,8 +75,8 @@ export interface Player {
   isCpu: boolean;
   color: string;
   students: Student[];
-  /** ROLE_ORDER の順に、担当する生徒uid */
-  roles: (string | null)[];
+  /** 係の席（学期で使える数まで。1つの係に2人まで、係の種類は3つまで） */
+  roles: RoleSeat[];
   points: number;
 }
 
@@ -100,6 +116,12 @@ export type Phase =
   | { kind: 'draw'; player: number }
   /** 転校：いらない生徒を別のクラスに押しつける */
   | { kind: 'push'; player: number }
+  /** カチコミ：他校を1つ選んで、自分の👊の数だけ減点させる */
+  | { kind: 'kachikomi'; player: number }
+  /** 交換留学：係に就いていない生徒どうしを他校と交換 */
+  | { kind: 'exchange'; player: number }
+  /** グッズ：生徒1人に装備する */
+  | { kind: 'equip'; player: number; card: string }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
   | { kind: 'gameOver' };
 
@@ -111,7 +133,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 11;
+  version: 12;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -139,6 +161,9 @@ export type Action =
   | { type: 'drawMember' }
   | { type: 'drawAllMembers' }
   | { type: 'continue' }
-  | { type: 'setRoles'; roles: (string | null)[] }
+  | { type: 'setRoles'; roles: RoleSeat[] }
   | { type: 'drawEvent' }
-  | { type: 'push'; uid: string | null; target?: number };
+  | { type: 'push'; uid: string | null; target?: number }
+  | { type: 'kachikomi'; target: number | null }
+  | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
+  | { type: 'equip'; uid: string | null };
