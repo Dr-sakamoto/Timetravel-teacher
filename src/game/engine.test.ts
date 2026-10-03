@@ -100,6 +100,14 @@ describe('engine', () => {
     expect([[1, 1], [1, 0], [1, 2], [1, 3], [2, 1], [2, 2], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([3, 3, 4, 5, 6, 6, 6]);
   });
 
+  it('regular modern students have 1 icon about 70% of the time and 2 icons otherwise', () => {
+    const regular = ARCHETYPES.filter((a) => a.rarity === 'N');
+    const ones = regular.filter((a) => parseAttrs(a.attrs).length === 1).length;
+    expect(regular.every((a) => parseAttrs(a.attrs).length <= 2)).toBe(true);
+    expect(ones / regular.length).toBeGreaterThanOrEqual(0.65);
+    expect(ones / regular.length).toBeLessThanOrEqual(0.75);
+  });
+
   it('a student can hold only one role, and locked roles stay empty', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 5);
     while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);

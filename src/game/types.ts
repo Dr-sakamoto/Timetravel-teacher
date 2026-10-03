@@ -1,4 +1,4 @@
-/** 生徒の属性アイコン。勉強はヤンキー以外ほぼ全員、喧嘩はヤンキー専用（ヤンキーの約半分は👊のみ） */
+/** 生徒の属性アイコン。喧嘩はヤンキー専用（ヤンキーの約半分は👊のみ） */
 export type Attr = 'study' | 'sports' | 'art' | 'charm' | 'fight';
 export const ATTRS: Attr[] = ['study', 'sports', 'art', 'charm', 'fight'];
 export const ATTR_ICON: Record<Attr, string> = {
