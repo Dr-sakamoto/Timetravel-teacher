@@ -1,6 +1,4 @@
-import type { Ability, Rarity, Tag } from '../types';
-
-export type ArchetypeGroup = 'sports' | 'study' | 'art' | 'charm' | 'yankee' | 'plain';
+import type { Rarity, Tag } from '../types';
 
 /** 現代の「普通のやつ」。初期メンバーと現代からの転校生はここから生成する */
 export interface Archetype {
@@ -8,60 +6,59 @@ export interface Archetype {
   title: string;
   icon: string;
   rarity: Rarity;
-  group: ArchetypeGroup;
+  /** 強さの目安（1〜10）。カードには1〜5に変換して印刷する */
   power: number;
   /** 属性の略記（s=📚 p=🏃 a=🎨 c=👑 f=👊） */
   attrs: string;
   tags: Tag[];
-  ability?: Ability;
   flavor: string;
 }
 
 const Y: Tag[] = ['現代', 'ヤンキー'];
 const M: Tag[] = ['現代'];
 
-function a(id: string, title: string, icon: string, rarity: Rarity, group: ArchetypeGroup, power: number, attrs: string, flavor: string, ability?: Ability): Archetype {
-  return { id, title, icon, rarity, group, power, attrs, tags: attrs.includes('f') ? Y : M, ability, flavor };
+function a(id: string, title: string, icon: string, rarity: Rarity, power: number, attrs: string, flavor: string): Archetype {
+  return { id, title, icon, rarity, power, attrs, tags: attrs.includes('f') ? Y : M, flavor };
 }
 
 // 📚はヤンキー以外ほぼ標準装備。👊はヤンキー専用
 export const ARCHETYPES: Archetype[] = [
-  a('baseball', '野球部', '⚾', 'N', 'sports', 3, 'sp', '坊主頭。声がでかい。'),
-  a('soccer', 'サッカー部', '⚽', 'N', 'sports', 3, 'sp', '昼休みは必ずグラウンド。'),
-  a('basket', 'バスケ部', '🏀', 'N', 'sports', 3, 'sp', '背が高い。'),
-  a('track', '陸上部', '🏃', 'N', 'sports', 5, 'p', 'とにかく足が速い。'),
-  a('judo', '柔道部', '🥋', 'N', 'sports', 4, 'sp', '受け身が得意。'),
-  a('swim', '水泳部', '🏊', 'N', 'sports', 3, 'sp', 'いつも髪が塩素くさい。'),
-  a('brass', '吹奏楽部', '🎺', 'N', 'art', 3, 'sa', '肺活量はクラス一。'),
-  a('artclub', '美術部', '🖌️', 'N', 'art', 4, 'sa', 'ノートの端が全部イラスト。'),
-  a('lit', '文芸部', '📖', 'N', 'art', 3, 'sa', 'ポエムを書いている。'),
-  a('band', '軽音部', '🎸', 'N', 'art', 4, 'ac', '文化祭のステージが命。'),
-  a('drama', '演劇部', '🎭', 'N', 'art', 2, 'sac', '日常会話がたまに芝居がかる。'),
-  a('dance', 'ダンス部', '💃', 'N', 'art', 3, 'pa', '廊下でステップを踏む。'),
-  a('nerd', 'ガリ勉', '🤓', 'N', 'study', 6, 's', '休み時間も単語帳。'),
-  a('science', '科学部', '🧪', 'N', 'study', 5, 's', 'たまに理科室が爆発する。'),
-  a('shogi', '将棋部', '♟️', 'N', 'study', 5, 's', '50手先まで読む。'),
-  a('otaku', 'オタク', '🎮', 'N', 'study', 3, 'sa', '早口になると止まらない。'),
-  a('council', '生徒会役員', '📋', 'N', 'charm', 3, 'sc', '朝の挨拶運動の常連。'),
-  a('rep', '委員長タイプ', '🙋', 'N', 'charm', 4, 'sc', '「ちょっと男子ー！」'),
-  a('gyaru', 'ギャル', '💅', 'N', 'charm', 4, 'ac', '誰とでもすぐ友達になる。'),
-  a('clown', 'お調子者', '🤡', 'N', 'charm', 2, 'spc', 'クラスのムードメーカー。'),
-  a('tennen', '天然', '🌼', 'N', 'charm', 2, 'sac', '上履きのまま帰る。'),
-  a('kitaku', '帰宅部', '🏠', 'N', 'plain', 4, 's', '放課後の帰宅スピードは全国レベル。'),
-  a('quiet', '目立たない子', '🙂', 'N', 'plain', 3, 'sa', '出席を取るまで居たか分からない。'),
-  a('yankee', 'ヤンキー', '😎', 'N', 'yankee', 4, 'pf', 'リーゼント。根は優しい。'),
-  a('sukeban', 'スケバン', '💄', 'N', 'yankee', 4, 'fc', 'スカートが長い。'),
-  a('furyo', '不良', '👊', 'N', 'yankee', 6, 'f', '授業中はだいたい寝ている。'),
-  a('bosozoku', '暴走族見習い', '🏍️', 'N', 'yankee', 3, 'pfc', 'まだ自転車。'),
+  a('baseball', '野球部', '⚾', 'N', 3, 'sp', '坊主頭。声がでかい。'),
+  a('soccer', 'サッカー部', '⚽', 'N', 3, 'sp', '昼休みは必ずグラウンド。'),
+  a('basket', 'バスケ部', '🏀', 'N', 3, 'sp', '背が高い。'),
+  a('track', '陸上部', '🏃', 'N', 5, 'p', 'とにかく足が速い。'),
+  a('judo', '柔道部', '🥋', 'N', 4, 'sp', '受け身が得意。'),
+  a('swim', '水泳部', '🏊', 'N', 3, 'sp', 'いつも髪が塩素くさい。'),
+  a('brass', '吹奏楽部', '🎺', 'N', 3, 'sa', '肺活量はクラス一。'),
+  a('artclub', '美術部', '🖌️', 'N', 4, 'sa', 'ノートの端が全部イラスト。'),
+  a('lit', '文芸部', '📖', 'N', 3, 'sa', 'ポエムを書いている。'),
+  a('band', '軽音部', '🎸', 'N', 4, 'ac', '文化祭のステージが命。'),
+  a('drama', '演劇部', '🎭', 'N', 2, 'sac', '日常会話がたまに芝居がかる。'),
+  a('dance', 'ダンス部', '💃', 'N', 3, 'pa', '廊下でステップを踏む。'),
+  a('nerd', 'ガリ勉', '🤓', 'N', 6, 's', '休み時間も単語帳。'),
+  a('science', '科学部', '🧪', 'N', 5, 's', 'たまに理科室が爆発する。'),
+  a('shogi', '将棋部', '♟️', 'N', 5, 's', '50手先まで読む。'),
+  a('otaku', 'オタク', '🎮', 'N', 3, 'sa', '早口になると止まらない。'),
+  a('council', '生徒会役員', '📋', 'N', 3, 'sc', '朝の挨拶運動の常連。'),
+  a('rep', '委員長タイプ', '🙋', 'N', 4, 'sc', '「ちょっと男子ー！」'),
+  a('gyaru', 'ギャル', '💅', 'N', 4, 'ac', '誰とでもすぐ友達になる。'),
+  a('clown', 'お調子者', '🤡', 'N', 2, 'spc', 'クラスのムードメーカー。'),
+  a('tennen', '天然', '🌼', 'N', 2, 'sac', '上履きのまま帰る。'),
+  a('kitaku', '帰宅部', '🏠', 'N', 4, 's', '放課後の帰宅スピードは全国レベル。'),
+  a('quiet', '目立たない子', '🙂', 'N', 3, 'sa', '出席を取るまで居たか分からない。'),
+  a('yankee', 'ヤンキー', '😎', 'N', 4, 'pf', 'リーゼント。根は優しい。'),
+  a('sukeban', 'スケバン', '💄', 'N', 4, 'fc', 'スカートが長い。'),
+  a('furyo', '不良', '👊', 'N', 6, 'f', '授業中はだいたい寝ている。'),
+  a('bosozoku', '暴走族見習い', '🏍️', 'N', 3, 'pfc', 'まだ自転車。'),
   // 転校生限定（現代）
-  a('returnee', '帰国子女', '✈️', 'R', 'charm', 4, 'sac', '英語の発音がネイティブ。'),
-  a('childstar', '天才子役', '🎬', 'R', 'art', 6, 'ac', 'ドラマ撮影で早退しがち。'),
-  a('topscore', '全国模試1位', '🥇', 'R', 'study', 9, 's', '塾を3つ掛け持ち。'),
-  a('esports', 'eスポーツ選手', '🕹️', 'R', 'study', 6, 'sa', '反射神経はプロ級。'),
-  a('influencer', '人気インフルエンサー', '📱', 'R', 'charm', 7, 'c', 'フォロワー50万人。', { kind: 'boost', attr: 'charm', amount: 2 }),
-  a('banchou', '伝説の番長', '🔱', 'SR', 'yankee', 7, 'pfc', '隣町まで名前が知れ渡っている。'),
-  a('olympian', 'オリンピック候補', '🏅', 'SR', 'sports', 9, 'sp', '練習で授業をよく休む。'),
-  a('genius', '飛び級の天才', '🧠', 'SR', 'study', 10, 'sa', '実はまだ10歳。'),
+  a('returnee', '帰国子女', '✈️', 'R', 4, 'sac', '英語の発音がネイティブ。'),
+  a('childstar', '天才子役', '🎬', 'R', 6, 'ac', 'ドラマ撮影で早退しがち。'),
+  a('topscore', '全国模試1位', '🥇', 'R', 9, 's', '塾を3つ掛け持ち。'),
+  a('esports', 'eスポーツ選手', '🕹️', 'R', 6, 'sa', '反射神経はプロ級。'),
+  a('influencer', '人気インフルエンサー', '📱', 'R', 7, 'c', 'フォロワー50万人。'),
+  a('banchou', '伝説の番長', '🔱', 'SR', 7, 'pfc', '隣町まで名前が知れ渡っている。'),
+  a('olympian', 'オリンピック候補', '🏅', 'SR', 9, 'sp', '練習で授業をよく休む。'),
+  a('genius', '飛び級の天才', '🧠', 'SR', 10, 'sa', '実はまだ10歳。'),
 ];
 
 export const STARTER_ARCHETYPES = ARCHETYPES.filter((a) => a.rarity === 'N');

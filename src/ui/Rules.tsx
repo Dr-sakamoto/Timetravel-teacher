@@ -1,20 +1,20 @@
-import { CLASS_CARDS } from '../game/data/classes';
 import { ERAS } from '../game/data/eras';
-import { ERA_EVENTS, FIXED_EVENTS, ICON_EVENTS, PERSONAL_EVENTS, SCHOOL_EVENTS, aggText, effectText } from '../game/data/events';
-import { ROLES, roleDesc } from '../game/data/roles';
-import { ATTRS, ATTR_ICON, ATTR_LABEL, type RoleId } from '../game/types';
-
-const ATTR_NOTE: Record<string, string> = {
-  study: 'ヤンキー以外はほぼ全員が持つ。定期テストは全員の平均なので、持っていない子は0点。',
-  sports: '体育祭・球技大会など。',
-  art: '文化祭・合唱コンクールなど。',
-  charm: '生徒会選挙など。まとめ役。',
-  fight: 'ヤンキー専用。カチコミ（他校の殴り込み）は👊持ちしか戦えない。',
-};
+import {
+  CONTEST_CARDS,
+  CONTEST_POINTS,
+  ERA_CARDS,
+  FIXED_EVENTS,
+  NORMAL_CARDS,
+  PERSONAL_CARDS,
+  RAID_CARDS,
+  RAID_LOSE,
+  RAID_WIN,
+  fixedRule,
+} from '../game/data/events';
+import { ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
+import { ATTRS, ATTR_ICON, ATTR_LABEL } from '../game/types';
 
 export function Rules({ onClose }: { onClose: () => void }) {
-  const deck = [...ICON_EVENTS, ...SCHOOL_EVENTS, ...PERSONAL_EVENTS];
-  const total = deck.reduce((a, e) => a + e.count, 0);
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -23,89 +23,80 @@ export function Rules({ onClose }: { onClose: () => void }) {
         </button>
         <h2>遊び方</h2>
         <p>
-          あなたは担任の先生。タイムトラベルで歴史上の偉人や恐竜を転校させ、教室の12席を埋めて<b>「時空最強のクラス」</b>を作ろう。
-          1〜3年間で一番ポイントを稼いだ先生の勝ち！
+          あなたは担任の先生。歴史上の偉人や恐竜を転入させて教室の12席を埋め、<b>クラスポイント</b>を一番集めた先生の勝ち！
         </p>
 
-        <h3>生徒カード：数値と属性</h3>
+        <h3>生徒カード</h3>
         <p>
-          生徒は<b>数値（1〜10）</b>と<b>属性アイコン</b>を持つ。数値が高い一点特化型か、属性の幅が広い万能型か。
+          左上の<b>数値（1〜5）</b>と、下の<b>属性アイコン</b>だけ。
+          {ATTRS.map((a) => `${ATTR_ICON[a]}${ATTR_LABEL[a]}`).join('・')}。
+          👊はヤンキーだけが持ち、ヤンキーは📚を持たない。
         </p>
-        <ul className="rule-list">
-          {ATTRS.map((a) => (
-            <li key={a}>
-              <b>
-                {ATTR_ICON[a]} {ATTR_LABEL[a]}
-              </b>
-              ：{ATTR_NOTE[a]}
-            </li>
-          ))}
-        </ul>
 
-        <h3>はじめ方</h3>
+        <h3>準備</h3>
         <ol className="rule-list">
-          <li>クラスカードを1枚引く（係の顔ぶれと、出やすい生徒の傾向が決まる）。</li>
-          <li>全員で順番に生徒カードを1枚ずつ引き、最初の6人をそろえる。</li>
-          <li>係は最初3つ。転入で人数が増えると 8人→4つ、10人→5つ、12人→6つ と解放される。係は学期の頭に決め直せる。</li>
+          <li>現代の生徒の山札から、全員で順番に1枚ずつ引いて6人そろえる。</li>
+          <li>
+            係は全員共通。6人で3つ、8人で4つ、10人で5つ、12人で6つ使える。係のアイコンを持つ子を就けると、そのアイコンで点が入るたび<b>+1</b>。
+            <div className="rule-roles">
+              {ROLE_ORDER.map((r) => (
+                <span key={r} className="chip">
+                  {ROLES[r].icon}
+                  {ROLES[r].name} {roleDesc(r)}
+                </span>
+              ))}
+            </div>
+          </li>
+          <li>時代は1年に3つランダム。1学期に1つずつ巡り、その学期の時代の生徒の山札と時代カードを使う。</li>
         </ol>
-        <ul className="rule-list">
-          {CLASS_CARDS.map((c) => (
-            <li key={c.id}>
-              {c.icon} <b>{c.nick}</b>：{c.desc}
-            </li>
-          ))}
-        </ul>
 
-        <h3>毎ターン：山札から1枚</h3>
-        <p>山札は全時代共通の{total}枚＋今学期の時代の固有カード（2種×2枚）。学期が変わると時代カードも入れ替わる。</p>
+        <h3>手番：イベントの山札を1枚めくる</h3>
         <ul className="rule-list">
           <li>
-            <b>アイコンカード（通常）</b>：{ICON_EVENTS.map((e) => `${e.icon}×${e.count}`).join(' ')}。全クラスで、その属性を持つ生徒1人につき+1pt（係で強化中の子は+2pt）。
+            <b>通常カード</b>（{NORMAL_CARDS.length}枚・{NORMAL_CARDS.map((c) => c.name).slice(0, 4).join('・')}…）：
+            そのアイコンを持つ子1人につき<b>+1</b>。全クラスが数える。
           </li>
-          {PERSONAL_EVENTS.map((e) => (
-            <li key={e.id}>
-              {e.icon} <b>{e.name}</b>（×{e.count}）：{e.desc}
+          <li>
+            <b>勝負カード</b>（{CONTEST_CARDS.map((c) => c.icon + c.name).join('・')}）：
+            そのアイコンを持つ子の<b>数値の合計</b>（＋係ボーナス）で順位をつけ、{(CONTEST_POINTS[4] ?? []).join('／')}点。
+          </li>
+          <li>
+            <b>カチコミ</b>（{RAID_CARDS.length}枚）：👊の数値の合計がカードの敵の強さ（{RAID_CARDS.map((c) => c.threat).join('・')}）以上なら+{RAID_WIN}、足りなければ{RAID_LOSE}。
+          </li>
+          {PERSONAL_CARDS.map((c) => (
+            <li key={c.id}>
+              <b>
+                {c.icon}
+                {c.name}
+              </b>
+              （{c.count}枚）：{c.desc}
             </li>
           ))}
-          {SCHOOL_EVENTS.map((e) => (
-            <li key={e.id}>
-              {e.icon} <b>{e.name}</b>（×{e.count}）：{aggText(e)}
-              {e.threshold && `　撃退+${e.threshold.win}pt／突破${e.threshold.lose}pt`}
-              {e.effects.length > 0 && <span className="effect-inline"> ✦ {e.effects.map(effectText).join('、')}</span>}
-            </li>
-          ))}
+          <li>
+            <b>時代カード</b>：勝負カードと同じ。ただしその時代出身の生徒は数値2倍。
+          </li>
         </ul>
 
-        <h3>時代カード</h3>
+        <h3>時代カード一覧</h3>
         <ul className="rule-list">
-          {ERAS.filter((era) => era.id !== 'present').map((era) => (
+          {ERAS.filter((e) => e.id !== 'present').map((era) => (
             <li key={era.id}>
-              {era.icon} <b>{era.name}</b>：
-              {ERA_EVENTS.filter((e) => e.era === era.id)
-                .map((e) => `${e.icon}${e.name}（${aggText(e)}${e.effects.length ? '・' + e.effects.map(effectText).join('・') : ''}）`)
+              {era.icon} {era.name}：
+              {ERA_CARDS.filter((c) => c.era === era.id)
+                .map((c) => `${c.icon}${c.name}（${ATTR_ICON[c.attr]}）`)
                 .join('　')}
             </li>
           ))}
         </ul>
 
-        <h3>固定イベント</h3>
+        <h3>決まったイベント</h3>
         <ul className="rule-list">
-          {FIXED_EVENTS.map((e) => (
-            <li key={e.id}>
-              {e.icon} <b>{e.name}</b>：{aggText(e)}（得点×{e.mult}）
+          {FIXED_EVENTS.map((f) => (
+            <li key={f.id}>
+              {f.icon} <b>{f.name}</b>：{fixedRule(f)}
             </li>
           ))}
-          <li>🌻 8月：夏休み合宿。その年の3つの時代から1つ選んで転校生を1人スカウト。</li>
-          <li>🌸 年度末：進級。全員の数値+1。時代は1年ごとに3つ、1学期に1つずつ巡る。</li>
-        </ul>
-
-        <h3>係</h3>
-        <ul className="rule-list">
-          {(Object.keys(ROLES) as RoleId[]).map((r) => (
-            <li key={r}>
-              {ROLES[r].icon} <b>{ROLES[r].name}</b>：{roleDesc(r)}
-            </li>
-          ))}
+          <li>🌻 8月 夏休み合宿：今年の3つの時代から1つ選んで転入（3枚から1人）。</li>
         </ul>
       </div>
     </div>
