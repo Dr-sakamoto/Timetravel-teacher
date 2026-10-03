@@ -1,7 +1,7 @@
 import { C, E, O, P } from './parts';
 
 /** 人の形をしていない生徒（恐竜・ロボ・宇宙人など）。100×100 の座標系 */
-export type Creature = 'trex' | 'triceratops' | 'brachio' | 'ptera' | 'raptor' | 'android' | 'alien' | 'robodog';
+export type Creature = 'trex' | 'triceratops' | 'brachio' | 'ptera' | 'raptor' | 'android' | 'alien' | 'robodog' | 'martian' | 'cyborg';
 
 const cheek = (x: number, y: number) => <E x={x} y={y} rx={3} ry={1.9} fill="#f59c9c" sw={0} />;
 const eye = (x: number, y: number, r = 2.3) => (
@@ -167,6 +167,59 @@ export function CreaturePart({ kind }: { kind: Creature }) {
           <P d="M48 58 Q50 64 52 58Z" fill="#f08a9a" sw={1} />
           {cheek(32, 54)}
           {cheek(68, 54)}
+        </g>
+      );
+    case 'martian':
+      // 火星人の侵略で勝手に座る子：タコ型の火星人。何もできないので、ぼんやり顔
+      return (
+        <g>
+          {[22, 34, 46, 58, 70].map((x) => (
+            <P key={x} d={`M${x + 4} 72 C${x - 2} 82 ${x + 8} 88 ${x + 2} 98`} sw={7.5} stroke={O} />
+          ))}
+          {[22, 34, 46, 58, 70].map((x) => (
+            <P key={`t${x}`} d={`M${x + 4} 72 C${x - 2} 82 ${x + 8} 88 ${x + 2} 98`} sw={5} stroke="#d9606a" />
+          ))}
+          <P d="M18 52 C14 24 32 8 50 8 C68 8 86 24 82 52 C80 68 66 76 50 76 C34 76 20 68 18 52Z" fill="#e5737b" />
+          {[30, 44, 60, 70].map((x, i) => (
+            <C key={x} x={x} y={[24, 16, 18, 30][i]} r={[3, 2.2, 2.6, 2][i]} fill="#c95560" sw={0} />
+          ))}
+          <E x={38} y={46} rx={7} ry={7.5} fill="#fff" />
+          <E x={62} y={46} rx={7} ry={7.5} fill="#fff" />
+          <C x={39} y={48} r={2.4} fill={O} sw={0} />
+          <C x={61} y={48} r={2.4} fill={O} sw={0} />
+          <P d="M31 39 Q38 36 45 39 M55 39 Q62 36 69 39" sw={1.3} />
+          <E x={50} y={62} rx={4} ry={2.6} fill="#9b3542" sw={1.2} />
+          <P d="M14 30 C8 22 10 12 18 10 M86 30 C92 22 90 12 82 10" stroke="#9be0ff" sw={1.2} op={0.8} />
+          <P d="M12 46 C2 40 0 30 6 22 M88 46 C98 40 100 30 94 22" stroke="#9be0ff" sw={1.2} op={0.6} />
+        </g>
+      );
+    case 'cyborg':
+      // サイボーグ化された子：顔の右半分が機械、片腕がロボットアーム
+      return (
+        <g>
+          <P d="M16 100 C17 80 30 71 50 70 C70 71 83 80 84 100 Z" fill="#3a4654" />
+          <P d="M50 70 C70 71 83 80 84 100 L50 100Z" fill="#9aa7b4" />
+          <P d="M58 78 H76 M60 86 H80 M62 94 H82" stroke="#35e0ff" sw={1.2} />
+          <C x={42} y={86} r={4.5} fill="#35e0ff" />
+          <C x={42} y={86} r={1.8} fill="#fff" sw={0} />
+          <rect x={44.5} y={60} width={11} height={12} fill="#ffd9b8" stroke={O} strokeWidth={1.4} />
+          <P d="M31 47 C31 33 39 26 50 26 L50 68 C39 68 31 60 31 47Z" fill="#ffd9b8" />
+          <P d="M50 26 C61 26 69 33 69 47 C69 60 61 68 50 68Z" fill="#c9d3dc" />
+          <P d="M50 26 V68" sw={1.6} />
+          <P d="M30 40 C28 26 38 18 50 19 L50 30 C42 29 35 33 32 40Z" fill="#2f2a2a" />
+          <P d="M50 19 C62 18 72 26 70 40 L66 36 C62 31 56 29 50 30Z" fill="#7b8794" />
+          {[54, 60, 66].map((x) => (
+            <C key={x} x={x} y={58} r={0.9} fill={O} sw={0} />
+          ))}
+          <P d="M53 34 L66 34 M53 64 L64 62" sw={1} />
+          <C x={42} y={46} r={2.3} fill={O} sw={0} />
+          <C x={42.8} y={45.1} r={0.75} fill="#fff" sw={0} />
+          <rect x={53} y={41} width={12} height={9} rx={2} fill="#1f2b3a" stroke={O} strokeWidth={1.2} />
+          <C x={59} y={45.5} r={2.6} fill="#e5534b" sw={0} />
+          <C x={59} y={45.5} r={1} fill="#ffd0cc" sw={0} />
+          <P d="M40 58 Q46 61 50 58" sw={1.4} />
+          <P d="M50 58 H56" sw={1.4} />
+          <E x={36} y={54} rx={3} ry={1.9} fill="#f59c9c" sw={0} />
         </g>
       );
   }

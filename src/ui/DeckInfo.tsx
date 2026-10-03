@@ -1,14 +1,14 @@
-import { ERAS } from '../game/data/eras';
+import { ERAS, favorLabel } from '../game/data/eras';
 import { DECK_GROUPS, currentEra, deckBreakdown, type DeckGroup, type DeckRow } from '../game/engine';
 import type { GameState } from '../game/types';
 
 const GROUP_NOTE: Record<DeckGroup, string> = {
   通常: 'めくった人：クラス全員のそのアイコンの数',
-  カチコミ: 'めくった人：他のクラスを自分の👊の数だけ減点',
+  カチコミ: 'めくった人：他のクラスを自分の👊の数×3だけ減点',
   共通イベント: '全クラス：状況でプラスにもマイナスにも',
-  '転校・クラス替え': 'めくった人：生徒を押しつける／入れ替える',
+  '転校・クラス替え': '転校は全クラスが1人ずつ外す／クラス替えはめくった人が入れ替える',
   グッズ: '生徒1人に装備してアイコン＋1',
-  時代イベント: '全クラス：この時代の子は2倍。大当たりも大損もある',
+  時代イベント: '全クラス：カードごとに効果が違う。この時代の子は2倍',
   人物: 'めくった人のクラスに転入',
 };
 
@@ -27,7 +27,7 @@ export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => 
         </button>
         <h2>
           {era.icon}
-          {era.name}の山札
+          {era.name}の山札（{favorLabel(era)}）
         </h2>
         <p>
           山札の残り {state.eventDeck.length}枚／捨て札 {state.discard.length}枚（合わせて {total}枚。装備されたグッズと転入した人物は含まない）

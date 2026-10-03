@@ -76,7 +76,8 @@ function scenario(id: string, label: string): Scenario {
     case 'swing':
       return { label, normal: false, fx: { attr: c.plus, minus: c.minus }, card: { title: c.name, icon: c.icon, attr: c.plus, tone: 'contest', desc: c.desc, rule, rows } };
     case 'contest':
-      return { label, normal: false, fx: { attr: c.attr, era: c.era }, card: { title: c.name, icon: c.icon, attr: c.attr, tone: 'era', desc: c.desc, rule, rows } };
+      // デモは👊の合戦だけ。全アイコン勝負（'all'）は演出がないので👊で代用
+      return { label, normal: false, fx: { attr: c.attr === 'all' ? 'fight' : c.attr, era: c.era }, card: { title: c.name, icon: c.icon, art: c.id, attr: c.attr, tone: 'era', desc: c.desc, rule, rows } };
     case 'raid':
       return {
         label,
@@ -92,7 +93,7 @@ function scenario(id: string, label: string): Scenario {
 const SCENARIOS: Scenario[] = [
   scenario('n_sports', '🏃 通常カード'),
   scenario('marathon', '🥵 共通イベント（−人数）'),
-  scenario('kassen', '⚔️ 時代イベント（×2）'),
+  scenario('sekigahara', '⚔️ 時代イベント（×2）'),
   scenario('raid_sengoku', '👊 襲来（−敵の強さ）'),
 ];
 

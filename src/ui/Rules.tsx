@@ -1,7 +1,8 @@
 import { MAX_CLASS, STARTING_MEMBERS } from '../game/calc';
 import { CARDS } from '../game/data/cards';
-import { ERAS } from '../game/data/eras';
+import { ERAS, favorLabel } from '../game/data/eras';
 import {
+  CYBORG_CARDS,
   ERA_CARDS,
   FIXED_EVENTS,
   GOODS_CARDS,
@@ -12,6 +13,7 @@ import {
   RAID_CARDS,
   SWING_CARDS,
   cardRule,
+  eraEffectRule,
   fixedRule,
 } from '../game/data/events';
 import { ARCHETYPES } from '../game/data/modern';
@@ -35,7 +37,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <p>
           書いてあるのは<b>アイコン</b>だけ。同じアイコンが並ぶほど得意（1枚に最大5個。N 1〜2個／R 2〜3個／SR 3〜4個／SSR 4〜5個）。
           {ATTRS.map((a) => `${ATTR_ICON[a]}${ATTR_LABEL[a]}`).join('・')}。
-          👊はヤンキーだけが持ち、ヤンキーの約半分は👊のみ。グッズを装備するとアイコンが1つ増える（1人1つまで）。
+          👊はヤンキーと恐竜だけが持ち、ヤンキーの約半分は👊のみ。<b>恐竜は👊が中心</b>（強い恐竜ほど👊が多い。空を飛ぶ・素早い恐竜は🏃も持つ）。グッズを装備するとアイコンが1つ増える（1人1つまで）。
         </p>
 
         <h3>準備</h3>
@@ -60,7 +62,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
 
         <h3>手番：1人1枚ずつ山札をめくる</h3>
         <p>
-          <b>通常カード・カチコミ・転校・クラス替え・グッズ・人物カードはめくった人だけ</b>。<b>共通イベントと時代イベントは学校行事なので全クラスに</b>効果がある。
+          <b>通常カード・カチコミ・クラス替え・グッズ・人物カードはめくった人だけ</b>。<b>共通イベント・時代イベント・転校は全クラスに</b>効果がある。
         </p>
         <p>
           山札は学期ごとに作り直す。<b>通常カード・カチコミ・共通イベント・転校・グッズは全時代共通</b>で、そこに
@@ -102,7 +104,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             <b>グッズ</b>（共通：{GOODS_CARDS.filter((g) => !g.era).map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`).join('・')}＋時代ごとに2種）：生徒1人に装備して、そのアイコンを＋1。
           </li>
           <li>
-            <b>時代イベント</b>（全クラス・2種×2枚）：クラス全員のそのアイコンの合計数。<b>その時代出身の子は2倍</b>。時代によって得をする能力が変わる。
+            <b>時代イベント</b>（全クラス・2種×2枚）：<b>時代ごとに有利なアイコン（0〜2個）が決まっていて</b>、そのアイコンで競う（効果はカードごとに違う。現代は優遇なしで全アイコン勝負）。<b>その時代出身の子のアイコンは2倍</b>。1年の3つの時代は年の初めに決まって上に出ているので、次の学期に向けてクラスを作っておこう。
           </li>
           <li>
             <b>襲来</b>（全クラス・時代ごとに1枚）：クラスの👊の数 − 敵の強さ（その時代出身の子は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス。
@@ -118,7 +120,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             const raid = RAID_CARDS.find((c) => c.era === era.id)!;
             return (
               <li key={era.id}>
-                {era.icon} <b>{era.name}</b>：
+                {era.icon} <b>{era.name}</b>（<b>{favorLabel(era)}</b>）：
                 {era.id === 'present' ? (
                   <>
                     転校生{' '}
@@ -136,13 +138,14 @@ export function Rules({ onClose }: { onClose: () => void }) {
                 )}
                 ／イベント{' '}
                 {ERA_CARDS.filter((c) => c.era === era.id)
-                  .map((c) => `${c.icon}${c.name}（${ATTR_ICON[c.attr]}）`)
+                  .map((c) => `${c.icon}${c.name}（${eraEffectRule(c)}）`)
                   .join('・')}
                 ／襲来 {raid.icon}
                 {raid.name.replace('襲来！', '')}（強さ{raid.threat}）／グッズ{' '}
-                {GOODS_CARDS.filter((g) => g.era === era.id)
-                  .map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`)
-                  .join('・')}
+                {[
+                  ...GOODS_CARDS.filter((g) => g.era === era.id).map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`),
+                  ...CYBORG_CARDS.filter((g) => g.era === era.id).map((g) => `${g.icon}${g.name}（${cardRule(g)}）`),
+                ].join('・')}
               </li>
             );
           })}

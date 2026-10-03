@@ -1,9 +1,11 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
+import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, contributions, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
 import { CARDS, CARD_MAP, toIcons } from './data/cards';
-import { ERAS, PRESENT_INDEX } from './data/eras';
+import { ERAS, PRESENT_INDEX, favorLabel } from './data/eras';
 import {
   ALL_EVENT_CARDS,
+  KACHIKOMI_CARDS,
   CONTEST_POINTS,
+  CYBORG_ATTRS,
   EVENT_MAP,
   FIXED_BY_MONTH,
   FIXED_MAP,
@@ -95,7 +97,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 15,
+    version: 19,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -279,7 +281,7 @@ function startTerm(s: GameState) {
   s.queueIdx = 0;
   const t = termOfMonth(MONTHS[s.monthIdx]);
   const era = ERAS[currentEra(s)];
-  log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name}。`);
+  log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name}（${favorLabel(era)}）。`);
   s.eventDeck = buildDeck(s);
   s.discard = [];
   s.phase = { kind: 'roles', player: s.queue[0] };
@@ -374,29 +376,124 @@ function resolveNormal(s: GameState, c: NormalCard, pi: number): EventResult {
 function resolveSwing(s: GameState, c: SwingCard): EventResult {
   const rows = s.players.map((p, i): ResultRow => {
     const plus = attrScore(p, c.plus);
-    const minus = c.minus === 'heads' ? { total: p.students.length, holders: [] as Student[] } : attrScore(p, c.minus);
-    const delta = plus.total - minus.total;
+    const minus = !c.minus ? { total: 0, holders: [] as Student[] } : c.minus === 'heads' ? { total: p.students.length, holders: [] as Student[] } : attrScore(p, c.minus);
+    // 打ち消すだけのカード（ケンカ騒ぎ）は0が上限
+    const delta = c.offsetOnly ? Math.min(0, plus.total - minus.total) : plus.total - minus.total;
     p.points += delta;
-    if (delta > 0) plus.holders.forEach((h) => h.mvp++);
-    const note = `${ATTR_ICON[c.plus]}${plus.total}−${c.minus === 'heads' ? '👥' : ATTR_ICON[c.minus]}${minus.total}`;
-    return { player: i, delta, note, uids: [...plus.holders, ...minus.holders].map((h) => h.uid) };
+    if (delta > 0 || c.offsetOnly) plus.holders.forEach((h) => h.mvp++);
+    const note = c.minus ? `${ATTR_ICON[c.plus]}${plus.total}−${c.minus === 'heads' ? '👥' : ATTR_ICON[c.minus]}${minus.total}` : undefined;
+    return { player: i, count: c.minus ? undefined : plus.total, delta, note, uids: [...plus.holders, ...minus.holders].map((h) => h.uid) };
   });
   sortRows(rows);
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: c.plus, minus: c.minus, tone: 'contest', desc: c.desc, rule: cardRule(c), rows };
 }
 
-/** 時代イベント（全クラス）：クラスのそのアイコンの合計数（＋係ボーナス）。その時代の生徒のアイコンが2倍 */
+/** 時代イベント（全クラス）：カードごとの効果。その時代の生徒のアイコンが2倍 */
 function resolveContest(s: GameState, c: ContestCard): EventResult {
+  const e = c.effect;
+  if (e.type === 'alien') return resolveInvasion(s, c);
+  /** その子が競うアイコンを持っているか */
+  const has = (x: Student) => (c.attr === 'all' ? x.attrs.length > 0 : x.attrs.includes(c.attr));
+  const icon = c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr];
+  const scores = s.players.map((p) => attrScore(p, c.attr, c.era));
+  // 代表：クラスで一番そのアイコンの点が多い1人
+  const aces = s.players.map((p) => contributions(p, c.attr, c.era).sort((x, y) => y.pts - x.pts)[0]);
+  const values = s.players.map((_, i) => (e.type === 'ace' || e.type === 'champion' ? aces[i]?.pts ?? 0 : scores[i].total));
+  const best = Math.max(...values);
+  const worst = Math.min(...values);
   const rows = s.players.map((p, i): ResultRow => {
-    const sc = attrScore(p, c.attr, c.era);
-    p.points += sc.total;
-    sc.holders.forEach((h) => h.mvp++);
-    return { player: i, count: sc.total, delta: sc.total, uids: sc.holders.map((h) => h.uid) };
+    const sc = scores[i];
+    let holders = sc.holders;
+    let delta = 0;
+    let count: number | undefined = values[i];
+    let note: string | undefined;
+    switch (e.type) {
+      case 'sum':
+        delta = values[i] * e.mult;
+        break;
+      case 'champion':
+        delta = values[i] > 0 && values[i] === best ? values[i] * e.mult : 0;
+        note = delta > 0 ? '優勝' : undefined;
+        break;
+      case 'top':
+        delta = values[i] > 0 && values[i] === best ? values[i] * e.mult : 0;
+        note = delta > 0 ? '総取り' : undefined;
+        break;
+      case 'ace':
+        delta = values[i] * e.mult;
+        break;
+      case 'heads': {
+        const n = p.students.filter(has).reduce((a, x) => a + (x.era === c.era ? 2 : 1), 0);
+        count = n;
+        delta = n * e.per;
+        note = `${n}人`;
+        break;
+      }
+      case 'variety': {
+        const kinds = new Set(p.students.flatMap((x) => x.attrs)).size;
+        count = kinds;
+        delta = kinds * e.per;
+        note = `${kinds}種類`;
+        break;
+      }
+      case 'threshold':
+        delta = values[i] >= e.need ? e.win : -e.lose;
+        note = values[i] >= e.need ? '成功' : '失敗';
+        break;
+      case 'battle':
+        delta = best === worst ? 0 : values[i] === best ? e.win : values[i] === worst ? -e.lose : 0;
+        note = best === worst ? '引き分け' : values[i] === best ? '勝利' : values[i] === worst ? '敗北' : undefined;
+        break;
+      case 'minus': {
+        const m = e.minus === 'without' ? p.students.filter((x) => !has(x)) : attrScore(p, e.minus).holders;
+        const lost = e.minus === 'without' ? m.length : attrScore(p, e.minus).total;
+        delta = values[i] - lost;
+        note = `${icon}${values[i]}−${e.minus === 'without' ? '🙅' : ATTR_ICON[e.minus]}${lost}`;
+        count = undefined;
+        holders = [...holders, ...m];
+        break;
+      }
+    }
+    if (e.type === 'ace' || e.type === 'champion') holders = aces[i] ? [aces[i].student] : [];
+    p.points += delta;
+    if (delta > 0) holders.filter(has).forEach((h) => h.mvp++);
+    return { player: i, count, delta, note, uids: holders.map((h) => h.uid) };
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, art: c.id, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows };
+}
+
+/** 火星人の侵略：空席のあるクラス全部に、アイコンのないエイリアンが1人ずつ転入する */
+function resolveInvasion(s: GameState, c: ContestCard): EventResult {
+  const aliens: Student[] = [];
+  const rows = s.players.map((p, i): ResultRow => {
+    if (p.students.length >= MAX_CLASS) return { player: i, delta: 0, note: '満席' };
+    const st: Student = {
+      uid: `u${s.uidCounter++}`,
+      name: '火星人',
+      title: 'エイリアン',
+      era: 'future',
+      rarity: 'N',
+      icon: '👽',
+      art: 'martian',
+      attrs: [],
+      flavor: '何もできない。ただ席に座っている。',
+      joined: joinedLabel(s),
+      mvp: 0,
+    };
+    p.students.push(st);
+    aliens.push(st);
+    return { player: i, delta: 0, note: '👽転入', uids: [st.uid] };
+  });
+  log(s, `【${c.name}】 空席のあるクラスにエイリアンが転入した。`);
+  return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows, students: aliens.slice(0, 1) };
+}
+
+/** サイボーグ化の対象（自分のクラスの子。もうサイボーグの子は除く） */
+export function cyborgable(p: Player): Student[] {
+  return p.students.filter((x) => x.art !== 'cyborg');
 }
 
 /** 襲来（時代イベント・全クラス）：👊の合計（この時代の生徒は2倍）− 敵の強さ */
@@ -410,7 +507,7 @@ function resolveRaid(s: GameState, c: RaidCard): EventResult {
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, art: c.id, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
 }
 
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {
@@ -437,12 +534,12 @@ function welcome(s: GameState, pi: number, st: Student, ctx: ResultCtx) {
   setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc: `${st.icon}${st.name}がやってきた！`, rows: [], students: [st] }, ctx);
 }
 
-/** 転校で押しつけられる相手（定員に空きがあるクラス） */
-export function pushTargets(s: GameState, pi: number): number[] {
-  return s.players.filter((p) => p.id !== pi && p.students.length < MAX_CLASS).map((p) => p.id);
+/** 転校で外せる生徒（係に就いていない子。定員の下限まで減っていたら外せない） */
+export function droppable(p: Player): Student[] {
+  return p.students.length <= MIN_CLASS ? [] : p.students.filter((x) => roleOf(p, x.uid) === null);
 }
 
-/** クラス替えに出せる生徒（係に就いていない子） */
+/** クラス替えでもらえる生徒（係に就いていない子） */
 export function tradeable(p: Player): Student[] {
   return p.students.filter((x) => roleOf(p, x.uid) === null);
 }
@@ -460,6 +557,38 @@ export function equippable(p: Player): Student[] {
 /** カチコミの相手 */
 export function kachikomiTargets(s: GameState, pi: number): number[] {
   return s.players.filter((p) => p.id !== pi).map((p) => p.id);
+}
+
+/** 転校：めくった人から席順に、全クラスが1人ずつ外す */
+function startDrop(s: GameState, drawer: number) {
+  const n = s.players.length;
+  nextDrop(s, drawer, Array.from({ length: n }, (_, i) => (drawer + i) % n), []);
+}
+
+/** 転校の次の人へ（left はまだ外していないクラス。外せる子がいないクラスは飛ばす）。全員終わったら結果を出す */
+function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[]) {
+  for (let i = 0; i < left.length; i++) {
+    const pi = left[i];
+    if (droppable(s.players[pi]).length > 0) {
+      s.phase = { kind: 'push', player: pi, drawer, left: left.slice(i + 1), gone };
+      return;
+    }
+    log(s, `${s.players[pi].name}のクラスは転校させられる子がいなかった。`, pi);
+  }
+  setResult(
+    s,
+    drawer,
+    {
+      title: '転校',
+      icon: '📦',
+      tone: 'personal',
+      desc: gone.length ? `${gone.map((x) => x.icon + x.name).join('・')} が転校していった。` : 'どのクラスも転校させられる子がいなかった。',
+      rule: cardRule(EVENT_MAP.push),
+      rows: [],
+      students: gone,
+    },
+    'turn',
+  );
 }
 
 function popCard(s: GameState): string {
@@ -521,12 +650,15 @@ function resolveDraw(s: GameState, pi: number) {
         personal('装備できる生徒がいなかった。');
       } else s.phase = { kind: 'equip', player: pi, card: id };
       return;
+    case 'cyborg':
+      if (cyborgable(p).length === 0) personal('サイボーグにできる生徒がいなかった。');
+      else s.phase = { kind: 'cyborg', player: pi };
+      return;
     case 'push':
-      if (pushTargets(s, pi).length === 0 || p.students.length <= MIN_CLASS) personal('押しつけられる相手がいなかった。');
-      else s.phase = { kind: 'push', player: pi };
+      startDrop(s, pi);
       return;
     case 'exchange':
-      if (tradeable(p).length === 0 || exchangeTargets(s, pi).length === 0) personal('交換できる生徒がいなかった。');
+      if (p.students.length === 0 || exchangeTargets(s, pi).length === 0) personal('交換できる生徒がいなかった。');
       else s.phase = { kind: 'exchange', player: pi };
       return;
   }
@@ -602,22 +734,10 @@ export function step(prev: GameState, a: Action): GameState {
     case 'push': {
       if (ph.kind !== 'push') return prev;
       const p = s.players[ph.player];
-      if (a.uid === null) {
-        setResult(s, ph.player, { title: '転校', icon: '📦', tone: 'personal', desc: 'やっぱりやめた。', rows: [] }, 'turn');
-        return s;
-      }
-      if (a.target === undefined || !pushTargets(s, ph.player).includes(a.target)) return prev;
-      if (!p.students.some((x) => x.uid === a.uid) || p.students.length <= MIN_CLASS) return prev;
+      if (!droppable(p).some((x) => x.uid === a.uid)) return prev;
       const st = removeStudent(s, p, a.uid, false)!;
-      const to = s.players[a.target];
-      to.students.push(st);
-      log(s, `${p.name}が${st.name}を${to.name}のクラスへ押しつけた！`, ph.player);
-      setResult(
-        s,
-        ph.player,
-        { title: '転校', icon: '📦', tone: 'personal', desc: `${st.icon}${st.name} を ${to.name} のクラスへ押しつけた！`, rows: [], students: [st] },
-        'turn',
-      );
+      log(s, `${p.name}のクラスの${st.name}が転校していった。`, ph.player);
+      nextDrop(s, ph.drawer, ph.left, [...ph.gone, st]);
       return s;
     }
     case 'kachikomi': {
@@ -629,12 +749,13 @@ export function step(prev: GameState, a: Action): GameState {
       }
       if (!kachikomiTargets(s, ph.player).includes(a.target)) return prev;
       const sc = attrScore(p, 'fight');
+      const damage = sc.total * KACHIKOMI_CARDS[0].mult;
       const to = s.players[a.target];
-      to.points -= sc.total;
+      to.points -= damage;
       sc.holders.forEach((h) => h.mvp++);
       const rows: ResultRow[] = [
         { player: ph.player, count: sc.total, delta: 0, note: 'カチコミ', uids: sc.holders.map((h) => h.uid) },
-        { player: a.target, delta: -sc.total, note: '被害' },
+        { player: a.target, delta: -damage, note: '被害' },
       ];
       logRows(s, `カチコミ（${p.name}→${to.name}）`, rows);
       setResult(
@@ -654,7 +775,7 @@ export function step(prev: GameState, a: Action): GameState {
       }
       if (a.target === undefined || !exchangeTargets(s, ph.player).includes(a.target)) return prev;
       const to = s.players[a.target];
-      if (!tradeable(p).some((x) => x.uid === a.uid) || !tradeable(to).some((x) => x.uid === a.theirUid)) return prev;
+      if (!p.students.some((x) => x.uid === a.uid) || !tradeable(to).some((x) => x.uid === a.theirUid)) return prev;
       const mine = removeStudent(s, p, a.uid, false)!;
       const theirs = removeStudent(s, to, a.theirUid!, false)!;
       p.students.push(theirs);
@@ -664,6 +785,38 @@ export function step(prev: GameState, a: Action): GameState {
         s,
         ph.player,
         { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: `${mine.icon}${mine.name} ⇄ ${theirs.icon}${theirs.name}（${to.name}）`, rows: [], students: [theirs, mine] },
+        'turn',
+      );
+      return s;
+    }
+    case 'cyborg': {
+      if (ph.kind !== 'cyborg') return prev;
+      if (a.uid === null) {
+        setResult(s, ph.player, { title: 'サイボーグ化', icon: '🦾', tone: 'personal', desc: '使わなかった。', rows: [] }, 'turn');
+        return s;
+      }
+      const owner = s.players[ph.player];
+      const st = cyborgable(owner).find((x) => x.uid === a.uid);
+      if (!st) return prev;
+      const was = `${st.icon}${st.name}`;
+      // 元のカードに覆いかぶさる：同じ席（uid・係）のまま中身だけ入れ替わり、元のカードは消える
+      Object.assign(st, {
+        cardId: undefined,
+        name: 'サイボーグ',
+        title: '改造人間',
+        era: 'future',
+        rarity: 'R',
+        icon: '🦾',
+        art: 'cyborg',
+        attrs: [...CYBORG_ATTRS],
+        flavor: `もとは${st.name}だった。`,
+        goods: undefined,
+      } satisfies Partial<Student>);
+      log(s, `${owner.name}のクラスの${was}がサイボーグになった！`, ph.player);
+      setResult(
+        s,
+        ph.player,
+        { title: 'サイボーグ化', icon: '🦾', art: 'cyborg', tone: 'personal', desc: `${was}がサイボーグになった！`, rule: cardRule(EVENT_MAP.cyborg), rows: [], students: [st] },
         'turn',
       );
       return s;
@@ -740,8 +893,10 @@ export function deckBreakdown(s: GameState): DeckRow[] {
           return { ...base, group: '転校・クラス替え' };
         case 'goods':
           return { ...base, name: `${c.name}（${ATTR_ICON[c.attr]}＋1）`, group: c.era ? '時代イベント' : 'グッズ' };
+        case 'cyborg':
+          return { ...base, group: '時代イベント' };
         case 'contest':
-          return { ...base, name: `${c.name}（${ATTR_ICON[c.attr]}）`, group: '時代イベント' };
+          return { ...base, name: c.effect.type === 'alien' ? c.name : `${c.name}（${c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr]}）`, group: '時代イベント' };
         case 'raid':
           return { ...base, name: `${c.name}（強さ${c.threat}）`, group: '時代イベント' };
       }

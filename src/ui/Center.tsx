@@ -1,7 +1,7 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
 import { currentEra } from '../game/engine';
-import { EVENT_MAP, cardRule } from '../game/data/events';
+import { EVENT_MAP, KACHIKOMI_CARDS, cardRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import type { Action, GameState } from '../game/types';
@@ -109,31 +109,21 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
     case 'draw':
       return <div className="say">{who} の番 — イベントの山札をめくろう</div>;
     case 'push': {
-      const target = pick.target !== null ? state.players[pick.target] : null;
       const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
       return (
         <div className="say">
-          📦 {who} の転校 — 手前の教室から生徒を選び、押しつける相手の名札をタップ
+          📦 転校（{state.players[ph.drawer].name}がめくった）— {who} は係に就いていない生徒を1人選んで転校させる（必ず1人）
+          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
           <div className="say-sub">
-            {st ? `${st.icon}${st.name}` : '生徒：未選択'} → {target ? target.name : '相手：未選択'}
-          </div>
-          <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'push', uid: null })}>
-              やめる
-            </button>
-            <button
-              className="btn primary"
-              disabled={!pick.uid || pick.target === null}
-              onClick={() => pick.uid && pick.target !== null && dispatch({ type: 'push', uid: pick.uid, target: pick.target })}
-            >
-              押しつける
+            <button className="btn primary" disabled={!pick.uid} onClick={() => pick.uid && dispatch({ type: 'push', uid: pick.uid })}>
+              転校させる
             </button>
           </div>
         </div>
       );
     }
     case 'kachikomi': {
-      const power = attrScore(state.players[ph.player], 'fight').total;
+      const power = attrScore(state.players[ph.player], 'fight').total * KACHIKOMI_CARDS[0].mult;
       const target = pick.target !== null ? state.players[pick.target] : null;
       return (
         <div className="say">
@@ -156,7 +146,7 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
       const theirs = target?.students.find((x) => x.uid === pick.theirUid);
       return (
         <div className="say">
-          🔁 {who} のクラス替え — 手前の教室から出す生徒を選び、相手の名札をタップして入れ替える相手を選ぶ（係の子は出せない）
+          🔁 {who} のクラス替え — 手前の教室から出す生徒を選び、相手の名札をタップして連れてくる生徒を選ぶ（相手の係の子は選べない）
           <div className="say-sub">
             {mine ? `${mine.icon}${mine.name}` : '自分の生徒：未選択'} ⇄ {theirs ? `${theirs.icon}${theirs.name}（${target!.name}）` : target ? `${target.name}の生徒：未選択` : '相手：未選択'}
           </div>
@@ -172,6 +162,23 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
               }
             >
               入れ替える
+            </button>
+          </div>
+        </div>
+      );
+    }
+    case 'cyborg': {
+      const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+      return (
+        <div className="say">
+          🦾 {who} のサイボーグ化 — {cardRule(EVENT_MAP.cyborg)}。手前の教室から生徒をタップ
+          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
+          <div className="say-sub">
+            <button className="btn ghost" onClick={() => dispatch({ type: 'cyborg', uid: null })}>
+              使わない
+            </button>
+            <button className="btn primary" disabled={!pick.uid} onClick={() => dispatch({ type: 'cyborg', uid: pick.uid })}>
+              サイボーグにする
             </button>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
-import { currentEra, deckBreakdown, newGame, step } from './engine';
+import { currentEra, deckBreakdown, droppable, newGame, step } from './engine';
 import type { Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
@@ -132,8 +132,8 @@ describe('engine', () => {
     }
     const yankees = all.filter((x) => x.tags.includes('ヤンキー'));
     const fightOnly = yankees.filter((x) => x.attrs.every((a) => a === 'fight'));
-    // アイコン構成を被らせないので、👊だけの子は👊1〜5個の5種類が上限
-    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.35);
+    // アイコン構成を被らせないので、👊だけの子は少なめ（恐竜の一部は🏃も持つ）
+    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.3);
     expect(fightOnly.length / yankees.length).toBeLessThanOrEqual(0.6);
   });
 
@@ -202,8 +202,10 @@ describe('engine', () => {
 
   it('every figure and transfer student has a different set of icons', () => {
     const key = (attrs: Attr[]) => [...attrs].sort().join(',');
+    // 恐竜は👊（と🏃）の個数だけのキャラなので、ほかの子との重複は許す
+    for (const d of CARDS.filter((c) => c.tags.includes('恐竜'))) expect(d.attrs.every((x) => x === 'fight' || x === 'sports'), d.name).toBe(true);
     const all = [
-      ...CARDS.map((c) => ({ name: c.name, k: key(c.attrs) })),
+      ...CARDS.filter((c) => !c.tags.includes('恐竜')).map((c) => ({ name: c.name, k: key(c.attrs) })),
       ...ARCHETYPES.filter((a) => a.rarity !== 'N').map((a) => ({ name: a.title, k: key(toIcons(a.attrs, a.rarity, a.power)) })),
     ];
     for (const x of all) expect(all.filter((y) => y.k === x.k).map((y) => y.name), x.name).toEqual([x.name]);
@@ -243,7 +245,7 @@ describe('engine', () => {
     expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(3 - 4);
   });
 
-  it('kachikomi takes the drawer\'s 👊 count from the chosen school', () => {
+  it('kachikomi takes 3× the drawer\'s 👊 count from the chosen school', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -255,7 +257,7 @@ describe('engine', () => {
     const k = step(t, { type: 'drawEvent' });
     expect(k.phase.kind).toBe('kachikomi');
     const done = step(k, { type: 'kachikomi', target });
-    expect(done.players[target].points - t.players[target].points).toBe(-3);
+    expect(done.players[target].points - t.players[target].points).toBe(-9);
     expect(done.players[pi].points).toBe(t.players[pi].points);
     // 👊がいなければカチコミに行けない
     const u = structuredClone(t);
@@ -270,11 +272,115 @@ describe('engine', () => {
     const t = structuredClone(s);
     t.players[pi].students = [mk('y', ['fight', 'fight']), mk('z', ['study'])];
     t.players[pi].roles = [];
+    // 抜き打ちテストは📚の数だけ（👊では引かれない）
     t.eventDeck.push('poptest');
-    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(1 - 2);
+    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(1);
     const u = structuredClone(t);
     u.eventDeck.push('marathon');
     expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(0 - 2);
+  });
+
+  it('brawl takes 👊 away, offset by 👑 but never above zero', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    const run = (students: Student[]) => {
+      const t = structuredClone(s);
+      t.players[pi].students = students;
+      t.players[pi].roles = [];
+      t.eventDeck.push('brawl');
+      return step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points;
+    };
+    expect(run([mk('y', ['fight', 'fight', 'fight']), mk('c', ['charm'])])).toBe(-2);
+    expect(run([mk('y', ['fight']), mk('c', ['charm', 'charm', 'charm'])])).toBe(0);
+  });
+
+  it('era events compete on the era\'s favored icons (none → all icons)', () => {
+    for (const era of ERAS) {
+      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien').map((c) => c.attr));
+      expect([...used].sort(), era.id).toEqual(era.favor.length ? [...era.favor].sort() : ['all']);
+    }
+    expect(ERAS.find((e) => e.id === 'future')!.favor).toEqual(['study']);
+    expect(ERAS.find((e) => e.id === 'cretaceous')!.favor).toEqual(['fight']);
+    expect(ERAS.find((e) => e.id === 'present')!.favor).toEqual([]);
+  });
+
+  it('martian invasion seats an iconless alien in every class with a free seat', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const full = 1 - s.phase.player;
+    while (s.players[full].students.length < MAX_CLASS) s.players[full].students.push(mk(`f${s.players[full].students.length}`, ['study']));
+    const sizes = s.players.map((p) => p.students.length);
+    const points = s.players.map((p) => p.points);
+    s.eventDeck.push('martian');
+    const next = step(s, { type: 'drawEvent' });
+    next.players.forEach((p, i) => {
+      expect(p.points).toBe(points[i]);
+      expect(p.students.length).toBe(i === full ? MAX_CLASS : sizes[i] + 1);
+    });
+    const alien = next.players[s.phase.kind === 'draw' ? s.phase.player : 0].students.at(-1)!;
+    expect(alien.attrs).toEqual([]);
+  });
+
+  it('cyborg covers one of the drawer\'s own students with a 📚🏃 card', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    s.eventDeck.push('cyborg');
+    s = step(s, { type: 'drawEvent' });
+    expect(s.phase.kind).toBe('cyborg');
+    // 相手のクラスの子は選べない
+    expect(step(s, { type: 'cyborg', uid: s.players[1 - pi].students[0].uid })).toBe(s);
+    const mine = s.players[pi].students[0];
+    const n = s.players[pi].students.length;
+    const next = step(s, { type: 'cyborg', uid: mine.uid });
+    const st = next.players[pi].students.find((x) => x.uid === mine.uid)!;
+    expect(next.players[pi].students).toHaveLength(n);
+    expect(st.attrs).toEqual(['study', 'sports']);
+    expect(st.name).toBe('サイボーグ');
+    expect(st.cardId).toBeUndefined();
+    // もうサイボーグの子はもう一度サイボーグにできない
+    const again = structuredClone(next);
+    again.phase = { kind: 'cyborg', player: pi };
+    expect(step(again, { type: 'cyborg', uid: mine.uid })).toBe(again);
+  });
+
+  it('era events each have their own effect', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const run = (id: string, classes: Student[][]) => {
+      const t = structuredClone(s);
+      classes.forEach((st, i) => {
+        t.players[i].students = st;
+        t.players[i].roles = [];
+      });
+      t.eventDeck.push(id);
+      const after = step(t, { type: 'drawEvent' });
+      return after.players.map((p, i) => p.points - t.players[i].points);
+    };
+    const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
+    const B = [mk('b1', ['sports', 'sports'])];
+    const C = [mk('c1', ['study'])];
+    // ティラノサウルスと力くらべ：どのクラスも代表1人の👊×2
+    expect(run('trex_sumo', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, 4, 0]);
+    // 古代オリンピック：全クラスで一番🏃の多い1人のクラスだけ、その子の🏃×3
+    expect(run('olympia', [A, B, C])).toEqual([9, 0, 0]);
+    // ギザの大ピラミッド建設：🏃8以上で+8、足りなければ−3
+    expect(run('giza', [[...A, mk('a3', ['sports', 'sports', 'sports', 'sports'])], B, C])).toEqual([8, -3, -3]);
+    // 関ヶ原の戦い：1位+10、最下位−5
+    expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([10, 0, -5]);
+    // 縄張り争い：一番のクラスだけ👊×2
+    expect(run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([4, 0, 0]);
+    // 文化祭：そろっているアイコンの種類×2
+    expect(run('bunkasai', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([6, 2, 2]);
+    // 生徒会長選挙：全校で一番アイコンの多い1人のクラスだけ×2（現代の子は2倍なので 3×2×2）
+    expect(run('seitokai', [A, B, C])).toEqual([12, 0, 0]);
+    // 楽市・楽座：👑の数をそのまま加点
+    expect(run('rakuichi', [[mk('c', ['charm', 'charm'])], B, C])).toEqual([2, 0, 0]);
+    // 鹿鳴館の舞踏会：👑を持つ子1人につき+2（近代の子は2人分）
+    expect(run('rokumeikan', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'modern')], B, C])).toEqual([6, 0, 0]);
+    // 中村座の歌舞伎興行：🎨 − 🎨を持たない子の人数
+    expect(run('nakamuraza', [[mk('a', ['art', 'art']), mk('b', ['study'])], B, C])).toEqual([1, -1, -1]);
   });
 
   it('goods add an icon to one student, one item each', () => {
@@ -307,17 +413,22 @@ describe('engine', () => {
     expect(next.players[0].roles).toEqual([{ role: 'study', uid }]);
   });
 
-  it('exchange swaps students without a role', () => {
+  it('exchange takes a student without a role from another class', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
     while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
     const [a0, a1] = s.players[0].students;
     const b0 = s.players[1].students[0];
-    s.players[0].roles = [{ role: 'study', uid: a0.uid }];
+    s.players[1].roles = [{ role: 'study', uid: b0.uid }];
     s.phase = { kind: 'exchange', player: 0 };
+    // 相手の係の子はもらえない
     expect(step(s, { type: 'exchange', uid: a0.uid, target: 1, theirUid: b0.uid })).toBe(s);
-    const next = step(s, { type: 'exchange', uid: a1.uid, target: 1, theirUid: b0.uid });
-    expect(next.players[0].students.map((x) => x.uid)).toContain(b0.uid);
+    const b1 = s.players[1].students[1];
+    // 自分の側は係の子でも出せる
+    s.players[0].roles = [{ role: 'study', uid: a1.uid }];
+    const next = step(s, { type: 'exchange', uid: a1.uid, target: 1, theirUid: b1.uid });
+    expect(next.players[0].students.map((x) => x.uid)).toContain(b1.uid);
     expect(next.players[1].students.map((x) => x.uid)).toContain(a1.uid);
+    expect(next.players[0].roles).toEqual([]);
   });
 
   it('drawn event cards go to the discard pile', () => {
@@ -328,14 +439,27 @@ describe('engine', () => {
     expect(s.discard[s.discard.length - 1]).toBe('n_study');
   });
 
-  it('push moves an unwanted student to another class', () => {
+  it('push makes every class drop one student without a role', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
-    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
-    s.phase = { kind: 'push', player: 0 };
-    const uid = s.players[0].students[0].uid;
-    const next = step(s, { type: 'push', uid, target: 1 });
-    expect(next.players[0].students).toHaveLength(5);
-    expect(next.players[1].students.map((x) => x.uid)).toContain(uid);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const drawer = s.phase.player;
+    const other = 1 - drawer;
+    const sitter = s.players[drawer].students[0];
+    s.players[drawer].roles = [{ role: 'study', uid: sitter.uid }];
+    s.eventDeck.push('push');
+    s = step(s, { type: 'drawEvent' });
+    expect(s.phase).toMatchObject({ kind: 'push', player: drawer });
+    // 係の子は外せない
+    expect(step(s, { type: 'push', uid: sitter.uid })).toBe(s);
+    const mine = s.players[drawer].students[1].uid;
+    s = step(s, { type: 'push', uid: mine });
+    expect(s.phase).toMatchObject({ kind: 'push', player: other });
+    const theirs = droppable(s.players[other])[0].uid;
+    s = step(s, { type: 'push', uid: theirs });
+    expect(s.phase.kind).toBe('result');
+    expect(s.players[drawer].students.map((x) => x.uid)).not.toContain(mine);
+    expect(s.players[other].students.map((x) => x.uid)).not.toContain(theirs);
+    expect(s.players.map((p) => p.students.length)).toEqual([STARTING_MEMBERS - 1, STARTING_MEMBERS - 1]);
   });
 
   it('normal cards score only for the drawer; era and common events score for every class', () => {
@@ -354,7 +478,7 @@ describe('engine', () => {
       expect(r.rows, id).toBe(1);
       r.d.forEach((d, i) => i !== drawer && expect(d, id).toBe(0));
     }
-    for (const id of ['poptest', 'marathon', 'trip', 'raid_present']) expect(run(id).rows, id).toBe(3);
+    for (const id of ['poptest', 'marathon', 'bunkasai', 'raid_present']) expect(run(id).rows, id).toBe(3);
   });
 });
 
