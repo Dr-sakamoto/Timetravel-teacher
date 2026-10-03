@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
-import { MAX_CLASS, STARTING_MEMBERS, attrScore, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
+import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
 import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
@@ -355,5 +355,21 @@ describe('engine', () => {
       r.d.forEach((d, i) => i !== drawer && expect(d, id).toBe(0));
     }
     for (const id of ['poptest', 'marathon', 'trip', 'raid_present']) expect(run(id).rows, id).toBe(3);
+  });
+});
+
+describe('1枚ごとの得点の内訳', () => {
+  it('合計がクラスのアイコンの点（attrScore）と一致する', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const s = playOut(3, 1, seed);
+      for (const p of s.players) {
+        for (const a of ['study', 'sports', 'art', 'charm', 'fight'] as Attr[]) {
+          for (const era of [undefined, ...ERAS.map((e) => e.id)]) {
+            const sum = contributions(p, a, era).reduce((x, c) => x + c.pts, 0);
+            expect(sum).toBe(attrScore(p, a, era).total);
+          }
+        }
+      }
+    }
   });
 });

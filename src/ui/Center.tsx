@@ -1,5 +1,5 @@
 import { ERAS } from '../game/data/eras';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { currentEra } from '../game/engine';
 import { EVENT_MAP, cardRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
@@ -14,6 +14,8 @@ interface Props {
   cpuBusy: boolean;
   /** 転校・カチコミ・クラス替え・グッズで選んだもの */
   pick: Pick;
+  /** 得点演出の明細（襲来）。点数表の上に出す */
+  side?: ReactNode;
 }
 
 /** 手前のマットで選んだ自分の生徒・相手のクラス・相手の生徒 */
@@ -24,7 +26,7 @@ export interface Pick {
 }
 
 /** 卓の中央：山札・捨て札・めくったカードと手番の操作 */
-export function Center({ state, dispatch, cpuBusy, pick }: Props) {
+export function Center({ state, dispatch, cpuBusy, pick, side }: Props) {
   const ph = state.phase;
   const era = ERAS[currentEra(state)];
   const actor = ph.kind !== 'gameOver' && ph.player !== null ? state.players[ph.player] : null;
@@ -73,13 +75,14 @@ export function Center({ state, dispatch, cpuBusy, pick }: Props) {
           dispatch={dispatch}
           cpuBusy={cpuBusy}
           pick={pick}
+          side={side}
         />
       </div>
     </div>
   );
 }
 
-function Action({ state, dispatch, cpuBusy, pick }: Props) {
+function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
   const ph = state.phase;
   if (ph.kind === 'gameOver') return null;
   const actor = ph.player !== null ? state.players[ph.player] : null;
@@ -198,6 +201,7 @@ function Action({ state, dispatch, cpuBusy, pick }: Props) {
         <div className="reveal">
           <EventCardView result={r} />
           <div className="reveal-side">
+            {side}
             {r.rows.length > 0 && (
               <div className="tally">
                 {r.rows.map((row) => {

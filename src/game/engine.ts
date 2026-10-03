@@ -383,7 +383,7 @@ function resolveSwing(s: GameState, c: SwingCard): EventResult {
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: c.plus, tone: 'contest', desc: c.desc, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, attr: c.plus, minus: c.minus, tone: 'contest', desc: c.desc, rule: cardRule(c), rows };
 }
 
 /** 時代イベント（全クラス）：クラスのそのアイコンの合計数（＋係ボーナス）。その時代の生徒のアイコンが2倍 */
@@ -396,7 +396,7 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: c.attr, tone: 'era', desc: c.desc, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows };
 }
 
 /** 襲来（時代イベント・全クラス）：👊の合計（この時代の生徒は2倍）− 敵の強さ */
@@ -410,7 +410,7 @@ function resolveRaid(s: GameState, c: RaidCard): EventResult {
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: 'fight', tone: 'era', desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
 }
 
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {

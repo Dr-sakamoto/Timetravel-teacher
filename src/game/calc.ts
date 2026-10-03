@@ -97,3 +97,27 @@ export function totalPower(p: Player): number {
 export function ranks(values: number[]): number[] {
   return values.map((v) => values.filter((o) => o > v).length);
 }
+
+/** 1枚ごとの得点の内訳（どのカードから何点入ったかを見せる演出用） */
+export interface Contribution {
+  student: Student;
+  /** カードに描かれたそのアイコンの数 */
+  icons: number;
+  /** 時代イベントでその時代出身（×2） */
+  era: boolean;
+  /** 係ボーナス（×2） */
+  role: boolean;
+  pts: number;
+}
+
+/** アイコンaの点を1枚ずつに分けたもの（合計は attrScore と同じ）。doubleEra の生徒は×2 */
+export function contributions(p: Player, a: Attr, doubleEra?: EraId): Contribution[] {
+  return p.students
+    .filter((s) => s.attrs.includes(a))
+    .map((s) => {
+      const era = s.era === doubleEra;
+      const role = hasRoleBonus(p, s, a);
+      const icons = iconsOf(s, a);
+      return { student: s, icons, era, role, pts: icons * (era ? 2 : 1) * (role ? 2 : 1) };
+    });
+}

@@ -4,6 +4,7 @@ import { newGame, PLAYER_COLORS, step, calendarLabel } from './game/engine';
 import type { Action, GameState } from './game/types';
 import { GameView } from './ui/GameView';
 import { Rules } from './ui/Rules';
+import { ScoreDemo } from './ui/ScoreDemo';
 
 const SAVE_KEY = 'timetravel-teacher-save-v10';
 
@@ -30,6 +31,12 @@ function writeSave(s: GameState | null) {
 const DEFAULT_NAMES = ['赤井先生', '青山先生', '緑川先生', '黄瀬先生', '紫藤先生'];
 
 export default function App() {
+  // 得点演出の見本（#score-demo）
+  if (location.hash.startsWith('#score-demo')) return <ScoreDemo />;
+  return <Game />;
+}
+
+function Game() {
   const [state, setState] = useState<GameState | null>(null);
   const [saved, setSaved] = useState<GameState | null>(() => loadSave());
   const [screen, setScreen] = useState<'title' | 'setup' | 'game'>('title');

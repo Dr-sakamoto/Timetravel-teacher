@@ -9,6 +9,7 @@ import { GameOver } from './GameOver';
 import { OpponentSeat, Playmat } from './Playmat';
 import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
+import { useGameFx } from './useGameFx';
 
 interface Props {
   state: GameState;
@@ -29,6 +30,10 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const [focus, setFocus] = useState(() => state.players.find((p) => !p.isCpu)?.id ?? 0);
   const [pick, setPick] = useState<Pick>({ uid: null, target: null, theirUid: null });
   const logRef = useRef<HTMLDivElement>(null);
+  const feltRef = useRef<HTMLDivElement>(null);
+  // どのカードから何点入ったかの演出（CPUの「速い」設定では早送り）
+  const fx = useGameFx(state, feltRef, speed === 'fast' ? 0.35 : 1);
+  const fxLength = fx?.length ?? 0;
   const cpuTurn = actor !== null && state.players[actor].isCpu && ph.kind !== 'result';
 
   // 人間の手番になったら、その人を手前に座らせる（ホットシート）
@@ -47,7 +52,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
     if (ph.kind === 'result') {
       const auto = (ph.player !== null && state.players[ph.player].isCpu) || allCpu;
       if (!auto) return;
-      const t = setTimeout(() => dispatch({ type: 'continue' }), 2400 * mul);
+      const t = setTimeout(() => dispatch({ type: 'continue' }), Math.max(2400, fxLength + 700) * mul);
       return () => clearTimeout(t);
     }
     if (!cpuTurn) return;
@@ -55,7 +60,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
     if (!a) return;
     const t = setTimeout(() => dispatch(a), 800 * mul);
     return () => clearTimeout(t);
-  }, [state, cpuTurn, allCpu, speed, dispatch, ph]);
+  }, [state, cpuTurn, allCpu, speed, dispatch, ph, fxLength]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -70,7 +75,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const lit = new Set<string>();
   if (ph.kind === 'result') {
     for (const r of ph.result.rows) {
-      deltas.set(r.player, r.delta);
+      if (!fx || fx.settled(r.player)) deltas.set(r.player, r.delta);
       r.uids?.forEach((u) => lit.add(u));
     }
     ph.result.students?.forEach((st) => lit.add(st.uid));
@@ -101,6 +106,10 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const peekPicking = choosing === 'exchange' && peek !== null && peek === pick.target;
   // 手番の人が相手なら、その人の教室を卓の中央に出す
   const stage = actor !== null && actor !== focus ? actor : null;
+  // 演出中は、まだ届いていない点を名札から引いて見せる
+  const shown = (i: number) => (fx ? { ...state.players[i], points: fx.points(i) } : state.players[i]);
+  const matLit = (i: number) => fx?.lit(i) ?? lit;
+  const fxDim = (i: number) => (fx?.dims(i) ? (u: string) => fx.dims(i)!.has(u) : undefined);
   const me = state.players[focus];
   const editingRoles = ph.kind === 'roles' && ph.player === focus && !me.isCpu;
 
@@ -135,12 +144,12 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
         </div>
       </header>
 
-      <div className="felt">
+      <div className="felt" ref={feltRef}>
         <div className="opponents">
           {others.map((pi) => (
             <OpponentSeat
               key={pi}
-              player={state.players[pi]}
+              player={shown(pi)}
               year={state.year}
               acting={actor === pi}
               delta={deltas.get(pi)}
@@ -155,16 +164,17 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
           {stage !== null && (
             <Playmat
               key={stage}
-              player={state.players[stage]}
+              player={shown(stage)}
               year={state.year}
               slots={slots}
               variant="stage"
               acting
               delta={deltas.get(stage)}
-              lit={lit}
+              lit={matLit(stage)}
+              dimUid={fxDim(stage)}
             />
           )}
-          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn} pick={pick} />
+          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn} pick={pick} side={fx?.side} />
         </div>
         <div className="near-seat">
           {editingRoles ? (
@@ -177,16 +187,16 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
             />
           ) : (
             <Playmat
-              player={me}
+              player={shown(focus)}
               year={state.year}
               slots={slots}
               variant="near"
               acting={actor === focus}
               delta={deltas.get(focus)}
-              lit={lit}
+              lit={matLit(focus)}
               onSeatClick={selectable.length ? (uid) => selectable.some((x) => x.uid === uid) && setPick((x) => ({ ...x, uid })) : undefined}
               selectedUid={choosing ? pick.uid : null}
-              dimUid={selectable.length ? (uid) => !selectable.some((x) => x.uid === uid) : undefined}
+              dimUid={selectable.length ? (uid) => !selectable.some((x) => x.uid === uid) : fxDim(focus)}
             />
           )}
         </div>
@@ -221,6 +231,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
           </div>
         </div>
       )}
+
+      {fx && <div className="fx-layer">{fx.overlay}</div>}
 
       {!portraitOk && (
         <div className="rotate-hint">

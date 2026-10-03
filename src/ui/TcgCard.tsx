@@ -26,6 +26,7 @@ export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onC
   const role = owner ? roleOf(owner, student.uid) : null;
   return (
     <div
+      data-uid={student.uid}
       className={`tcg ${size} r-${student.rarity} ${selected ? 'selected' : ''} ${lit ? 'lit' : ''} ${dim ? 'dim' : ''} ${onClick ? 'clickable' : ''}`}
       style={{ '--era': era.color } as CSSProperties}
       onClick={onClick}
