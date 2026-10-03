@@ -67,15 +67,21 @@ describe('engine', () => {
     }
   });
 
-  it('normal cards score the best value among holders, +1 if a matching role holder exists', () => {
+  it('normal cards score the best holder, and a role holder counts double', () => {
     const p = player([mk('a', ['study']), mk('b', ['study', 'study', 'study', 'art']), mk('c', ['sports', 'sports'])], ['a']);
-    expect(bestScore(p, 'study')).toMatchObject({ sum: 3, bonus: 1, total: 4 });
+    // 係の子は1個×2=2 < 3個の子 → 3
+    expect(bestScore(p, 'study')).toMatchObject({ sum: 3, bonus: 0, total: 3 });
+    const q = player([mk('a', ['study', 'study']), mk('b', ['study', 'study', 'study'])], ['a']);
+    // 係の子は2個×2=4 > 3個の子
+    expect(bestScore(q, 'study')).toMatchObject({ sum: 2, bonus: 2, total: 4 });
+    // 係の子がアイコンを1つも持っていなければ効果なし
+    expect(bestScore(player([mk('a', ['sports']), mk('b', ['study'])], ['a']), 'study').total).toBe(1);
     expect(bestScore(p, 'fight').total).toBe(0);
   });
 
-  it('event cards score the sum of values of students with the icon, +1 per matching role', () => {
+  it('event cards sum all holders, and a role holder counts double', () => {
     const p = player([mk('a', ['study', 'study', 'study']), mk('b', ['study', 'study', 'art']), mk('c', ['sports'])], ['a']);
-    expect(attrScore(p, 'study')).toMatchObject({ sum: 5, bonus: 1, total: 6 });
+    expect(attrScore(p, 'study')).toMatchObject({ sum: 5, bonus: 3, total: 8 });
     expect(attrScore(p, 'fight').total).toBe(0);
     // 係のアイコンを持っていない子が就いても +1 は付かない
     const q = player([mk('c', ['sports'])], ['c']);

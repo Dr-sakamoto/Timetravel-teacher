@@ -17,9 +17,9 @@ export const ROLES: Record<RoleId, RoleDef> = {
   library: { id: 'library', name: '図書委員', icon: '📖', attr: 'study' },
 };
 
-/** 全クラス共通の係。人数が増えるとこの順に解放される（6人で3つ、8人で4つ、10人で5つ、12人で6つ） */
+/** 全クラス共通の係。学期が進むとこの順に1つずつ解放される（最初の学期は3つ） */
 export const ROLE_ORDER: RoleId[] = ['study', 'pe', 'culture', 'leader', 'discipline', 'library'];
 
 export function roleDesc(id: RoleId): string {
-  return `${ATTR_ICON[ROLES[id].attr]}+1`;
+  return `${ATTR_ICON[ROLES[id].attr]}×2`;
 }

@@ -29,10 +29,15 @@ export function roleOf(p: Player, uid: string): RoleId | null {
   return idx >= 0 ? ROLE_ORDER[idx] : null;
 }
 
-/** 係ボーナスが付いているか（係のアイコンを本人が持っている） */
+/** 係ボーナスが付いているか（その生徒が、アイコンaの係に就いていて、aを持っている） */
 export function hasRoleBonus(p: Player, s: Student, a: Attr): boolean {
   const r = roleOf(p, s.uid);
   return r !== null && ROLES[r].attr === a && s.attrs.includes(a);
+}
+
+/** 係に就いた子は、その係のアイコンが2倍に数えられる */
+function weighted(p: Player, s: Student, a: Attr): number {
+  return hasRoleBonus(p, s, a) ? iconsOf(s, a) * 2 : iconsOf(s, a);
 }
 
 /** その生徒が持つアイコンaの数 */
@@ -43,7 +48,7 @@ export function iconsOf(s: Student, a: Attr): number {
 export interface AttrScore {
   /** アイコンの合計数 */
   sum: number;
-  /** 係ボーナス（+1ずつ） */
+  /** 係ボーナス（係に就いた子のアイコン数ぶん） */
   bonus: number;
   total: number;
   holders: Student[];
@@ -57,19 +62,20 @@ export function attrScore(p: Player, a: Attr, doubleEra?: EraId): AttrScore {
   for (const s of p.students) {
     if (!s.attrs.includes(a)) continue;
     holders.push(s);
-    sum += s.era === doubleEra ? iconsOf(s, a) * 2 : iconsOf(s, a);
-    if (hasRoleBonus(p, s, a)) bonus += 1;
+    const n = s.era === doubleEra ? iconsOf(s, a) * 2 : iconsOf(s, a);
+    sum += n;
+    if (hasRoleBonus(p, s, a)) bonus += n;
   }
   return { sum, bonus, total: sum + bonus, holders };
 }
 
-/** 通常カードの点：そのアイコンを一番多く持つ子の個数＋（係のアイコンを持つ子が係に就いていれば）+1 */
+/** 通常カードの点：そのアイコンを一番多く持つ子の個数（係に就いた子は2倍で数える） */
 export function bestScore(p: Player, a: Attr): AttrScore {
   const holders = p.students.filter((s) => s.attrs.includes(a));
-  const best = holders.reduce((m, s) => Math.max(m, iconsOf(s, a)), 0);
-  const bonus = holders.some((s) => hasRoleBonus(p, s, a)) ? 1 : 0;
-  const top = holders.filter((s) => iconsOf(s, a) === best).slice(0, 1);
-  return { sum: best, bonus, total: best + bonus, holders: top };
+  const total = holders.reduce((m, s) => Math.max(m, weighted(p, s, a)), 0);
+  const top = holders.filter((s) => weighted(p, s, a) === total).slice(0, 1);
+  const sum = top.length ? iconsOf(top[0], a) : 0;
+  return { sum, bonus: total - sum, total, holders: top };
 }
 
 export function countAttr(p: Player, a: Attr): number {
