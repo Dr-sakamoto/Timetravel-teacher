@@ -19,7 +19,21 @@ export const ATTR_LABEL: Record<Attr, string> = {
 export type Rarity = 'N' | 'R' | 'SR' | 'SSR';
 export type Tag = '現代' | 'ヤンキー' | '恐竜' | '武将' | '忍者' | '学者' | '芸術家' | '王族' | '未来' | '動物';
 
-export type RoleId = 'study' | 'pe' | 'culture' | 'leader' | 'discipline' | 'library';
+export type RoleId = 'study' | 'pe' | 'culture' | 'leader';
+
+/** 係の席：どの係に誰が就いているか */
+export interface RoleSeat {
+  role: RoleId;
+  uid: string;
+}
+
+/** 生徒に装備したグッズ（アイコンが1つ増える） */
+export interface Goods {
+  id: string;
+  name: string;
+  icon: string;
+  attr: Attr;
+}
 
 export type EraId =
   | 'cretaceous'
@@ -49,6 +63,8 @@ export interface Student {
   attrs: Attr[];
   flavor: string;
   joined: string;
+  /** 装備しているグッズ（1人1つまで。そのアイコンは attrs にも足してある） */
+  goods?: Goods;
   /** 得点に貢献した回数 */
   mvp: number;
 }
@@ -59,8 +75,10 @@ export interface Player {
   isCpu: boolean;
   color: string;
   students: Student[];
-  /** ROLE_ORDER の順に、担当する生徒uid */
-  roles: (string | null)[];
+  /** 解放した係の種類（解放した順。学期の頭に1種ずつ、自分で選んで増やす） */
+  unlocked: RoleId[];
+  /** 係に就いている生徒（解放した係に1人ずつ） */
+  roles: RoleSeat[];
   points: number;
 }
 
@@ -86,16 +104,18 @@ export interface EventResult {
   desc: string;
   /** カードに書かれたルール（短文） */
   rule?: string;
-  /** 時代イベント：この時代の生徒は×2（得点演出用） */
+  /** 時代イベント・襲来：この時代の生徒は×2（得点演出用） */
   era?: EraId;
-  /** カチコミ：敵の強さ（得点演出用） */
+  /** 襲来：敵の強さ（得点演出用） */
   threat?: number;
+  /** 共通イベント：引かれるアイコン（または人数）（得点演出用） */
+  minus?: Attr | 'heads';
   rows: ResultRow[];
   lines?: string[];
   students?: Student[];
 }
 
-export type ResultCtx = 'turn' | 'summer' | 'monthEnd' | 'yearEnd' | 'final';
+export type ResultCtx = 'turn' | 'monthEnd' | 'yearEnd' | 'final';
 
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
@@ -104,6 +124,12 @@ export type Phase =
   | { kind: 'draw'; player: number }
   /** 転校：いらない生徒を別のクラスに押しつける */
   | { kind: 'push'; player: number }
+  /** カチコミ：他のクラスを1つ選んで、自分の👊の数だけ減点させる */
+  | { kind: 'kachikomi'; player: number }
+  /** クラス替え：係に就いていない生徒どうしを他のクラスと入れ替える */
+  | { kind: 'exchange'; player: number }
+  /** グッズ：生徒1人に装備する */
+  | { kind: 'equip'; player: number; card: string }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
   | { kind: 'gameOver' };
 
@@ -115,7 +141,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 11;
+  version: 15;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -133,6 +159,8 @@ export interface GameState {
   eventDeck: string[];
   /** 捨て札（末尾が一番上） */
   discard: string[];
+  /** 初期メンバー用の山（現代の普通の生徒） */
+  starters: string[];
   pools: Record<EraId, string[]>;
   uidCounter: number;
   logCounter: number;
@@ -143,6 +171,9 @@ export type Action =
   | { type: 'drawMember' }
   | { type: 'drawAllMembers' }
   | { type: 'continue' }
-  | { type: 'setRoles'; roles: (string | null)[] }
+  | { type: 'setRoles'; roles: RoleSeat[]; unlock?: RoleId[] }
   | { type: 'drawEvent' }
-  | { type: 'push'; uid: string | null; target?: number };
+  | { type: 'push'; uid: string | null; target?: number }
+  | { type: 'kachikomi'; target: number | null }
+  | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
+  | { type: 'equip'; uid: string | null };

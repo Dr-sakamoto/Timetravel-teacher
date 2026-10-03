@@ -1,13 +1,14 @@
 import { ERAS } from '../game/data/eras';
-import { currentEra, deckBreakdown, type DeckRow } from '../game/engine';
+import { DECK_GROUPS, currentEra, deckBreakdown, type DeckGroup, type DeckRow } from '../game/engine';
 import type { GameState } from '../game/types';
 
-const GROUP_NOTE: Record<DeckRow['group'], string> = {
-  通常: '全員',
-  イベント: 'めくった人',
-  時代イベント: 'めくった人・この時代の子は2倍',
-  カチコミ: 'めくった人',
-  転校: 'めくった人',
+const GROUP_NOTE: Record<DeckGroup, string> = {
+  通常: 'めくった人：クラス全員のそのアイコンの数',
+  カチコミ: 'めくった人：他のクラスを自分の👊の数だけ減点',
+  共通イベント: '全クラス：状況でプラスにもマイナスにも',
+  '転校・クラス替え': 'めくった人：生徒を押しつける／入れ替える',
+  グッズ: '生徒1人に装備してアイコン＋1',
+  時代イベント: '全クラス：この時代の子は2倍。大当たりも大損もある',
   人物: 'めくった人のクラスに転入',
 };
 
@@ -15,7 +16,7 @@ const GROUP_NOTE: Record<DeckRow['group'], string> = {
 export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => void }) {
   const era = ERAS[currentEra(state)];
   const rows = deckBreakdown(state);
-  const groups = (Object.keys(GROUP_NOTE) as DeckRow['group'][]).filter((g) => rows.some((r) => r.group === g));
+  const groups = DECK_GROUPS.filter((g) => rows.some((r) => r.group === g));
   const sum = (rs: DeckRow[]) => rs.reduce((a, r) => a + r.left + r.used, 0);
   const total = sum(rows);
   return (
@@ -29,7 +30,7 @@ export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => 
           {era.name}の山札
         </h2>
         <p>
-          山札の残り {state.eventDeck.length}枚／捨て札 {state.discard.length}枚（今学期の合計 {total}枚）
+          山札の残り {state.eventDeck.length}枚／捨て札 {state.discard.length}枚（合わせて {total}枚。装備されたグッズと転入した人物は含まない）
         </p>
         <table className="deck-table">
           <thead>
@@ -46,7 +47,7 @@ export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => 
               <tbody key={g}>
                 <tr className="deck-group">
                   <th colSpan={3}>
-                    {g}カード {n}枚（{Math.round((n / total) * 100)}%）<span className="deck-note">{GROUP_NOTE[g]}</span>
+                    {g} {n}枚（{Math.round((n / total) * 100)}%）<span className="deck-note">{GROUP_NOTE[g]}</span>
                   </th>
                 </tr>
                 {rs.map((r) => (

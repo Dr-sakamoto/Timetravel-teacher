@@ -1,21 +1,7 @@
 import { useMemo, type ReactNode, type RefObject } from 'react';
-import { contributions, type Contribution } from '../game/calc';
-import type { Attr, GameState } from '../game/types';
-import {
-  measure,
-  mid,
-  NO_RECTS,
-  popBatch,
-  popLength,
-  top,
-  useFxClock,
-  variantFor,
-  why,
-  type FxCtx,
-  type FxRects,
-  type PopSrc,
-  type Variant,
-} from './scoreFx';
+import { contributions } from '../game/calc';
+import type { GameState } from '../game/types';
+import { measure, minusList, NO_RECTS, useFxClock, variantFor, type FxCtx, type FxRects, type Variant } from './scoreFx';
 
 /** めくったカードが配られてから演出を始めるまで */
 const START = 450;
@@ -23,119 +9,78 @@ const START = 450;
 export interface GameFx {
   /** 演出の長さ（ms、早送り前） */
   length: number;
-  /** 光らせるカード（null なら今まで通り、関わった子を全部） */
-  lit: Set<string> | null;
-  dim: Set<string>;
+  /** その人の教室で光らせるカード（null なら今まで通り、関わった子を全部） */
+  lit: (pid: number) => Set<string> | null;
+  /** その人の教室で暗くするカード */
+  dims: (pid: number) => Set<string> | null;
   /** 名札に出す点（まだ届いていない分を引いたもの） */
   points: (pid: number) => number;
   /** 点が入り終わった人（名札の「+点」を出してよい） */
   settled: (pid: number) => boolean;
   overlay: ReactNode[];
-  /** めくったカードの横に出すもの（カチコミの明細） */
+  /** めくったカードの横に出すもの（襲来の明細） */
   side?: ReactNode;
 }
 
-type Plan =
-  /** 通常カード：全員の一番の子から同時に「+点」が名札へ飛ぶ */
-  | { kind: 'batch'; attr: Attr; rows: { pid: number; pts: number; c?: Contribution }[] }
-  /** イベント・時代イベント・カチコミ：引いた人の教室で1枚ずつ */
-  | { kind: 'single'; pid: number; variant: Variant; base: Omit<FxCtx, 't' | 'rects'> };
+interface Plan {
+  /** めくった人：この人の教室で1枚ずつ見せる */
+  pid: number;
+  variant: Variant;
+  base: Omit<FxCtx, 't' | 'rects'>;
+  /** 全クラスに効くカードで、ほかの人に入る点（めくった人の演出の終わりぎわにまとめて入る） */
+  others: Map<number, number>;
+  othersAt: number;
+  length: number;
+}
 
 function planOf(s: GameState): Plan | null {
   if (s.phase.kind !== 'result') return null;
   const r = s.phase.result;
   const a = r.attr;
-  if (!a || a === 'all' || r.tone === 'fixed' || r.rows.length === 0) return null;
-  if (r.tone === 'normal') {
-    return {
-      kind: 'batch',
-      attr: a,
-      rows: r.rows.filter((x) => x.delta > 0).map((x) => ({ pid: x.player, pts: x.delta, c: contributions(s.players[x.player], a, 'best')[0] })),
-    };
-  }
-  const row = r.rows[0];
-  const p = s.players[row.player];
-  const card = { attr: a, era: r.era, threat: r.threat };
-  const list = contributions(p, a, 'sum', r.era);
-  const total = list.reduce((x, c) => x + c.pts, 0);
-  return { kind: 'single', pid: row.player, variant: variantFor(card), base: { start: START, list, card, delta: row.delta, total, all: p.students.map((x) => x.uid) } };
+  if (!a || a === 'all' || r.tone === 'fixed' || r.tone === 'personal') return null;
+  const pid = s.phase.player ?? r.rows[0]?.player;
+  const row = r.rows.find((x) => x.player === pid);
+  if (pid === undefined || !row) return null;
+  const p = s.players[pid];
+  const card = { attr: a, era: r.era, threat: r.threat, minus: r.minus };
+  const list = contributions(p, a, r.era);
+  const minus = r.minus ? minusList(p.students, r.minus === 'heads' ? null : contributions(p, r.minus)) : [];
+  const variant = variantFor(card, r.tone === 'normal');
+  const base = { start: START, list, minusList: minus, card, delta: row.delta, total: list.reduce((x, c) => x + c.pts, 0), all: p.students.map((x) => x.uid) };
+  const own = variant.length(base);
+  const others = new Map(r.rows.filter((x) => x.player !== pid && x.delta !== 0).map((x) => [x.player, x.delta]));
+  const othersAt = Math.max(START, own - 600);
+  return { pid, variant, base, others, othersAt, length: others.size ? Math.max(own, othersAt + 400) : own };
 }
 
-interface BatchRects {
-  /** 教室が見えていればそのカード、畳まれていれば相手の席 */
-  from?: DOMRect;
-  onCard: boolean;
-  to?: DOMRect;
-}
-interface Measured {
-  single: FxRects;
-  batch: Record<number, BatchRects>;
-}
-const EMPTY: Measured = { single: NO_RECTS, batch: {} };
-
-function measureGame(root: HTMLElement | null, plan: Plan | null): Measured {
-  if (!root || !plan) return EMPTY;
-  if (plan.kind === 'single') return { single: measure(root, plan.base.card.attr, `.playmat[data-pid="${plan.pid}"]`, '.reveal .ecard'), batch: {} };
-  const batch: Record<number, BatchRects> = {};
-  for (const x of plan.rows) {
-    const mat = root.querySelector(`.playmat[data-pid="${x.pid}"]`);
-    const card = mat && x.c ? mat.querySelector(`[data-uid="${x.c.student.uid}"]`) : null;
-    const seat = root.querySelector(`.opp[data-pid="${x.pid}"]`);
-    batch[x.pid] = {
-      from: (card ?? seat)?.getBoundingClientRect(),
-      onCard: !!card,
-      to: (mat?.querySelector('.plate-pts') ?? seat?.querySelector('.opp-pts'))?.getBoundingClientRect(),
-    };
-  }
-  return { single: NO_RECTS, batch };
-}
-
-/** 今めくられたカードの得点演出。演出のないカード（学校行事・転入など）なら null */
+/** 今めくられたカードの得点演出。演出のないカード（学校行事・転入・カチコミなど）なら null */
 export function useGameFx(state: GameState, root: RefObject<HTMLElement>, scale: number): GameFx | null {
   const result = state.phase.kind === 'result' ? state.phase.result : null;
   // 結果が変わったときだけ計画し直す（演出中は毎フレーム描き直すので）
   const plan = useMemo(() => planOf(state), [result]);
-  const length = !plan ? 0 : plan.kind === 'batch' ? popLength(START, plan.rows.length) : plan.variant.length(plan.base);
-  const { t, rects } = useFxClock<Measured>(result, length, () => measureGame(root.current, plan), EMPTY, scale);
+  const length = plan?.length ?? 0;
+  const { t, rects } = useFxClock<FxRects>(
+    result,
+    length,
+    () => (root.current && plan ? measure(root.current, `.playmat[data-pid="${plan.pid}"]`, '.reveal .ecard') : NO_RECTS),
+    NO_RECTS,
+    scale,
+  );
   if (!plan) return null;
   const over = t >= length;
   const players = state.players;
-
-  if (plan.kind === 'batch') {
-    const overlay: ReactNode[] = [];
-    const srcs: PopSrc[] = [];
-    for (const x of plan.rows) {
-      const m = rects.batch[x.pid];
-      if (!m?.from || !m.to) continue;
-      srcs.push({
-        key: String(x.pid),
-        from: m.onCard ? top(m.from) : mid(m.from),
-        to: mid(m.to),
-        label: `+${x.pts}`,
-        why: m.onCard && x.c ? why(x.c, { attr: plan.attr }) : undefined,
-      });
-    }
-    const arrived = popBatch(t, START, srcs, overlay);
-    const pending = (pid: number) => !over && plan.rows.some((x) => x.pid === pid) && !arrived.has(String(pid));
-    const delta = (pid: number) => plan.rows.find((x) => x.pid === pid)?.pts ?? 0;
-    return {
-      length,
-      lit: null,
-      dim: new Set(),
-      points: (pid) => players[pid].points - (pending(pid) ? delta(pid) : 0),
-      settled: (pid) => !pending(pid),
-      overlay,
-    };
-  }
-
-  const f = plan.variant.run({ ...plan.base, t, rects: rects.single });
+  const f = plan.variant.run({ ...plan.base, t, rects });
   const done = f.done || over;
+  const othersIn = t >= plan.othersAt || over;
   return {
     length,
-    lit: f.lit,
-    dim: f.dim,
-    points: (pid) => (pid === plan.pid && !done ? players[pid].points - plan.base.delta + f.gained : players[pid].points),
-    settled: (pid) => pid !== plan.pid || done,
+    lit: (pid) => (pid === plan.pid ? f.lit : null),
+    dims: (pid) => (pid === plan.pid ? f.dim : null),
+    points: (pid) => {
+      if (pid === plan.pid) return done ? players[pid].points : players[pid].points - plan.base.delta + f.gained;
+      return othersIn ? players[pid].points : players[pid].points - (plan.others.get(pid) ?? 0);
+    },
+    settled: (pid) => (pid === plan.pid ? done : othersIn),
     overlay: f.overlay,
     side: f.side,
   };

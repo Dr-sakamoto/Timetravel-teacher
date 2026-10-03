@@ -1,15 +1,15 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Contribution } from '../game/calc';
 import { ERAS } from '../game/data/eras';
-import { ATTR_ICON, type Attr, type EraId } from '../game/types';
+import { ATTR_ICON, type Attr, type EraId, type Student } from '../game/types';
 
 /*
  * 得点演出：「どのカードから何点入ったか」を見せるアニメーション。
  * 時刻 t（ms）から1コマを組み立てる純粋な関数なので、再生も早送りも t を進めるだけ。
- *   通常カード     → popBatch（A：全員のカードから同時に「+点」が名札へ飛ぶ）
- *   イベントカード → absorb（D：アイコンが1個ずつめくったカードに吸い込まれる）
- *   時代イベント   → stamp（B：カードにスタンプが押されて残る）
- *   カチコミ       → receipt（C：明細が1行ずつ出て、敵の強さとの差が分かる）
+ *   通常カード → popFly（A：点の入ったカード全部から同時に「+点」が名札へ飛ぶ）
+ *   共通イベント → absorb（D：アイコンが1個ずつめくったカードに吸い込まれ、引かれる分は赤で出ていく）
+ *   時代イベント → stamp（B：カードにスタンプが押されて残る）
+ *   襲来         → receipt（C：明細が1行ずつ出て、敵の強さとの差が分かる）
  */
 
 export interface Pt {
@@ -22,13 +22,15 @@ export interface FxCard {
   attr: Attr;
   /** 時代イベント：この時代の生徒は×2 */
   era?: EraId;
-  /** カチコミ：敵の強さ */
+  /** 襲来：敵の強さ */
   threat?: number;
+  /** 共通イベント：引かれるアイコン（または人数） */
+  minus?: Attr | 'heads';
 }
 
 export interface FxRects {
   cards: Record<string, DOMRect>;
-  icons: Record<string, DOMRect[]>;
+  icons: Record<string, { a: Attr; r: DOMRect }[]>;
   plate?: DOMRect;
   ecard?: DOMRect;
   rows: Record<string, DOMRect>;
@@ -41,6 +43,8 @@ export interface FxCtx {
   /** 演出を始める時刻（めくったカードが配られるのを待つ） */
   start: number;
   list: Contribution[];
+  /** 共通イベントで引かれる分（1枚ずつ） */
+  minusList: Contribution[];
   card: FxCard;
   rects: FxRects;
   /** 最後に入る点 */
@@ -89,6 +93,13 @@ function fly(a: Pt, b: Pt, p: number, arc = 70): Pt {
 }
 const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 const isRaid = (card: FxCard) => card.threat !== undefined;
+const minusIcon = (m: Attr | 'heads') => (m === 'heads' ? '👥' : ATTR_ICON[m]);
+const iconRects = (rects: FxRects, u: string, a: Attr) => (rects.icons[u] ?? []).filter((x) => x.a === a).map((x) => x.r);
+
+/** 共通イベントで引かれる分：アイコンなら1枚ずつの数、人数なら1人1つ */
+export function minusList(students: Student[], minus: Contribution[] | null): Contribution[] {
+  return minus ?? students.map((s) => ({ student: s, icons: 1, era: false, role: false, pts: 1 }));
+}
 const sum = (list: Contribution[]) => list.reduce((a, x) => a + x.pts, 0);
 const newFrame = (): Frame => ({ lit: new Set(), dim: new Set(), gained: 0, done: false, overlay: [] });
 function dimOthers(c: FxCtx, f: Frame) {
@@ -133,7 +144,7 @@ function finale(c: FxCtx, from: Pt, t0: number, f: Frame) {
     const q = back((t - t0) / 300);
     f.overlay.push(
       <div key="raid-eq" className="fx-raid-eq" style={{ left: (rects.ecard?.right ?? 0) + 16, top: from.y, transform: `translate(0,-50%) scale(${q})` }}>
-        敵 {card.threat} − 👊{total} ＝ <b className={delta < 0 ? 'down' : 'up'}>{delta < 0 ? delta : '撃退！'}</b>
+        👊{total} − 敵 {card.threat} ＝ <b className={delta < 0 ? 'down' : 'up'}>{delta < 0 ? delta : `撃退！${sign(delta)}`}</b>
       </div>,
     );
   }
@@ -273,7 +284,7 @@ const receiptStep = (n: number) => Math.min(600, 2000 / Math.max(1, n));
 export const receipt: Variant = {
   id: 'C',
   name: 'C. レシート（明細）',
-  desc: 'カチコミ用。めくったカードの横に明細が1行ずつ印字され、その行のカードと線でつながる。最後に敵の強さを引いて名札へ。',
+  desc: '襲来用。めくったカードの横に明細が1行ずつ印字され、その行のカードと線でつながる。最後に敵の強さを引いて名札へ。',
   length: (c) => c.start + c.list.length * receiptStep(c.list.length) + 400 + 550,
   run(c) {
     const { t, list, card, rects, delta, start } = c;
@@ -321,9 +332,9 @@ export const receipt: Variant = {
         )}
         {t >= end && (
           <div className={`fx-row total ${delta < 0 ? 'down' : ''}`} data-total>
-            <span className="fx-row-who">{raid ? (delta < 0 ? '合計' : '撃退！') : '合計'}</span>
+            <span className="fx-row-who">{raid && delta >= 0 ? '撃退！' : '合計'}</span>
             <span className="fx-row-why" />
-            <span className="fx-row-pts">{raid ? (delta < 0 ? delta : '±0') : `+${sum(shown)}`}</span>
+            <span className="fx-row-pts">{raid ? (delta === 0 ? '±0' : sign(delta)) : `+${sum(shown)}`}</span>
           </div>
         )}
       </div>
@@ -351,84 +362,98 @@ export const receipt: Variant = {
 
 const ABSORB_FLY = 520;
 /** アイコンが多いときは間隔を詰めて、だいたい2秒に収める */
-function absorbTiming(list: Contribution[]) {
-  const n = Math.max(1, sum(list));
-  return { gap: Math.max(28, Math.min(85, 1500 / n)), pause: list.length > 4 ? 120 : 260 };
+function absorbTiming(all: Contribution[]) {
+  const n = Math.max(1, sum(all));
+  return { gap: Math.max(24, Math.min(85, 1500 / n)), pause: all.length > 4 ? 100 : 260 };
 }
-function absorbEnd(start: number, list: Contribution[]) {
-  const { gap, pause } = absorbTiming(list);
-  return start + list.reduce((a, x) => a + x.pts * gap + pause, 0) + ABSORB_FLY;
+function absorbEnd(c: Pick<FxCtx, 'start' | 'list' | 'minusList'>) {
+  const all = [...c.list, ...c.minusList];
+  const { gap, pause } = absorbTiming(all);
+  return c.start + all.reduce((a, x) => a + x.pts * gap + pause, 0) + ABSORB_FLY;
 }
 
 export const absorb: Variant = {
   id: 'D',
   name: 'D. アイコン吸い込み',
-  desc: 'イベントカード用。カードに描かれたアイコンが1個ずつ飛び出して、めくったカードに吸い込まれる。×2の子は同じアイコンが2個ずつ飛ぶ。',
-  length: (c) => absorbEnd(c.start, c.list) + finaleLength(c.card),
+  desc: '共通イベント用。カードのアイコンが1個ずつめくったカードに吸い込まれる（×2の子は2個ずつ）。引かれるアイコンや人数は赤い「−」で吸い込まれる。',
+  length: (c) => absorbEnd(c) + finaleLength(c.card),
   run(c) {
-    const { t, list, card, rects, start } = c;
-    const raid = isRaid(card);
-    const { gap, pause } = absorbTiming(list);
+    const { t, list, minusList: minus, card, rects, start } = c;
+    const all = [...list, ...minus];
+    const { gap, pause } = absorbTiming(all);
     const f = newFrame();
-    dimOthers(c, f);
+    if (t >= start - 200) for (const u of c.all) if (!all.some((x) => x.student.uid === u)) f.dim.add(u);
     const target = mid(rects.ecard);
     let got = 0;
+    let lost = 0;
     let t0 = start;
-    for (const x of list) {
+    all.forEach((x, i) => {
+      const neg = i >= list.length;
       const u = x.student.uid;
-      const icons = rects.icons[u] ?? [];
+      const a = neg ? (card.minus === 'heads' ? null : card.minus!) : card.attr;
+      const icons = a ? iconRects(rects, u, a) : [];
       const mul = x.pts / Math.max(1, x.icons);
       if (t >= t0 && t < t0 + x.pts * gap + ABSORB_FLY) f.lit.add(u);
       for (let k = 0; k < x.pts; k++) {
         const p = (t - t0 - k * gap) / ABSORB_FLY;
         if (p < 0) continue;
         if (p >= 1) {
-          got++;
+          if (neg) lost++;
+          else got++;
           continue;
         }
-        const src = mid(icons[Math.floor(k / mul) % Math.max(1, icons.length)] ?? rects.cards[u]);
+        const src = icons.length ? mid(icons[Math.floor(k / mul) % icons.length]) : mid(rects.cards[u]);
         const at = fly(src, target, p, 110 + (k % 3) * 25);
         f.overlay.push(
-          <div key={`${u}-${k}`} className={`fx-icon ${k % mul === 1 ? 'twin' : ''}`} style={{ left: at.x, top: at.y, transform: `translate(-50%,-50%) scale(${1.6 - 0.8 * ease(p)})` }}>
-            {ATTR_ICON[card.attr]}
+          <div
+            key={`${u}-${neg ? 'm' : 'p'}${k}`}
+            className={`fx-icon ${neg ? 'neg' : k % mul === 1 ? 'twin' : ''}`}
+            style={{ left: at.x, top: at.y, transform: `translate(-50%,-50%) scale(${1.6 - 0.8 * ease(p)})` }}
+          >
+            {neg ? minusIcon(card.minus!) : ATTR_ICON[card.attr]}
           </div>,
         );
       }
       t0 += x.pts * gap + pause;
-    }
+    });
     if (t >= start)
       f.overlay.push(
         counter(
           c,
           <>
             {ATTR_ICON[card.attr]} {got}
-            {raid && <small> / {card.threat}</small>}
+            {card.minus && (
+              <span className="fx-counter-neg">
+                {' '}
+                − {minusIcon(card.minus)} {lost}
+              </span>
+            )}
           </>,
-          `big ${raid ? 'shield' : ''}`,
-          got,
+          'big',
+          got * 100 + lost,
         ),
       );
-    finale(c, target, absorbEnd(start, list), f);
+    finale(c, target, absorbEnd(c), f);
     return f;
   },
 };
 
 export const VARIANTS: Variant[] = [popFly, stamp, receipt, absorb];
 
-/** めくったカードの種類ごとの演出 */
-export function variantFor(card: FxCard): Variant {
-  return isRaid(card) ? receipt : card.era ? stamp : absorb;
+/** めくったカードの種類ごとの演出：通常カード→A、襲来→C、時代イベント→B、共通イベント→D */
+export function variantFor(card: FxCard, normal: boolean): Variant {
+  return normal ? popFly : isRaid(card) ? receipt : card.era ? stamp : absorb;
 }
 
 // ---------- 位置の計測と時計 ----------
 
 /** 教室（mat）の中のカード・アイコン・名札と、めくったカード・レシートの位置 */
-export function measure(root: ParentNode, attr: Attr, mat: string, ecard: string): FxRects {
+export function measure(root: ParentNode, mat: string, ecard: string): FxRects {
   const r: FxRects = { cards: {}, icons: {}, rows: {} };
   root.querySelectorAll<HTMLElement>(`${mat} [data-uid]`).forEach((el) => {
     const u = el.dataset.uid!;
     r.cards[u] = el.getBoundingClientRect();
-    r.icons[u] = [...el.querySelectorAll(`.tcg-attr.a-${attr}`)].map((x) => x.getBoundingClientRect());
+    r.icons[u] = [...el.querySelectorAll<HTMLElement>('.tcg-attr')].map((x) => ({ a: /a-(\w+)/.exec(x.className)?.[1] as Attr, r: x.getBoundingClientRect() }));
   });
   root.querySelectorAll<HTMLElement>('[data-row]').forEach((el) => (r.rows[el.dataset.row!] = el.getBoundingClientRect()));
   r.total = root.querySelector('[data-total] .fx-row-pts')?.getBoundingClientRect();

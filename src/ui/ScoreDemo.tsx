@@ -3,10 +3,11 @@ import { contributions } from '../game/calc';
 import { CARD_MAP } from '../game/data/cards';
 import { ARCHETYPE_MAP } from '../game/data/modern';
 import { ROLE_ORDER } from '../game/data/roles';
-import { type Attr, type EraId, type EventResult, type Player, type RoleId, type Student } from '../game/types';
+import { type Attr, type EventResult, type Player, type RoleId, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
 import { Playmat } from './Playmat';
-import { measure, NO_RECTS, useFxClock, VARIANTS, type FxCard } from './scoreFx';
+import { measure, minusList, NO_RECTS, useFxClock, VARIANTS, type FxCard } from './scoreFx';
+import { EVENT_MAP, cardRule } from '../game/data/events';
 
 /*
  * 得点演出のデモ（#score-demo で開く）：
@@ -27,7 +28,6 @@ function modern(id: string, name: string, attrs: Attr[]): Student {
 
 const STUDENTS: Student[] = [
   modern('track', '佐藤 陸', ['sports', 'sports']),
-  modern('baseball', '鈴木 翔', ['study', 'sports']),
   modern('nerd', '高橋 学', ['study', 'study']),
   modern('gyaru', '田中 ゆな', ['charm']),
   modern('brass', '伊藤 奏', ['art']),
@@ -36,14 +36,13 @@ const STUDENTS: Student[] = [
   modern('olympian', '中村 隼', ['sports', 'sports', 'sports', 'study']),
   hist('yukimura'),
   hist('keiji'),
-  hist('nobunaga'),
 ];
 const byArt = (art: string) => STUDENTS.find((s) => s.art === art)!.uid;
 const ROLE_PICK: Partial<Record<RoleId, string>> = {
   study: byArt('nerd'),
   pe: byArt('yukimura'),
   culture: byArt('brass'),
-  leader: byArt('nobunaga'),
+  leader: byArt('gyaru'),
 };
 const BASE_POINTS = 42;
 const PLAYER: Player = {
@@ -52,62 +51,58 @@ const PLAYER: Player = {
   isCpu: false,
   color: '#e85d5d',
   students: STUDENTS,
-  roles: ROLE_ORDER.map((r) => ROLE_PICK[r] ?? null),
+  unlocked: [...ROLE_ORDER],
+  roles: ROLE_ORDER.map((role) => ({ role, uid: ROLE_PICK[role]! })),
   points: BASE_POINTS,
 };
 
 // ---------- シナリオ（めくったカード） ----------
 
 interface Scenario {
-  id: string;
   label: string;
   card: EventResult;
-  attr: Attr;
-  mode: 'sum' | 'best';
-  era?: EraId;
-  threat?: number;
+  fx: FxCard;
+  normal: boolean;
+}
+
+/** 本物のカードから、めくったときの見た目と演出の材料を作る */
+function scenario(id: string, label: string): Scenario {
+  const c = EVENT_MAP[id];
+  const rule = cardRule(c);
+  const rows: EventResult['rows'] = [];
+  switch (c.kind) {
+    case 'normal':
+      return { label, normal: true, fx: { attr: c.attr }, card: { title: c.name, icon: c.icon, attr: c.attr, tone: 'normal', desc: '', rule, rows } };
+    case 'swing':
+      return { label, normal: false, fx: { attr: c.plus, minus: c.minus }, card: { title: c.name, icon: c.icon, attr: c.plus, tone: 'contest', desc: c.desc, rule, rows } };
+    case 'contest':
+      return { label, normal: false, fx: { attr: c.attr, era: c.era }, card: { title: c.name, icon: c.icon, attr: c.attr, tone: 'era', desc: c.desc, rule, rows } };
+    case 'raid':
+      return {
+        label,
+        normal: false,
+        fx: { attr: 'fight', era: c.era, threat: c.threat },
+        card: { title: c.name, icon: c.icon, attr: 'fight', tone: 'era', desc: `敵の強さ ${c.threat}`, rule, rows },
+      };
+    default:
+      throw new Error(id);
+  }
 }
 
 const SCENARIOS: Scenario[] = [
-  {
-    id: 'contest',
-    label: '🏃 体育祭（合計）',
-    attr: 'sports',
-    mode: 'sum',
-    card: { title: '体育祭', icon: '🏃', attr: 'sports', tone: 'contest', desc: 'リレーに綱引き！', rule: '引いた人：クラス全員の🏃の数を加点', rows: [] },
-  },
-  {
-    id: 'era',
-    label: '⚔️ 合戦（時代×2）',
-    attr: 'fight',
-    mode: 'sum',
-    era: 'sengoku',
-    card: { title: '天下分け目の合戦', icon: '⚔️', attr: 'fight', tone: 'era', desc: '関ヶ原で全軍激突！', rule: '引いた人：クラス全員の👊の数を加点（この時代の生徒は2倍）', rows: [] },
-  },
-  {
-    id: 'normal',
-    label: '📚 授業（一番の子）',
-    attr: 'study',
-    mode: 'best',
-    card: { title: '授業', icon: '📚', attr: 'study', tone: 'normal', desc: '', rule: '全員：📚を一番多く持つ子の個数を加点', rows: [] },
-  },
-  {
-    id: 'raid',
-    label: '👊 カチコミ（マイナス）',
-    attr: 'fight',
-    mode: 'sum',
-    threat: 7,
-    card: { title: 'カチコミ！他校のヤンキー', icon: '😠', attr: 'fight', tone: 'contest', desc: '敵の強さ 7', rule: '引いた人：クラスの👊の数が7に足りない分だけマイナス', rows: [] },
-  },
+  scenario('n_sports', '🏃 通常カード'),
+  scenario('marathon', '🥵 共通イベント（−人数）'),
+  scenario('kassen', '⚔️ 時代イベント（×2）'),
+  scenario('raid_sengoku', '👊 襲来（−敵の強さ）'),
 ];
 
 function readHash(): { v: number; s: number } {
   const m = /v=(\d)&s=(\d)/.exec(location.hash);
-  return m ? { v: Math.min(+m[1], VARIANTS.length - 1), s: Math.min(+m[2], SCENARIOS.length - 1) } : { v: 0, s: 2 };
+  return m ? { v: Math.min(+m[1], VARIANTS.length - 1), s: Math.min(+m[2], SCENARIOS.length - 1) } : { v: 0, s: 0 };
 }
 
 /** 案ごとに、本編で使う場面 */
-const HOME_SCENARIO = [2, 1, 3, 0];
+const HOME_SCENARIO = [0, 2, 3, 1];
 
 export function ScoreDemo() {
   const [v, setV] = useState(() => readHash().v);
@@ -116,12 +111,13 @@ export function ScoreDemo() {
   const root = useRef<HTMLDivElement>(null);
   const sc = SCENARIOS[s];
   const variant = VARIANTS[v];
-  const list = useMemo(() => contributions(PLAYER, sc.attr, sc.mode, sc.era), [sc]);
+  const fx = sc.fx;
+  const list = useMemo(() => contributions(PLAYER, fx.attr, fx.era), [fx]);
+  const minus = useMemo(() => (fx.minus ? minusList(STUDENTS, fx.minus === 'heads' ? null : contributions(PLAYER, fx.minus)) : []), [fx]);
   const total = list.reduce((a, x) => a + x.pts, 0);
-  const delta = sc.threat !== undefined ? Math.min(0, total - sc.threat) : total;
-  const card: FxCard = { attr: sc.attr, era: sc.era, threat: sc.threat };
-  const base = { start: 700, list, card, delta, total, all: STUDENTS.map((x) => x.uid) };
-  const clock = useFxClock(`${v}-${s}-${run}`, variant.length(base), () => measure(root.current!, sc.attr, '.demo-mat', '.demo-ecard .ecard'), NO_RECTS);
+  const delta = fx.threat !== undefined ? total - fx.threat : total - minus.reduce((a, x) => a + x.pts, 0);
+  const base = { start: 700, list, minusList: minus, card: fx, delta, total, all: STUDENTS.map((x) => x.uid) };
+  const clock = useFxClock(`${v}-${s}-${run}`, variant.length(base), () => measure(root.current!, '.demo-mat', '.demo-ecard .ecard'), NO_RECTS);
   const frame = variant.run({ ...base, t: clock.t, rects: clock.rects });
 
   useEffect(() => {
@@ -143,7 +139,7 @@ export function ScoreDemo() {
         </div>
         <div className="demo-tabs">
           {SCENARIOS.map((x, i) => (
-            <button key={x.id} className={`btn small ${i === s ? 'primary' : 'ghost'}`} onClick={() => (setS(i), setRun((r) => r + 1))}>
+            <button key={x.label} className={`btn small ${i === s ? 'primary' : 'ghost'}`} onClick={() => (setS(i), setRun((r) => r + 1))}>
               {x.label}
             </button>
           ))}
@@ -172,7 +168,7 @@ export function ScoreDemo() {
         />
       </div>
       <div className="fx-layer">{frame.overlay}</div>
-      <p className="demo-legend">係に就いた子（係ボードの下に係アイコン）はそのアイコンが×2。合戦では戦国出身の子が×2。</p>
+      <p className="demo-legend">係に就いた子（係ボードの下に係アイコン）はそのアイコンが×2。時代イベントと襲来では、その時代（ここでは戦国）出身の子が×2。</p>
     </div>
   );
 }

@@ -33,7 +33,7 @@ export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onC
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
-      title={`${student.name}（${era.name}${student.title ? `・${student.title}` : ''}）\n${student.attrs.map((a) => ATTR_LABEL[a]).join('・')}\n${student.flavor}`}
+      title={`${student.name}（${era.name}${student.title ? `・${student.title}` : ''}）\n${student.attrs.map((a) => ATTR_LABEL[a]).join('・')}${student.goods ? `\n装備：${student.goods.name}` : ''}\n${student.flavor}`}
     >
       <div className="tcg-inner">
         <div className="tcg-head">
@@ -56,6 +56,11 @@ export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onC
         </div>
         {size === 'full' && <div className="tcg-foot">{RARITY_MARK[student.rarity]} {student.rarity}</div>}
       </div>
+      {student.goods && (
+        <div className="tcg-goods" title={`${student.goods.name}（${ATTR_ICON[student.goods.attr]}＋1）`}>
+          {student.goods.icon}
+        </div>
+      )}
       {role && <div className="tcg-role">{ROLES[role].icon}{size === 'full' && ROLES[role].name}</div>}
     </div>
   );
