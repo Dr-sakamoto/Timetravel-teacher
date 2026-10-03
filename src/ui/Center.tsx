@@ -12,7 +12,7 @@ interface Props {
   state: GameState;
   dispatch: (a: Action) => void;
   cpuBusy: boolean;
-  /** 転校・カチコミ・交換留学・グッズで選んだもの */
+  /** 転校・カチコミ・クラス替え・グッズで選んだもの */
   pick: Pick;
 }
 
@@ -153,7 +153,7 @@ function Action({ state, dispatch, cpuBusy, pick }: Props) {
       const theirs = target?.students.find((x) => x.uid === pick.theirUid);
       return (
         <div className="say">
-          🔁 {who} の交換留学 — 手前の教室から出す生徒を選び、相手の名札をタップして交換相手を選ぶ（係の子は出せない）
+          🔁 {who} のクラス替え — 手前の教室から出す生徒を選び、相手の名札をタップして入れ替える相手を選ぶ（係の子は出せない）
           <div className="say-sub">
             {mine ? `${mine.icon}${mine.name}` : '自分の生徒：未選択'} ⇄ {theirs ? `${theirs.icon}${theirs.name}（${target!.name}）` : target ? `${target.name}の生徒：未選択` : '相手：未選択'}
           </div>
@@ -168,7 +168,7 @@ function Action({ state, dispatch, cpuBusy, pick }: Props) {
                 pick.uid && pick.target !== null && pick.theirUid && dispatch({ type: 'exchange', uid: pick.uid, target: pick.target, theirUid: pick.theirUid })
               }
             >
-              交換する
+              入れ替える
             </button>
           </div>
         </div>

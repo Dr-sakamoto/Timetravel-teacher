@@ -3,7 +3,7 @@ import { ATTR_ICON, type EventResult } from '../game/types';
 /** 卓の中央でめくられたイベントカード */
 export function EventCardView({ result }: { result: EventResult }) {
   const attr = result.attr && result.attr !== 'all' ? ATTR_ICON[result.attr] : result.attr === 'all' ? '🌈' : null;
-  const kind = { normal: '通常', contest: 'イベント', era: '時代イベント', fixed: '学校行事（全員）', personal: 'イベント' }[result.tone];
+  const kind = { normal: '通常（めくった人）', contest: '共通イベント（全員）', era: '時代イベント（全員）', fixed: '学校行事（全員）', personal: 'イベント' }[result.tone];
   return (
     <div className={`ecard tone-${result.tone} deal-in`}>
       <div className="ecard-inner">

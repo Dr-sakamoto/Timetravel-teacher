@@ -116,9 +116,9 @@ export type Phase =
   | { kind: 'draw'; player: number }
   /** 転校：いらない生徒を別のクラスに押しつける */
   | { kind: 'push'; player: number }
-  /** カチコミ：他校を1つ選んで、自分の👊の数だけ減点させる */
+  /** カチコミ：他のクラスを1つ選んで、自分の👊の数だけ減点させる */
   | { kind: 'kachikomi'; player: number }
-  /** 交換留学：係に就いていない生徒どうしを他校と交換 */
+  /** クラス替え：係に就いていない生徒どうしを他のクラスと入れ替える */
   | { kind: 'exchange'; player: number }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string }

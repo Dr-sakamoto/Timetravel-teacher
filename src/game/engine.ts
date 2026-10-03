@@ -369,39 +369,45 @@ function resolveNormal(s: GameState, c: NormalCard, pi: number): EventResult {
   return { title: c.name, icon: c.icon, attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), rows };
 }
 
-/** 共通イベント：プラスのアイコン − マイナスのアイコン（または人数）。状況でプラスにもマイナスにもなる */
-function resolveSwing(s: GameState, c: SwingCard, pi: number): EventResult {
-  const p = s.players[pi];
-  const plus = attrScore(p, c.plus);
-  const minus = c.minus === 'heads' ? { total: p.students.length, holders: [] as Student[] } : attrScore(p, c.minus);
-  const delta = plus.total - minus.total;
-  p.points += delta;
-  if (delta > 0) plus.holders.forEach((h) => h.mvp++);
-  const note = `${ATTR_ICON[c.plus]}${plus.total} − ${c.minus === 'heads' ? '👥' : ATTR_ICON[c.minus]}${minus.total}`;
-  const rows: ResultRow[] = [{ player: pi, delta, note, uids: [...plus.holders, ...minus.holders].map((h) => h.uid) }];
+/** 共通イベント（全クラス）：プラスのアイコン − マイナスのアイコン（または人数）。状況でプラスにもマイナスにもなる */
+function resolveSwing(s: GameState, c: SwingCard): EventResult {
+  const rows = s.players.map((p, i): ResultRow => {
+    const plus = attrScore(p, c.plus);
+    const minus = c.minus === 'heads' ? { total: p.students.length, holders: [] as Student[] } : attrScore(p, c.minus);
+    const delta = plus.total - minus.total;
+    p.points += delta;
+    if (delta > 0) plus.holders.forEach((h) => h.mvp++);
+    const note = `${ATTR_ICON[c.plus]}${plus.total}−${c.minus === 'heads' ? '👥' : ATTR_ICON[c.minus]}${minus.total}`;
+    return { player: i, delta, note, uids: [...plus.holders, ...minus.holders].map((h) => h.uid) };
+  });
+  sortRows(rows);
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: c.plus, tone: 'contest', desc: c.desc, rule: cardRule(c), rows };
 }
 
-/** 時代イベント：クラスのそのアイコンの合計数（＋係ボーナス）。その時代の生徒のアイコンが2倍 */
-function resolveContest(s: GameState, c: ContestCard, pi: number): EventResult {
-  const p = s.players[pi];
-  const sc = attrScore(p, c.attr, c.era);
-  p.points += sc.total;
-  sc.holders.forEach((h) => h.mvp++);
-  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta: sc.total, uids: sc.holders.map((h) => h.uid) }];
+/** 時代イベント（全クラス）：クラスのそのアイコンの合計数（＋係ボーナス）。その時代の生徒のアイコンが2倍 */
+function resolveContest(s: GameState, c: ContestCard): EventResult {
+  const rows = s.players.map((p, i): ResultRow => {
+    const sc = attrScore(p, c.attr, c.era);
+    p.points += sc.total;
+    sc.holders.forEach((h) => h.mvp++);
+    return { player: i, count: sc.total, delta: sc.total, uids: sc.holders.map((h) => h.uid) };
+  });
+  sortRows(rows);
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: c.attr, tone: 'era', desc: c.desc, rule: cardRule(c), rows };
 }
 
-/** 襲来（時代イベント）：👊の合計（この時代の生徒は2倍）− 敵の強さ */
-function resolveRaid(s: GameState, c: RaidCard, pi: number): EventResult {
-  const p = s.players[pi];
-  const sc = attrScore(p, 'fight', c.era);
-  const delta = sc.total - c.threat;
-  p.points += delta;
-  if (delta >= 0) sc.holders.forEach((h) => h.mvp++);
-  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, note: delta >= 0 ? '撃退' : sc.total ? '突破' : '無防備', uids: sc.holders.map((h) => h.uid) }];
+/** 襲来（時代イベント・全クラス）：👊の合計（この時代の生徒は2倍）− 敵の強さ */
+function resolveRaid(s: GameState, c: RaidCard): EventResult {
+  const rows = s.players.map((p, i): ResultRow => {
+    const sc = attrScore(p, 'fight', c.era);
+    const delta = sc.total - c.threat;
+    p.points += delta;
+    if (delta >= 0) sc.holders.forEach((h) => h.mvp++);
+    return { player: i, count: sc.total, delta, note: delta >= 0 ? '撃退' : sc.total ? '突破' : '無防備', uids: sc.holders.map((h) => h.uid) };
+  });
+  sortRows(rows);
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: 'fight', tone: 'era', desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
 }
@@ -435,12 +441,12 @@ export function pushTargets(s: GameState, pi: number): number[] {
   return s.players.filter((p) => p.id !== pi && p.students.length < MAX_CLASS).map((p) => p.id);
 }
 
-/** 交換留学に出せる生徒（係に就いていない子） */
+/** クラス替えに出せる生徒（係に就いていない子） */
 export function tradeable(p: Player): Student[] {
   return p.students.filter((x) => roleOf(p, x.uid) === null);
 }
 
-/** 交換留学の相手（係に就いていない生徒がいるクラス） */
+/** クラス替えの相手（係に就いていない生徒がいるクラス） */
 export function exchangeTargets(s: GameState, pi: number): number[] {
   return s.players.filter((p) => p.id !== pi && tradeable(p).length > 0).map((p) => p.id);
 }
@@ -496,13 +502,13 @@ function resolveDraw(s: GameState, pi: number) {
       setResult(s, pi, resolveNormal(s, c, pi), 'turn');
       return;
     case 'swing':
-      setResult(s, pi, resolveSwing(s, c, pi), 'turn');
+      setResult(s, pi, resolveSwing(s, c), 'turn');
       return;
     case 'contest':
-      setResult(s, pi, resolveContest(s, c, pi), 'turn');
+      setResult(s, pi, resolveContest(s, c), 'turn');
       return;
     case 'raid':
-      setResult(s, pi, resolveRaid(s, c, pi), 'turn');
+      setResult(s, pi, resolveRaid(s, c), 'turn');
       return;
     case 'kachikomi':
       if (attrScore(p, 'fight').total === 0) personal('👊を持つ子がいないので、カチコミに行けなかった。');
@@ -629,7 +635,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'contest', desc: `${p.name}のクラスが${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, rows },
+        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: `${p.name}のクラスが${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, rows },
         'turn',
       );
       return s;
@@ -638,7 +644,7 @@ export function step(prev: GameState, a: Action): GameState {
       if (ph.kind !== 'exchange') return prev;
       const p = s.players[ph.player];
       if (a.uid === null) {
-        setResult(s, ph.player, { title: '交換留学', icon: '🔁', tone: 'personal', desc: 'やっぱりやめた。', rows: [] }, 'turn');
+        setResult(s, ph.player, { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: 'やっぱりやめた。', rows: [] }, 'turn');
         return s;
       }
       if (a.target === undefined || !exchangeTargets(s, ph.player).includes(a.target)) return prev;
@@ -648,11 +654,11 @@ export function step(prev: GameState, a: Action): GameState {
       const theirs = removeStudent(s, to, a.theirUid!, false)!;
       p.students.push(theirs);
       to.students.push(mine);
-      log(s, `${p.name}の${mine.name}と${to.name}の${theirs.name}が交換留学！`, ph.player);
+      log(s, `${p.name}の${mine.name}と${to.name}の${theirs.name}がクラス替え！`, ph.player);
       setResult(
         s,
         ph.player,
-        { title: '交換留学', icon: '🔁', tone: 'personal', desc: `${mine.icon}${mine.name} ⇄ ${theirs.icon}${theirs.name}（${to.name}）`, rows: [], students: [theirs, mine] },
+        { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: `${mine.icon}${mine.name} ⇄ ${theirs.icon}${theirs.name}（${to.name}）`, rows: [], students: [theirs, mine] },
         'turn',
       );
       return s;
@@ -691,7 +697,7 @@ export function finalRanking(s: GameState): Player[] {
 
 // ---------- 山札の内訳 ----------
 
-export const DECK_GROUPS = ['通常', 'カチコミ', '共通イベント', '転校・留学', 'グッズ', '時代イベント', '人物'] as const;
+export const DECK_GROUPS = ['通常', 'カチコミ', '共通イベント', '転校・クラス替え', 'グッズ', '時代イベント', '人物'] as const;
 export type DeckGroup = (typeof DECK_GROUPS)[number];
 
 export interface DeckRow {
@@ -726,7 +732,7 @@ export function deckBreakdown(s: GameState): DeckRow[] {
           return { ...base, group: '共通イベント' };
         case 'push':
         case 'exchange':
-          return { ...base, group: '転校・留学' };
+          return { ...base, group: '転校・クラス替え' };
         case 'goods':
           return { ...base, name: `${c.name}（${ATTR_ICON[c.attr]}＋1）`, group: c.era ? '時代イベント' : 'グッズ' };
         case 'contest':

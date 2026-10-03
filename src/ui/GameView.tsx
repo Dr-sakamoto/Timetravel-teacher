@@ -79,7 +79,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const term = termOfMonth(month);
   const slots = slotsNow(state);
 
-  // 転校・カチコミ・交換留学・グッズ：手前の教室の生徒と、相手のクラスを選ぶ
+  // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ
   const choosing = (ph.kind === 'push' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip') && !cpuTurn && ph.player === focus ? ph.kind : null;
   const targets =
     choosing === 'push' ? pushTargets(state, focus)
@@ -95,7 +95,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const pickOpponent = (pi: number) => {
     if (!targets.includes(pi)) return setPeek(pi);
     setPick((x) => ({ ...x, target: pi, theirUid: x.target === pi ? x.theirUid : null }));
-    // 交換留学は相手の教室を開いて、交換する生徒を選ぶ
+    // クラス替えは相手の教室を開いて、交換する生徒を選ぶ
     if (choosing === 'exchange') setPeek(pi);
   };
   const peekPicking = choosing === 'exchange' && peek !== null && peek === pick.target;
@@ -198,7 +198,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
             <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
               ✕
             </button>
-            {peekPicking && <div className="peek-hint">🔁 交換してもらう生徒をタップ（係の子は選べない）</div>}
+            {peekPicking && <div className="peek-hint">🔁 こちらのクラスに来てもらう生徒をタップ（係の子は選べない）</div>}
             <Playmat
               player={state.players[peek]}
               year={state.year}

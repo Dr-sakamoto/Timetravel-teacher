@@ -10,7 +10,7 @@ export interface NormalCard {
   count: number;
 }
 
-/** カチコミ：めくった人が他校を1つ選び、自分のクラスの👊の数だけその学校を減点させる */
+/** カチコミ：めくった人が他のクラスを1つ選び、自分のクラスの👊の数だけそのクラスを減点させる */
 export interface KachikomiCard {
   id: string;
   kind: 'kachikomi';
@@ -19,7 +19,7 @@ export interface KachikomiCard {
   count: number;
 }
 
-/** 共通イベント：「プラスのアイコン − マイナスのアイコン（または人数）」が入る。クラスの状況でプラスにもマイナスにもなる */
+/** 共通イベント（全クラス）：「プラスのアイコン − マイナスのアイコン（または人数）」が入る。クラスの状況でプラスにもマイナスにもなる */
 export interface SwingCard {
   id: string;
   kind: 'swing';
@@ -31,7 +31,7 @@ export interface SwingCard {
   count: number;
 }
 
-/** 時代イベント：クラス全員のそのアイコンの合計数。その時代出身の生徒のアイコンは2倍 */
+/** 時代イベント（全クラス）：クラス全員のそのアイコンの合計数。その時代出身の生徒のアイコンは2倍 */
 export interface ContestCard {
   id: string;
   kind: 'contest';
@@ -43,7 +43,7 @@ export interface ContestCard {
   count: number;
 }
 
-/** 襲来（時代イベント）：クラスの👊の数 − 敵の強さ（その時代出身の生徒は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス */
+/** 襲来（時代イベント・全クラス）：クラスの👊の数 − 敵の強さ（その時代出身の生徒は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス */
 export interface RaidCard {
   id: string;
   kind: 'raid';
@@ -66,7 +66,7 @@ export interface GoodsCard {
   count: number;
 }
 
-/** 転校・交換留学 */
+/** 転校・クラス替え */
 export interface MoveCard {
   id: string;
   kind: 'push' | 'exchange';
@@ -112,7 +112,7 @@ export const SWING_CARDS: SwingCard[] = [
 
 export const MOVE_CARDS: MoveCard[] = [
   { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: 'いらない生徒を1人、別のクラスに押しつける', count: 2 },
-  { id: 'exchange', kind: 'exchange', name: '交換留学', icon: '🔁', desc: '係に就いていない生徒どうしを、他校と1人ずつ交換する', count: 1 },
+  { id: 'exchange', kind: 'exchange', name: 'クラス替え', icon: '🔁', desc: '係に就いていない生徒どうしを、他のクラスと1人ずつ入れ替える', count: 1 },
 ];
 
 const G = (id: string, name: string, icon: string, attr: Attr, era?: EraId): GoodsCard => ({ id, kind: 'goods', name, icon, attr, era, count: 1 });
@@ -235,15 +235,15 @@ export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EV
 export function cardRule(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
-      return `クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
+      return `めくった人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return '他校を1つ選び、自分のクラスの👊の数だけ減点させる';
+      return '他のクラスを1つ選び、自分のクラスの👊の数だけ減点させる';
     case 'swing':
-      return `${ATTR_ICON[c.plus]}の数 − ${c.minus === 'heads' ? 'クラスの人数' : `${ATTR_ICON[c.minus]}の数`}（マイナスもある）`;
+      return `全クラス：${ATTR_ICON[c.plus]}の数 − ${c.minus === 'heads' ? 'クラスの人数' : `${ATTR_ICON[c.minus]}の数`}（マイナスもある）`;
     case 'contest':
-      return `クラス全員の${ATTR_ICON[c.attr]}の数を加点（この時代の生徒は2倍）`;
+      return `全クラス：クラス全員の${ATTR_ICON[c.attr]}の数を加点（この時代の生徒は2倍）`;
     case 'raid':
-      return `クラスの👊の数 − ${c.threat}（この時代の生徒は2倍）`;
+      return `全クラス：クラスの👊の数 − ${c.threat}（この時代の生徒は2倍）`;
     case 'goods':
       return `生徒1人に装備：${ATTR_ICON[c.attr]}＋1（1人1つまで）`;
     default:

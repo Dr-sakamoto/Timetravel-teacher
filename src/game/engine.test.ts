@@ -94,12 +94,11 @@ describe('engine', () => {
     expect([[1, 1], [1, 2], [1, 3], [2, 1], [2, 2], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([3, 4, 5, 6, 6, 6]);
   });
 
-  it('regular modern students have 1 icon about 70% of the time and 2 icons otherwise', () => {
+  it('regular modern students have 1-2 icons, each with a different set', () => {
     const regular = ARCHETYPES.filter((a) => a.rarity === 'N');
-    const ones = regular.filter((a) => parseAttrs(a.attrs).length === 1).length;
+    const keys = regular.map((a) => [...parseAttrs(a.attrs)].sort().join(','));
     expect(regular.every((a) => parseAttrs(a.attrs).length <= 2)).toBe(true);
-    expect(ones / regular.length).toBeGreaterThanOrEqual(0.65);
-    expect(ones / regular.length).toBeLessThanOrEqual(0.75);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it('roles: one per student, at most 2 per role and 3 kinds, within the seat count', () => {
@@ -113,7 +112,7 @@ describe('engine', () => {
     expect(validRoles(p, [r('study', 'zz')], 6)).toBe(false);
   });
 
-  it('fight icons belong only to yankees, and about half of them are fight-only', () => {
+  it('fight icons belong only to yankees, and a good share of them are fight-only', () => {
     const all = [
       ...CARDS.map((c) => ({ name: c.name, attrs: c.attrs, tags: c.tags })),
       ...ARCHETYPES.map((a) => ({ name: a.title, attrs: parseAttrs(a.attrs), tags: a.tags })),
@@ -124,7 +123,8 @@ describe('engine', () => {
     }
     const yankees = all.filter((x) => x.tags.includes('ヤンキー'));
     const fightOnly = yankees.filter((x) => x.attrs.every((a) => a === 'fight'));
-    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.45);
+    // アイコン構成を被らせないので、👊だけの子は👊1〜5個の5種類が上限
+    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.35);
     expect(fightOnly.length / yankees.length).toBeLessThanOrEqual(0.6);
   });
 
@@ -318,7 +318,7 @@ describe('engine', () => {
     expect(next.players[1].students.map((x) => x.uid)).toContain(uid);
   });
 
-  it('every card scores only for the drawer (kachikomi only hurts the target)', () => {
+  it('normal cards score only for the drawer; era and common events score for every class', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 21);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const drawer = s.phase.player;
@@ -326,9 +326,14 @@ describe('engine', () => {
       const t = structuredClone(s);
       t.eventDeck.push(id);
       const before = t.players.map((p) => p.points);
-      const after = step(t, { type: 'drawEvent' }).players.map((p) => p.points);
-      return after.map((v, i) => v - before[i]);
+      const after = step(t, { type: 'drawEvent' });
+      return { rows: after.phase.kind === 'result' ? after.phase.result.rows.length : 0, d: after.players.map((p, i) => p.points - before[i]) };
     };
-    for (const id of ['n_study', 'n_sports', 'poptest', 'trip', 'raid_present']) run(id).forEach((d, i) => i !== drawer && expect(d, id).toBe(0));
+    for (const id of ['n_study', 'n_sports']) {
+      const r = run(id);
+      expect(r.rows, id).toBe(1);
+      r.d.forEach((d, i) => i !== drawer && expect(d, id).toBe(0));
+    }
+    for (const id of ['poptest', 'marathon', 'trip', 'raid_present']) expect(run(id).rows, id).toBe(3);
   });
 });
