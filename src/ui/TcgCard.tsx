@@ -9,6 +9,8 @@ interface Props {
   owner?: Player;
   size?: 'full' | 'mini';
   selected?: boolean;
+  /** 今のイベントに関わった（光らせる） */
+  lit?: boolean;
   dim?: boolean;
   onClick?: () => void;
 }
@@ -16,12 +18,12 @@ interface Props {
 const RARITY_MARK = { N: '●', R: '◆', SR: '★', SSR: '✦' } as const;
 
 /** TCG風の生徒カード：中央にイラスト、下段に属性アイコン（重なるほど強い） */
-export function TcgCard({ student, owner, size = 'full', selected, dim, onClick }: Props) {
+export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onClick }: Props) {
   const era = ERAS.find((e) => e.id === student.era)!;
   const role = owner ? roleOf(owner, student.uid) : null;
   return (
     <div
-      className={`tcg ${size} r-${student.rarity} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''} ${onClick ? 'clickable' : ''}`}
+      className={`tcg ${size} r-${student.rarity} ${selected ? 'selected' : ''} ${lit ? 'lit' : ''} ${dim ? 'dim' : ''} ${onClick ? 'clickable' : ''}`}
       style={{ '--era': era.color } as CSSProperties}
       onClick={onClick}
       role={onClick ? 'button' : undefined}

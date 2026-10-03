@@ -79,7 +79,15 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const others = Array.from({ length: n - 1 }, (_, i) => (focus + 1 + i) % n);
   const seat = seating(others);
   const deltas = new Map<number, number>();
-  if (ph.kind === 'result') for (const r of ph.result.rows) deltas.set(r.player, r.delta);
+  // 今のイベントに関わったカード：相手の教室でもこれだけ表に返して見せる
+  const lit = new Set<string>();
+  if (ph.kind === 'result') {
+    for (const r of ph.result.rows) {
+      deltas.set(r.player, r.delta);
+      r.uids?.forEach((u) => lit.add(u));
+    }
+    ph.result.students?.forEach((st) => lit.add(st.uid));
+  }
   const month = MONTHS[Math.min(state.monthIdx, 11)];
   const term = termOfMonth(month);
 
@@ -93,6 +101,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
       near={false}
       acting={actor === pi}
       delta={deltas.get(pi)}
+      lit={lit}
       targetable={targets.includes(pi)}
       targeted={push.target === pi}
       onTarget={() => setPush((x) => ({ ...x, target: pi }))}
@@ -152,6 +161,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               near
               acting={actor === focus}
               delta={deltas.get(focus)}
+              lit={lit}
               onSeatClick={pushing && me.students.length > MIN_CLASS ? (uid) => setPush((x) => ({ ...x, uid })) : undefined}
               selectedUid={pushing ? push.uid : null}
             />

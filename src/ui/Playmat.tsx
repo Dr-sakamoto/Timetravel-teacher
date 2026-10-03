@@ -24,9 +24,11 @@ interface Props {
   dimUid?: (uid: string) => boolean;
   /** 係決めの下書き */
   roles?: (string | null)[];
+  /** 今のイベントに関わった生徒。相手の教室ではこのカードだけ表に返る */
+  lit?: Set<string>;
 }
 
-/** 教室プレイマット：名札・係ボード・12の座席 */
+/** 教室プレイマット：名札・係ボード・12の座席。相手の教室は裏向きで、イベントに関わったカードだけ表に返る */
 export function Playmat(props: Props) {
   const { player, year, near, acting, delta, targetable, targeted, onTarget } = props;
   const view: Player = props.roles ? { ...player, roles: props.roles } : player;
@@ -54,36 +56,41 @@ export function Playmat(props: Props) {
           </span>
         )}
       </div>
-      <div className="roleboard">
-        {ROLE_ORDER.map((r, i) => {
-          const locked = i >= k;
-          const st = view.students.find((s) => s.uid === view.roles[i]);
-          return (
-            <button
-              key={r}
-              className={`role-slot ${locked ? 'locked' : ''} ${props.activeSlot === i ? 'active' : ''}`}
-              disabled={locked || !props.onSlotClick}
-              onClick={(e) => {
-                e.stopPropagation();
-                props.onSlotClick?.(i);
-              }}
-              title={locked ? `${slotUnlockAt(i)}人で解放` : `${ROLES[r].name}：${roleDesc(r)}`}
-            >
-              <span>{locked ? '🔒' : ROLES[r].icon}</span>
-              {near && <span className="role-name">{locked ? `${slotUnlockAt(i)}人` : roleDesc(r)}</span>}
-              {!locked && <span className="role-who">{st ? st.icon : '·'}</span>}
-            </button>
-          );
-        })}
-      </div>
+      {near && (
+        <div className="roleboard">
+          {ROLE_ORDER.map((r, i) => {
+            const locked = i >= k;
+            const st = view.students.find((s) => s.uid === view.roles[i]);
+            return (
+              <button
+                key={r}
+                className={`role-slot ${locked ? 'locked' : ''} ${props.activeSlot === i ? 'active' : ''}`}
+                disabled={locked || !props.onSlotClick}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onSlotClick?.(i);
+                }}
+                title={locked ? `${slotUnlockAt(i)}人で解放` : `${ROLES[r].name}：${roleDesc(r)}`}
+              >
+                <span>{locked ? '🔒' : ROLES[r].icon}</span>
+                {near && <span className="role-name">{locked ? `${slotUnlockAt(i)}人` : roleDesc(r)}</span>}
+                {!locked && <span className="role-who">{st ? st.icon : '·'}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="seats">
         {seats.map((st, i) => (
           <div key={st?.uid ?? `e${i}`} className={`seat ${st ? '' : 'empty'}`}>
-            {st ? (
+            {st && !near && !props.lit?.has(st.uid) ? (
+              <span className="card-back" />
+            ) : st ? (
               <TcgCard
                 student={st}
                 owner={view}
                 size={near ? 'full' : 'mini'}
+                lit={props.lit?.has(st.uid)}
                 selected={props.selectedUid === st.uid}
                 dim={props.dimUid?.(st.uid)}
                 onClick={props.onSeatClick ? () => props.onSeatClick!(st.uid) : undefined}

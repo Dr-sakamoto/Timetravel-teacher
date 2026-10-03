@@ -1669,3 +1669,76 @@ h3 {
     padding: 0.8rem 1rem;
   }
 }
+
+/* ---------- 相手のカードは裏向き。イベントに関わったカードだけ表に返す ---------- */
+.card-back {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: 5px;
+  border: 2px solid #e9d9b0;
+  background:
+    radial-gradient(circle, rgba(246, 216, 96, 0.35) 0 22%, transparent 24%),
+    repeating-linear-gradient(45deg, #2c4a7a, #2c4a7a 4px, #22395f 4px, #22395f 8px);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
+}
+.playmat.far .tcg.lit {
+  z-index: 5;
+  transform-origin: 50% 10%;
+  animation:
+    flip-in 0.45s ease-out both,
+    lit-pop 0.45s 0.45s ease-out both;
+}
+@keyframes flip-in {
+  from {
+    transform: perspective(300px) rotateY(90deg);
+    filter: brightness(0.6);
+  }
+}
+@keyframes lit-pop {
+  to {
+    transform: scale(1.35);
+  }
+}
+.tcg.lit {
+  box-shadow:
+    0 0 0 2px var(--yellow),
+    0 0 14px rgba(246, 216, 96, 0.9);
+}
+.playmat.near .tcg.lit {
+  animation: lit-bob 0.5s ease-out both;
+}
+@keyframes lit-bob {
+  50% {
+    transform: translateY(-8px) scale(1.06);
+  }
+  to {
+    transform: translateY(-4px);
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .side {
+    overflow: visible;
+  }
+  .card-back {
+    border-width: 1px;
+    border-radius: 3px;
+  }
+  @keyframes lit-pop {
+    to {
+      transform: scale(1.7);
+    }
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .side.top .playmat.far .tcg.lit {
+    animation:
+      flip-in 0.45s ease-out both,
+      lit-pop-sm 0.45s 0.45s ease-out both;
+  }
+  @keyframes lit-pop-sm {
+    to {
+      transform: scale(1.25);
+    }
+  }
+}

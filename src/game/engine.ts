@@ -403,7 +403,7 @@ function resolveNormal(s: GameState, c: NormalCard): EventResult {
     const sc = bestScore(p, c.attr);
     p.points += sc.total;
     for (const h of sc.holders) h.mvp++;
-    return { player: i, count: sc.total, delta: sc.total };
+    return { player: i, count: sc.total, delta: sc.total, uids: sc.holders.map((h) => h.uid) };
   });
   sortRows(rows);
   logRows(s, name, rows);
@@ -417,7 +417,7 @@ function resolveContest(s: GameState, c: ContestCard, pi: number): EventResult {
   const delta = sc.total * EVENT_MULT;
   p.points += delta;
   sc.holders.forEach((h) => h.mvp++);
-  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta }];
+  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, uids: sc.holders.map((h) => h.uid) }];
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: c.attr, tone: c.era ? 'era' : 'contest', desc: c.desc, rule: cardRule(c), rows };
 }
@@ -430,14 +430,19 @@ function resolveRaid(s: GameState, c: RaidCard, pi: number): EventResult {
   const delta = Math.min(0, sc.total - c.threat);
   p.points += delta;
   if (delta === 0) sc.holders.forEach((h) => h.mvp++);
-  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, note: delta === 0 ? '撃退' : sc.total ? '突破' : '無防備' }];
+  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, note: delta === 0 ? '撃退' : sc.total ? '突破' : '無防備', uids: sc.holders.map((h) => h.uid) }];
   logRows(s, `カチコミ（${name}）`, rows);
   return { title: `カチコミ！${name}`, icon, attr: 'fight', tone: 'contest', desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
 }
 
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {
   const values = s.players.map((p) => (f.rule === 'test' ? testScore(p, TEST_YANKEE_PENALTY) : totalPower(p)));
-  const rows = sortRows(awardRanks(s, values, f.mult));
+  const rows = awardRanks(s, values, f.mult);
+  for (const r of rows) {
+    const st = s.players[r.player].students;
+    r.uids = (f.rule === 'test' ? st.filter((x) => x.attrs.includes('study') || x.attrs.includes('fight')) : st).map((x) => x.uid);
+  }
+  sortRows(rows);
   logRows(s, f.name, rows);
   return { title: f.name, icon: f.icon, attr: f.rule === 'test' ? 'study' : 'all', tone: 'fixed', desc: '', rule: fixedRule(f), rows };
 }

@@ -69,6 +69,8 @@ export interface ResultRow {
   rank?: number;
   delta: number;
   note?: string;
+  /** 点に関わった生徒（相手のカードはこれだけ表向きにして見せる） */
+  uids?: string[];
 }
 
 /** 'normal'=通常カード 'contest'=勝負カード 'era'=時代カード 'fixed'=固定イベント 'personal'=個人 */
