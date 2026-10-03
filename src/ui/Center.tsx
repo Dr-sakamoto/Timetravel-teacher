@@ -1,6 +1,8 @@
 import { ERAS } from '../game/data/eras';
 import { useState } from 'react';
-import { currentEra, pushTargets } from '../game/engine';
+import { currentEra } from '../game/engine';
+import { EVENT_MAP, cardRule } from '../game/data/events';
+import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import type { Action, GameState } from '../game/types';
 import { EventCardView } from './EventCardView';
@@ -10,12 +12,19 @@ interface Props {
   state: GameState;
   dispatch: (a: Action) => void;
   cpuBusy: boolean;
-  /** 転校：手前のマットで選んだ生徒と、押しつけ先 */
-  push: { uid: string | null; target: number | null };
+  /** 転校・カチコミ・クラス替え・グッズで選んだもの */
+  pick: Pick;
+}
+
+/** 手前のマットで選んだ自分の生徒・相手のクラス・相手の生徒 */
+export interface Pick {
+  uid: string | null;
+  target: number | null;
+  theirUid: string | null;
 }
 
 /** 卓の中央：山札・捨て札・めくったカードと手番の操作 */
-export function Center({ state, dispatch, cpuBusy, push }: Props) {
+export function Center({ state, dispatch, cpuBusy, pick }: Props) {
   const ph = state.phase;
   const era = ERAS[currentEra(state)];
   const actor = ph.kind !== 'gameOver' && ph.player !== null ? state.players[ph.player] : null;
@@ -46,7 +55,7 @@ export function Center({ state, dispatch, cpuBusy, push }: Props) {
           <button className={`pile modern-pile ${canMember ? 'glow' : ''}`} disabled={!canMember} onClick={() => dispatch({ type: 'drawMember' })}>
             <span className="pile-back">🏫</span>
             <span className="pile-label">現代の生徒</span>
-            <span className="pile-count">{state.pools.present.length}</span>
+            <span className="pile-count">{state.starters.length}</span>
           </button>
         ) : (
           <div className="pile era-pile" style={{ borderColor: era.color }} title={`まだ転入していない${era.name}の生徒`}>
@@ -63,14 +72,14 @@ export function Center({ state, dispatch, cpuBusy, push }: Props) {
           state={state}
           dispatch={dispatch}
           cpuBusy={cpuBusy}
-          push={push}
+          pick={pick}
         />
       </div>
     </div>
   );
 }
 
-function Action({ state, dispatch, cpuBusy, push }: Props) {
+function Action({ state, dispatch, cpuBusy, pick }: Props) {
   const ph = state.phase;
   if (ph.kind === 'gameOver') return null;
   const actor = ph.player !== null ? state.players[ph.player] : null;
@@ -83,7 +92,7 @@ function Action({ state, dispatch, cpuBusy, push }: Props) {
       const p = state.players[ph.player];
       return (
         <div className="say">
-          {who} が生徒を引く（{p.students.length}/6）
+          {who} が生徒を引く（{p.students.length}/{STARTING_MEMBERS}）
           <div className="say-sub">
             <button className="btn small ghost" onClick={() => dispatch({ type: 'drawAllMembers' })}>
               まとめて引く
@@ -97,16 +106,13 @@ function Action({ state, dispatch, cpuBusy, push }: Props) {
     case 'draw':
       return <div className="say">{who} の番 — イベントの山札をめくろう</div>;
     case 'push': {
-      const targets = pushTargets(state, ph.player);
+      const target = pick.target !== null ? state.players[pick.target] : null;
+      const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
       return (
         <div className="say">
           📦 {who} の転校 — 手前の教室から生徒を選び、押しつける相手の名札をタップ
           <div className="say-sub">
-            {targets.map((t) => (
-              <span key={t} className={`chip ${push.target === t ? 'on' : ''}`} style={{ borderColor: state.players[t].color }}>
-                → {state.players[t].name}
-              </span>
-            ))}
+            {st ? `${st.icon}${st.name}` : '生徒：未選択'} → {target ? target.name : '相手：未選択'}
           </div>
           <div className="say-sub">
             <button className="btn ghost" onClick={() => dispatch({ type: 'push', uid: null })}>
@@ -114,10 +120,73 @@ function Action({ state, dispatch, cpuBusy, push }: Props) {
             </button>
             <button
               className="btn primary"
-              disabled={!push.uid || push.target === null}
-              onClick={() => push.uid && push.target !== null && dispatch({ type: 'push', uid: push.uid, target: push.target })}
+              disabled={!pick.uid || pick.target === null}
+              onClick={() => pick.uid && pick.target !== null && dispatch({ type: 'push', uid: pick.uid, target: pick.target })}
             >
               押しつける
+            </button>
+          </div>
+        </div>
+      );
+    }
+    case 'kachikomi': {
+      const power = attrScore(state.players[ph.player], 'fight').total;
+      const target = pick.target !== null ? state.players[pick.target] : null;
+      return (
+        <div className="say">
+          👊 {who} のカチコミ — 殴りこむ相手の名札をタップ（相手は−{power}）
+          <div className="say-sub">→ {target ? target.name : '相手：未選択'}</div>
+          <div className="say-sub">
+            <button className="btn ghost" onClick={() => dispatch({ type: 'kachikomi', target: null })}>
+              やめる
+            </button>
+            <button className="btn primary" disabled={pick.target === null} onClick={() => dispatch({ type: 'kachikomi', target: pick.target })}>
+              カチコむ
+            </button>
+          </div>
+        </div>
+      );
+    }
+    case 'exchange': {
+      const mine = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+      const target = pick.target !== null ? state.players[pick.target] : null;
+      const theirs = target?.students.find((x) => x.uid === pick.theirUid);
+      return (
+        <div className="say">
+          🔁 {who} のクラス替え — 手前の教室から出す生徒を選び、相手の名札をタップして入れ替える相手を選ぶ（係の子は出せない）
+          <div className="say-sub">
+            {mine ? `${mine.icon}${mine.name}` : '自分の生徒：未選択'} ⇄ {theirs ? `${theirs.icon}${theirs.name}（${target!.name}）` : target ? `${target.name}の生徒：未選択` : '相手：未選択'}
+          </div>
+          <div className="say-sub">
+            <button className="btn ghost" onClick={() => dispatch({ type: 'exchange', uid: null })}>
+              やめる
+            </button>
+            <button
+              className="btn primary"
+              disabled={!pick.uid || pick.target === null || !pick.theirUid}
+              onClick={() =>
+                pick.uid && pick.target !== null && pick.theirUid && dispatch({ type: 'exchange', uid: pick.uid, target: pick.target, theirUid: pick.theirUid })
+              }
+            >
+              入れ替える
+            </button>
+          </div>
+        </div>
+      );
+    }
+    case 'equip': {
+      const c = EVENT_MAP[ph.card];
+      const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+      return (
+        <div className="say">
+          {c.icon} {who} がグッズ「{c.name}」をゲット — {cardRule(c)}。手前の教室から装備する生徒をタップ
+          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
+          <div className="say-sub">
+            <button className="btn ghost" onClick={() => dispatch({ type: 'equip', uid: null })}>
+              装備しない
+            </button>
+            <button className="btn primary" disabled={!pick.uid} onClick={() => dispatch({ type: 'equip', uid: pick.uid })}>
+              装備する
             </button>
           </div>
         </div>

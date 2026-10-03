@@ -5,7 +5,7 @@ import type { GameState } from '../game/types';
 
 /** その年の3学期の時代。今の学期を強調する */
 export function EraBar({ state }: { state: GameState }) {
-  const term = termOfMonth(MONTHS[Math.min(state.monthIdx, 11)]);
+  const term = termOfMonth(MONTHS[Math.min(state.monthIdx, MONTHS.length - 1)]);
   return (
     <div className="erabar">
       {state.yearEras.map((ei, i) => {

@@ -1,41 +1,59 @@
 import { useState } from 'react';
 import { autoRoles } from '../game/ai';
-import { ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
-import type { Player } from '../game/types';
+import { MAX_PER_ROLE, MAX_ROLE_KINDS, ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
+import type { Player, RoleId, RoleSeat } from '../game/types';
 import { Playmat } from './Playmat';
 
 interface Props {
   player: Player;
   year: number;
   slots: number;
-  onConfirm: (roles: (string | null)[]) => void;
+  onConfirm: (roles: RoleSeat[]) => void;
 }
 
-/** 係決め：手前の教室マットの係ボードを選び、座席の生徒をタップ */
+/** 係決め：係の種類を選んで、座席の生徒をタップ（もう一度タップで外す） */
 export function RoleEditor({ player, year, slots, onConfirm }: Props) {
   const k = slots;
-  const [roles, setRoles] = useState<(string | null)[]>(() =>
-    ROLE_ORDER.map((_, i) => {
-      const r = player.roles[i];
-      return i < k && r && player.students.some((s) => s.uid === r) ? r : null;
-    }),
+  const [roles, setRoles] = useState<RoleSeat[]>(() =>
+    player.roles.filter((r) => player.students.some((s) => s.uid === r.uid)).slice(0, k),
   );
-  const [active, setActive] = useState(0);
-  const role = ROLES[ROLE_ORDER[active]];
+  const [active, setActive] = useState<RoleId>(() => roles[0]?.role ?? 'study');
+  const [warn, setWarn] = useState('');
+  const kinds = new Set(roles.map((r) => r.role));
+  const role = ROLES[active];
+
   const assign = (uid: string) => {
-    setRoles((prev) => {
-      const next = prev.map((r) => (r === uid ? null : r));
-      next[active] = prev[active] === uid ? null : uid;
-      return next;
-    });
-    setActive((i) => (i + 1 < k ? i + 1 : i));
+    const cur = roles.find((r) => r.uid === uid);
+    if (cur?.role === active) {
+      setRoles(roles.filter((r) => r.uid !== uid));
+      setWarn('');
+      return;
+    }
+    const rest = roles.filter((r) => r.uid !== uid);
+    const restKinds = new Set(rest.map((r) => r.role));
+    if (rest.length >= k) return setWarn(`係の席は今学期${k}つまで`);
+    if (rest.filter((r) => r.role === active).length >= MAX_PER_ROLE) return setWarn(`${role.name}は${MAX_PER_ROLE}人まで`);
+    if (!restKinds.has(active) && restKinds.size >= MAX_ROLE_KINDS) return setWarn(`係の種類は${MAX_ROLE_KINDS}つまで`);
+    const next = cur ? roles.map((r) => (r.uid === uid ? { role: active, uid } : r)) : [...roles, { role: active, uid }];
+    setRoles(next);
+    setWarn('');
   };
+
   return (
     <div className="role-editor">
       <div className="role-bar">
         <span>
-          {role.icon} <b>{role.name}</b>（{roleDesc(role.id)}）に就ける生徒をタップ
+          係の席 {roles.length}/{k}（1つの係に{MAX_PER_ROLE}人・種類は{MAX_ROLE_KINDS}つまで）
         </span>
+        <div className="role-kinds">
+          {ROLE_ORDER.map((r) => (
+            <button key={r} className={`chip ${active === r ? 'on' : ''} ${kinds.has(r) ? 'used' : ''}`} onClick={() => setActive(r)} title={`${ROLES[r].name} ${roleDesc(r)}`}>
+              {ROLES[r].icon}
+              <span className="role-kind-name">{ROLES[r].name}</span> {roleDesc(r)}
+            </button>
+          ))}
+        </div>
+        {warn && <div className="role-warn">{warn}</div>}
         <button className="btn small ghost" onClick={() => setRoles(autoRoles(player, k))}>
           🤖 おまかせ
         </button>
@@ -50,10 +68,8 @@ export function RoleEditor({ player, year, slots, onConfirm }: Props) {
         variant="near"
         acting
         roles={roles}
-        activeSlot={active}
-        onSlotClick={setActive}
+        onSlotClick={(i) => setRoles(roles.filter((_, j) => j !== i))}
         onSeatClick={assign}
-        selectedUid={roles[active]}
         dimUid={(uid) => !player.students.find((s) => s.uid === uid)?.attrs.includes(role.attr)}
       />
     </div>
