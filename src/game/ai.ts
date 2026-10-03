@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf } from './calc';
-import { ALL_EVENT_CARDS, EVENT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
+import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { droppable, equippable, exchangeTargets, kachikomiTargets, slotsNow, tradeable } from './engine';
+import { cyborgable, droppable, equippable, exchangeTargets, kachikomiTargets, slotsNow, tradeable } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -114,6 +114,25 @@ export function cpuAction(s: GameState): Action | null {
       }
       if (!best || best.gain <= 0) return { type: 'exchange', uid: null };
       return { type: 'exchange', uid: mine.uid, target: best.target, theirUid: best.uid };
+    }
+    case 'cyborg': {
+      // 自分の弱い子を強くするか、トップのクラスの強い子をつぶすか、得が大きいほう
+      const me = s.players[ph.player];
+      const after = (p: Player, uid: string) => withStudents(p, p.students.map((x) => (x.uid === uid ? { ...x, attrs: [...CYBORG_ATTRS], goods: undefined } : x)));
+      let best: { uid: string; target: number; gain: number } | null = null;
+      for (const st of cyborgable(me)) {
+        const gain = classScore(after(me, st.uid)) - classScore(me);
+        if (!best || gain > best.gain) best = { uid: st.uid, target: me.id, gain };
+      }
+      const top = s.players.filter((p) => p.id !== me.id).sort((x, y) => y.points - x.points)[0];
+      if (top) {
+        for (const st of cyborgable(top)) {
+          const gain = classScore(top) - classScore(after(top, st.uid));
+          if (!best || gain > best.gain) best = { uid: st.uid, target: top.id, gain };
+        }
+      }
+      if (!best || best.gain <= 0) return { type: 'cyborg', uid: null };
+      return { type: 'cyborg', uid: best.uid, target: best.target };
     }
     case 'equip': {
       const p = s.players[ph.player];

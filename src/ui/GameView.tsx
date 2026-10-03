@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cpuAction } from '../game/ai';
-import { MONTHS, actingPlayer, droppable, equippable, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth, tradeable } from '../game/engine';
+import { MONTHS, actingPlayer, cyborgable, droppable, equippable, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth, tradeable } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 import type { Pick } from './Center';
 import { Center } from './Center';
@@ -84,24 +84,28 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const slots = slotsNow(state);
 
   // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ（転校は自分の生徒だけ）
-  const choosing = (ph.kind === 'push' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip') && !cpuTurn && ph.player === focus ? ph.kind : null;
+  const choosing = (ph.kind === 'push' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg') && !cpuTurn && ph.player === focus ? ph.kind : null;
   const targets =
     choosing === 'kachikomi' ? kachikomiTargets(state, focus)
     : choosing === 'exchange' ? exchangeTargets(state, focus)
+    : choosing === 'cyborg' ? state.players.filter((p) => p.id !== focus && cyborgable(p).length > 0).map((p) => p.id)
     : [];
   const meNow = state.players[focus];
   const selectable =
     choosing === 'push' ? droppable(meNow)
     : choosing === 'exchange' ? meNow.students
     : choosing === 'equip' ? equippable(meNow)
+    : choosing === 'cyborg' ? cyborgable(meNow)
     : [];
   const pickOpponent = (pi: number) => {
     if (!targets.includes(pi)) return setPeek(pi);
     setPick((x) => ({ ...x, target: pi, theirUid: x.target === pi ? x.theirUid : null }));
-    // クラス替えは相手の教室を開いて、交換する生徒を選ぶ
-    if (choosing === 'exchange') setPeek(pi);
+    // クラス替え・サイボーグ化は相手の教室を開いて、生徒を選ぶ
+    if (choosing === 'exchange' || choosing === 'cyborg') setPeek(pi);
   };
-  const peekPicking = choosing === 'exchange' && peek !== null && peek === pick.target;
+  const peekPicking = (choosing === 'exchange' || choosing === 'cyborg') && peek !== null && peek === pick.target;
+  /** 相手の教室で選べる生徒 */
+  const peekable = (pi: number) => (choosing === 'cyborg' ? cyborgable(state.players[pi]) : tradeable(state.players[pi]));
   // 手番の人が相手なら、その人の教室を卓の中央に出す
   const stage = actor !== null && actor !== focus ? actor : null;
   // 演出中は、まだ届いていない点を名札から引いて見せる
@@ -192,7 +196,14 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               acting={actor === focus}
               delta={deltas.get(focus)}
               lit={matLit(focus)}
-              onSeatClick={selectable.length ? (uid) => selectable.some((x) => x.uid === uid) && setPick((x) => ({ ...x, uid })) : undefined}
+              onSeatClick={
+                selectable.length
+                  ? (uid) =>
+                      selectable.some((x) => x.uid === uid) &&
+                      // サイボーグ化は自分か相手のどちらか1人なので、自分の子を選んだら相手の選択は外す
+                      setPick((x) => (choosing === 'cyborg' ? { uid, target: null, theirUid: null } : { ...x, uid }))
+                  : undefined
+              }
               selectedUid={choosing ? pick.uid : null}
               dimUid={selectable.length ? (uid) => !selectable.some((x) => x.uid === uid) : fxDim(focus)}
             />
@@ -206,7 +217,11 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
             <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
               ✕
             </button>
-            {peekPicking && <div className="peek-hint">🔁 こちらのクラスに来てもらう生徒をタップ（係の子は選べない）</div>}
+            {peekPicking && (
+              <div className="peek-hint">
+                {choosing === 'cyborg' ? '🦾 サイボーグにする生徒をタップ' : '🔁 こちらのクラスに来てもらう生徒をタップ（係の子は選べない）'}
+              </div>
+            )}
             <Playmat
               player={state.players[peek]}
               year={state.year}
@@ -217,14 +232,14 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               onSeatClick={
                 peekPicking
                   ? (uid) => {
-                      if (!tradeable(state.players[peek]).some((x) => x.uid === uid)) return;
-                      setPick((x) => ({ ...x, theirUid: uid }));
+                      if (!peekable(peek).some((x) => x.uid === uid)) return;
+                      setPick((x) => (choosing === 'cyborg' ? { uid: null, target: x.target, theirUid: uid } : { ...x, theirUid: uid }));
                       setPeek(null);
                     }
                   : undefined
               }
               selectedUid={peekPicking ? pick.theirUid : null}
-              dimUid={peekPicking ? (uid) => !tradeable(state.players[peek]).some((x) => x.uid === uid) : undefined}
+              dimUid={peekPicking ? (uid) => !peekable(peek).some((x) => x.uid === uid) : undefined}
             />
           </div>
         </div>

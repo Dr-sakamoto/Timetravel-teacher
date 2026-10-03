@@ -167,6 +167,28 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
         </div>
       );
     }
+    case 'cyborg': {
+      const mine = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+      const target = pick.target !== null ? state.players[pick.target] : null;
+      const theirs = target?.students.find((x) => x.uid === pick.theirUid);
+      const chosen = mine ? { uid: mine.uid, target: ph.player } : theirs ? { uid: theirs.uid, target: pick.target! } : null;
+      return (
+        <div className="say">
+          🦾 {who} のサイボーグ化 — {cardRule(EVENT_MAP.cyborg)}。手前の教室の生徒か、相手の名札をタップしてその教室の生徒を選ぶ
+          <div className="say-sub">
+            {mine ? `${mine.icon}${mine.name}（自分のクラス）` : theirs ? `${theirs.icon}${theirs.name}（${target!.name}）` : '生徒：未選択'}
+          </div>
+          <div className="say-sub">
+            <button className="btn ghost" onClick={() => dispatch({ type: 'cyborg', uid: null })}>
+              使わない
+            </button>
+            <button className="btn primary" disabled={!chosen} onClick={() => chosen && dispatch({ type: 'cyborg', ...chosen })}>
+              サイボーグにする
+            </button>
+          </div>
+        </div>
+      );
+    }
     case 'equip': {
       const c = EVENT_MAP[ph.card];
       const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);

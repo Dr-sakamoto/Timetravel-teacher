@@ -128,6 +128,8 @@ export type Phase =
   | { kind: 'kachikomi'; player: number }
   /** クラス替え：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える */
   | { kind: 'exchange'; player: number }
+  /** サイボーグ化：どのクラスでも生徒1人をサイボーグに作り替える */
+  | { kind: 'cyborg'; player: number }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
@@ -141,7 +143,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 16;
+  version: 17;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -176,4 +178,5 @@ export type Action =
   | { type: 'push'; uid: string }
   | { type: 'kachikomi'; target: number | null }
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
-  | { type: 'equip'; uid: string | null };
+  | { type: 'equip'; uid: string | null }
+  | { type: 'cyborg'; uid: string | null; target?: number };

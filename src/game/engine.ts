@@ -4,6 +4,7 @@ import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
   ALL_EVENT_CARDS,
   CONTEST_POINTS,
+  CYBORG_ATTRS,
   EVENT_MAP,
   FIXED_BY_MONTH,
   FIXED_MAP,
@@ -95,7 +96,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 16,
+    version: 17,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -279,7 +280,7 @@ function startTerm(s: GameState) {
   s.queueIdx = 0;
   const t = termOfMonth(MONTHS[s.monthIdx]);
   const era = ERAS[currentEra(s)];
-  log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name}。`);
+  log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name}（${ATTR_ICON[era.favor]}が有利）。`);
   s.eventDeck = buildDeck(s);
   s.discard = [];
   s.phase = { kind: 'roles', player: s.queue[0] };
@@ -390,6 +391,7 @@ function resolveSwing(s: GameState, c: SwingCard): EventResult {
 /** 時代イベント（全クラス）：カードごとの効果。その時代の生徒のアイコンが2倍 */
 function resolveContest(s: GameState, c: ContestCard): EventResult {
   const e = c.effect;
+  if (e.type === 'alien') return resolveInvasion(s, c);
   const table = CONTEST_POINTS[s.players.length] ?? CONTEST_POINTS[5];
   const scores = s.players.map((p) => attrScore(p, c.attr, c.era));
   // 代表：クラスで一番そのアイコンの点が多い1人
@@ -454,6 +456,36 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
   sortRows(rows);
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows };
+}
+
+/** 火星人の侵略：空席のあるクラス全部に、アイコンのないエイリアンが1人ずつ転入する */
+function resolveInvasion(s: GameState, c: ContestCard): EventResult {
+  const aliens: Student[] = [];
+  const rows = s.players.map((p, i): ResultRow => {
+    if (p.students.length >= MAX_CLASS) return { player: i, delta: 0, note: '満席' };
+    const st: Student = {
+      uid: `u${s.uidCounter++}`,
+      name: 'エイリアン',
+      title: '火星人',
+      era: 'future',
+      rarity: 'N',
+      icon: '👽',
+      attrs: [],
+      flavor: '何もできない。ただ席に座っている。',
+      joined: joinedLabel(s),
+      mvp: 0,
+    };
+    p.students.push(st);
+    aliens.push(st);
+    return { player: i, delta: 0, note: '👽転入', uids: [st.uid] };
+  });
+  log(s, `【${c.name}】 空席のあるクラスにエイリアンが転入した。`);
+  return { title: c.name, icon: c.icon, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows, students: aliens.slice(0, 1) };
+}
+
+/** サイボーグ化の対象（どのクラスの生徒でも。もうサイボーグの子は除く） */
+export function cyborgable(p: Player): Student[] {
+  return p.students.filter((x) => x.art !== 'cyborg');
 }
 
 /** 襲来（時代イベント・全クラス）：👊の合計（この時代の生徒は2倍）− 敵の強さ */
@@ -610,6 +642,10 @@ function resolveDraw(s: GameState, pi: number) {
         personal('装備できる生徒がいなかった。');
       } else s.phase = { kind: 'equip', player: pi, card: id };
       return;
+    case 'cyborg':
+      if (s.players.every((x) => cyborgable(x).length === 0)) personal('サイボーグにできる生徒がいなかった。');
+      else s.phase = { kind: 'cyborg', player: pi };
+      return;
     case 'push':
       startDrop(s, pi);
       return;
@@ -744,6 +780,39 @@ export function step(prev: GameState, a: Action): GameState {
       );
       return s;
     }
+    case 'cyborg': {
+      if (ph.kind !== 'cyborg') return prev;
+      if (a.uid === null) {
+        setResult(s, ph.player, { title: 'サイボーグ化', icon: '🦾', tone: 'personal', desc: '使わなかった。', rows: [] }, 'turn');
+        return s;
+      }
+      const owner = s.players[a.target ?? ph.player];
+      if (!owner) return prev;
+      const st = cyborgable(owner).find((x) => x.uid === a.uid);
+      if (!st) return prev;
+      const was = `${st.icon}${st.name}`;
+      // 元のカードに覆いかぶさる：同じ席（uid・係）のまま中身だけ入れ替わり、元のカードは消える
+      Object.assign(st, {
+        cardId: undefined,
+        name: 'サイボーグ',
+        title: '改造人間',
+        era: 'future',
+        rarity: 'R',
+        icon: '🦾',
+        art: 'cyborg',
+        attrs: [...CYBORG_ATTRS],
+        flavor: `もとは${st.name}だった。`,
+        goods: undefined,
+      } satisfies Partial<Student>);
+      log(s, `${s.players[ph.player].name}が${owner.name}のクラスの${was}をサイボーグにした！`, ph.player);
+      setResult(
+        s,
+        ph.player,
+        { title: 'サイボーグ化', icon: '🦾', tone: 'personal', desc: `${owner.name}のクラスの${was}がサイボーグになった！`, rule: cardRule(EVENT_MAP.cyborg), rows: [], students: [st] },
+        'turn',
+      );
+      return s;
+    }
     case 'equip': {
       if (ph.kind !== 'equip') return prev;
       const p = s.players[ph.player];
@@ -816,8 +885,10 @@ export function deckBreakdown(s: GameState): DeckRow[] {
           return { ...base, group: '転校・クラス替え' };
         case 'goods':
           return { ...base, name: `${c.name}（${ATTR_ICON[c.attr]}＋1）`, group: c.era ? '時代イベント' : 'グッズ' };
+        case 'cyborg':
+          return { ...base, group: '時代イベント' };
         case 'contest':
-          return { ...base, name: `${c.name}（${ATTR_ICON[c.attr]}）`, group: '時代イベント' };
+          return { ...base, name: c.effect.type === 'alien' ? c.name : `${c.name}（${ATTR_ICON[c.attr]}）`, group: '時代イベント' };
         case 'raid':
           return { ...base, name: `${c.name}（強さ${c.threat}）`, group: '時代イベント' };
       }

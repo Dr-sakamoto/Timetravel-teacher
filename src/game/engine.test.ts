@@ -293,6 +293,52 @@ describe('engine', () => {
     expect(run([mk('y', ['fight']), mk('c', ['charm', 'charm', 'charm'])])).toBe(0);
   });
 
+  it('both era events of an era compete on that era\'s favored icon', () => {
+    for (const era of ERAS) {
+      const cards = ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien');
+      for (const c of cards) expect(c.attr, c.id).toBe(era.favor);
+    }
+  });
+
+  it('martian invasion seats an iconless alien in every class with a free seat', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const full = 1 - s.phase.player;
+    while (s.players[full].students.length < MAX_CLASS) s.players[full].students.push(mk(`f${s.players[full].students.length}`, ['study']));
+    const sizes = s.players.map((p) => p.students.length);
+    const points = s.players.map((p) => p.points);
+    s.eventDeck.push('martian');
+    const next = step(s, { type: 'drawEvent' });
+    next.players.forEach((p, i) => {
+      expect(p.points).toBe(points[i]);
+      expect(p.students.length).toBe(i === full ? MAX_CLASS : sizes[i] + 1);
+    });
+    const alien = next.players[s.phase.kind === 'draw' ? s.phase.player : 0].students.at(-1)!;
+    expect(alien.attrs).toEqual([]);
+  });
+
+  it('cyborg covers any student, in any class, with a 📚🏃 card', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    const other = 1 - pi;
+    s.eventDeck.push('cyborg');
+    s = step(s, { type: 'drawEvent' });
+    expect(s.phase.kind).toBe('cyborg');
+    const victim = s.players[other].students[0];
+    const n = s.players[other].students.length;
+    const next = step(s, { type: 'cyborg', uid: victim.uid, target: other });
+    const st = next.players[other].students.find((x) => x.uid === victim.uid)!;
+    expect(next.players[other].students).toHaveLength(n);
+    expect(st.attrs).toEqual(['study', 'sports']);
+    expect(st.name).toBe('サイボーグ');
+    expect(st.cardId).toBeUndefined();
+    // もうサイボーグの子はもう一度サイボーグにできない
+    const again = structuredClone(next);
+    again.phase = { kind: 'cyborg', player: pi };
+    expect(step(again, { type: 'cyborg', uid: victim.uid, target: other })).toBe(again);
+  });
+
   it('era events each have their own effect', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
@@ -309,8 +355,8 @@ describe('engine', () => {
     const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
     const B = [mk('b1', ['sports', 'sports'])];
     const C = [mk('c1', ['study'])];
-    // 恐竜レース：代表1人の🏃×2
-    expect(run('dino_race', [A, B, C])).toEqual([6, 4, 0]);
+    // 恐竜と力くらべ：代表1人の👊×2
+    expect(run('dino_sumo', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, 4, 0]);
     // 古代オリンピック：順位点×2
     expect(run('olympia', [A, B, C])).toEqual([10, 6, 2]);
     // ピラミッド建設：🏃8以上で+8、足りなければ−3（白亜紀ではないのでそのまま）
@@ -319,7 +365,7 @@ describe('engine', () => {
     expect(run('kassen', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([10, 0, -5]);
     // 雄叫びコンテスト：一番のクラスだけ👊×2
     expect(run('roar', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([4, 0, 0]);
-    // 修学旅行：👑を持つ子1人につき+2（現代の子は2人分）
+    // 修学旅行：👑を持つ子1人につき+2（現代の子は2人分。B・Cの子は👑なし）
     expect(run('trip', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'edo')], B, C])).toEqual([6, 0, 0]);
     // 演奏会：🎨 − 🎨を持たない子の人数
     expect(run('concert', [[mk('a', ['art', 'art']), mk('b', ['study'])], B, C])).toEqual([1, -1, -1]);

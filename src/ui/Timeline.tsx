@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { ERAS } from '../game/data/eras';
 import { MONTHS, termOfMonth } from '../game/engine';
-import type { GameState } from '../game/types';
+import { ATTR_ICON, ATTR_LABEL, type GameState } from '../game/types';
 
 /** その年の3学期の時代。今の学期を強調する */
 export function EraBar({ state }: { state: GameState }) {
@@ -13,10 +13,11 @@ export function EraBar({ state }: { state: GameState }) {
         const t = i + 1;
         const status = t === term ? 'now' : t < term ? 'past' : 'next';
         return (
-          <div key={i} className={`era-chip ${status}`} style={{ '--era': era.color } as CSSProperties} title={era.when}>
+          <div key={i} className={`era-chip ${status}`} style={{ '--era': era.color } as CSSProperties} title={`${era.when}／${ATTR_LABEL[era.favor]}が有利`}>
             <span className="era-term">{t}学期</span>
             <span className="era-icon">{era.icon}</span>
             <span className="era-name">{era.name}</span>
+            <span className="era-favor">{ATTR_ICON[era.favor]}有利</span>
             <span className="era-left">残{state.pools[era.id].length}</span>
           </div>
         );

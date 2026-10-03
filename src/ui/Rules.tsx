@@ -2,6 +2,7 @@ import { MAX_CLASS, STARTING_MEMBERS } from '../game/calc';
 import { CARDS } from '../game/data/cards';
 import { ERAS } from '../game/data/eras';
 import {
+  CYBORG_CARDS,
   ERA_CARDS,
   FIXED_EVENTS,
   GOODS_CARDS,
@@ -103,7 +104,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             <b>グッズ</b>（共通：{GOODS_CARDS.filter((g) => !g.era).map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`).join('・')}＋時代ごとに2種）：生徒1人に装備して、そのアイコンを＋1。
           </li>
           <li>
-            <b>時代イベント</b>（全クラス・2種×2枚）：カードごとに効果が違う（下の「時代ごとのカード」）。<b>その時代出身の子のアイコンは2倍</b>。順位点は5／3／2／1点が基本。
+            <b>時代イベント</b>（全クラス・2種×2枚）：<b>時代ごとに有利なアイコンが決まっていて</b>、2種ともそのアイコンで競う（効果はカードごとに違う）。<b>その時代出身の子のアイコンは2倍</b>。1年の3つの時代は年の初めに決まって上に出ているので、次の学期に向けてクラスを作っておこう。
           </li>
           <li>
             <b>襲来</b>（全クラス・時代ごとに1枚）：クラスの👊の数 − 敵の強さ（その時代出身の子は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス。
@@ -119,7 +120,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             const raid = RAID_CARDS.find((c) => c.era === era.id)!;
             return (
               <li key={era.id}>
-                {era.icon} <b>{era.name}</b>：
+                {era.icon} <b>{era.name}</b>（<b>{ATTR_ICON[era.favor]}有利</b>）：
                 {era.id === 'present' ? (
                   <>
                     転校生{' '}
@@ -141,9 +142,10 @@ export function Rules({ onClose }: { onClose: () => void }) {
                   .join('・')}
                 ／襲来 {raid.icon}
                 {raid.name.replace('襲来！', '')}（強さ{raid.threat}）／グッズ{' '}
-                {GOODS_CARDS.filter((g) => g.era === era.id)
-                  .map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`)
-                  .join('・')}
+                {[
+                  ...GOODS_CARDS.filter((g) => g.era === era.id).map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`),
+                  ...CYBORG_CARDS.filter((g) => g.era === era.id).map((g) => `${g.icon}${g.name}（${cardRule(g)}）`),
+                ].join('・')}
               </li>
             );
           })}
