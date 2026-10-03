@@ -12,6 +12,7 @@ import {
   RAID_CARDS,
   SWING_CARDS,
   cardRule,
+  eraEffectRule,
   fixedRule,
 } from '../game/data/events';
 import { ARCHETYPES } from '../game/data/modern';
@@ -60,7 +61,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
 
         <h3>手番：1人1枚ずつ山札をめくる</h3>
         <p>
-          <b>通常カード・カチコミ・転校・クラス替え・グッズ・人物カードはめくった人だけ</b>。<b>共通イベントと時代イベントは学校行事なので全クラスに</b>効果がある。
+          <b>通常カード・カチコミ・クラス替え・グッズ・人物カードはめくった人だけ</b>。<b>共通イベント・時代イベント・転校は全クラスに</b>効果がある。
         </p>
         <p>
           山札は学期ごとに作り直す。<b>通常カード・カチコミ・共通イベント・転校・グッズは全時代共通</b>で、そこに
@@ -102,7 +103,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             <b>グッズ</b>（共通：{GOODS_CARDS.filter((g) => !g.era).map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`).join('・')}＋時代ごとに2種）：生徒1人に装備して、そのアイコンを＋1。
           </li>
           <li>
-            <b>時代イベント</b>（全クラス・2種×2枚）：クラス全員のそのアイコンの合計数。<b>その時代出身の子は2倍</b>。時代によって得をする能力が変わる。
+            <b>時代イベント</b>（全クラス・2種×2枚）：カードごとに効果が違う（下の「時代ごとのカード」）。<b>その時代出身の子のアイコンは2倍</b>。順位点は5／3／2／1点が基本。
           </li>
           <li>
             <b>襲来</b>（全クラス・時代ごとに1枚）：クラスの👊の数 − 敵の強さ（その時代出身の子は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス。
@@ -136,7 +137,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
                 )}
                 ／イベント{' '}
                 {ERA_CARDS.filter((c) => c.era === era.id)
-                  .map((c) => `${c.icon}${c.name}（${ATTR_ICON[c.attr]}）`)
+                  .map((c) => `${c.icon}${c.name}（${eraEffectRule(c)}）`)
                   .join('・')}
                 ／襲来 {raid.icon}
                 {raid.name.replace('襲来！', '')}（強さ{raid.threat}）／グッズ{' '}

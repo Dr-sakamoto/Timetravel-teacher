@@ -122,11 +122,11 @@ export type Phase =
   | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
   | { kind: 'roles'; player: number }
   | { kind: 'draw'; player: number }
-  /** 転校：いらない生徒を別のクラスに押しつける */
-  | { kind: 'push'; player: number }
+  /** 転校：全クラスが順番に、係に就いていない生徒を1人ずつクラスから外す（player は今選んでいる人、left はこの後に選ぶ人） */
+  | { kind: 'push'; player: number; drawer: number; left: number[]; gone: Student[] }
   /** カチコミ：他のクラスを1つ選んで、自分の👊の数だけ減点させる */
   | { kind: 'kachikomi'; player: number }
-  /** クラス替え：係に就いていない生徒どうしを他のクラスと入れ替える */
+  /** クラス替え：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える */
   | { kind: 'exchange'; player: number }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string }
@@ -141,7 +141,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 15;
+  version: 16;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -173,7 +173,7 @@ export type Action =
   | { type: 'continue' }
   | { type: 'setRoles'; roles: RoleSeat[]; unlock?: RoleId[] }
   | { type: 'drawEvent' }
-  | { type: 'push'; uid: string | null; target?: number }
+  | { type: 'push'; uid: string }
   | { type: 'kachikomi'; target: number | null }
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
   | { type: 'equip'; uid: string | null };

@@ -5,7 +5,7 @@ import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
-import { currentEra, deckBreakdown, newGame, step } from './engine';
+import { currentEra, deckBreakdown, droppable, newGame, step } from './engine';
 import type { Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
@@ -270,11 +270,59 @@ describe('engine', () => {
     const t = structuredClone(s);
     t.players[pi].students = [mk('y', ['fight', 'fight']), mk('z', ['study'])];
     t.players[pi].roles = [];
+    // 抜き打ちテストは📚の数だけ（👊では引かれない）
     t.eventDeck.push('poptest');
-    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(1 - 2);
+    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(1);
     const u = structuredClone(t);
     u.eventDeck.push('marathon');
     expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(0 - 2);
+  });
+
+  it('brawl takes 👊 away, offset by 👑 but never above zero', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const pi = s.phase.player;
+    const run = (students: Student[]) => {
+      const t = structuredClone(s);
+      t.players[pi].students = students;
+      t.players[pi].roles = [];
+      t.eventDeck.push('brawl');
+      return step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points;
+    };
+    expect(run([mk('y', ['fight', 'fight', 'fight']), mk('c', ['charm'])])).toBe(-2);
+    expect(run([mk('y', ['fight']), mk('c', ['charm', 'charm', 'charm'])])).toBe(0);
+  });
+
+  it('era events each have their own effect', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const run = (id: string, classes: Student[][]) => {
+      const t = structuredClone(s);
+      classes.forEach((st, i) => {
+        t.players[i].students = st;
+        t.players[i].roles = [];
+      });
+      t.eventDeck.push(id);
+      const after = step(t, { type: 'drawEvent' });
+      return after.players.map((p, i) => p.points - t.players[i].points);
+    };
+    const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
+    const B = [mk('b1', ['sports', 'sports'])];
+    const C = [mk('c1', ['study'])];
+    // 恐竜レース：代表1人の🏃×2
+    expect(run('dino_race', [A, B, C])).toEqual([6, 4, 0]);
+    // 古代オリンピック：順位点×2
+    expect(run('olympia', [A, B, C])).toEqual([10, 6, 2]);
+    // ピラミッド建設：🏃8以上で+8、足りなければ−3（白亜紀ではないのでそのまま）
+    expect(run('pyramid', [[...A, mk('a3', ['sports', 'sports', 'sports', 'sports'])], B, C])).toEqual([8, -3, -3]);
+    // 天下分け目の合戦：1位+10、最下位−5
+    expect(run('kassen', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([10, 0, -5]);
+    // 雄叫びコンテスト：一番のクラスだけ👊×2
+    expect(run('roar', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([4, 0, 0]);
+    // 修学旅行：👑を持つ子1人につき+2（現代の子は2人分）
+    expect(run('trip', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'edo')], B, C])).toEqual([6, 0, 0]);
+    // 演奏会：🎨 − 🎨を持たない子の人数
+    expect(run('concert', [[mk('a', ['art', 'art']), mk('b', ['study'])], B, C])).toEqual([1, -1, -1]);
   });
 
   it('goods add an icon to one student, one item each', () => {
@@ -307,17 +355,22 @@ describe('engine', () => {
     expect(next.players[0].roles).toEqual([{ role: 'study', uid }]);
   });
 
-  it('exchange swaps students without a role', () => {
+  it('exchange takes a student without a role from another class', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
     while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
     const [a0, a1] = s.players[0].students;
     const b0 = s.players[1].students[0];
-    s.players[0].roles = [{ role: 'study', uid: a0.uid }];
+    s.players[1].roles = [{ role: 'study', uid: b0.uid }];
     s.phase = { kind: 'exchange', player: 0 };
+    // 相手の係の子はもらえない
     expect(step(s, { type: 'exchange', uid: a0.uid, target: 1, theirUid: b0.uid })).toBe(s);
-    const next = step(s, { type: 'exchange', uid: a1.uid, target: 1, theirUid: b0.uid });
-    expect(next.players[0].students.map((x) => x.uid)).toContain(b0.uid);
+    const b1 = s.players[1].students[1];
+    // 自分の側は係の子でも出せる
+    s.players[0].roles = [{ role: 'study', uid: a1.uid }];
+    const next = step(s, { type: 'exchange', uid: a1.uid, target: 1, theirUid: b1.uid });
+    expect(next.players[0].students.map((x) => x.uid)).toContain(b1.uid);
     expect(next.players[1].students.map((x) => x.uid)).toContain(a1.uid);
+    expect(next.players[0].roles).toEqual([]);
   });
 
   it('drawn event cards go to the discard pile', () => {
@@ -328,14 +381,27 @@ describe('engine', () => {
     expect(s.discard[s.discard.length - 1]).toBe('n_study');
   });
 
-  it('push moves an unwanted student to another class', () => {
+  it('push makes every class drop one student without a role', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
-    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
-    s.phase = { kind: 'push', player: 0 };
-    const uid = s.players[0].students[0].uid;
-    const next = step(s, { type: 'push', uid, target: 1 });
-    expect(next.players[0].students).toHaveLength(5);
-    expect(next.players[1].students.map((x) => x.uid)).toContain(uid);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const drawer = s.phase.player;
+    const other = 1 - drawer;
+    const sitter = s.players[drawer].students[0];
+    s.players[drawer].roles = [{ role: 'study', uid: sitter.uid }];
+    s.eventDeck.push('push');
+    s = step(s, { type: 'drawEvent' });
+    expect(s.phase).toMatchObject({ kind: 'push', player: drawer });
+    // 係の子は外せない
+    expect(step(s, { type: 'push', uid: sitter.uid })).toBe(s);
+    const mine = s.players[drawer].students[1].uid;
+    s = step(s, { type: 'push', uid: mine });
+    expect(s.phase).toMatchObject({ kind: 'push', player: other });
+    const theirs = droppable(s.players[other])[0].uid;
+    s = step(s, { type: 'push', uid: theirs });
+    expect(s.phase.kind).toBe('result');
+    expect(s.players[drawer].students.map((x) => x.uid)).not.toContain(mine);
+    expect(s.players[other].students.map((x) => x.uid)).not.toContain(theirs);
+    expect(s.players.map((p) => p.students.length)).toEqual([STARTING_MEMBERS - 1, STARTING_MEMBERS - 1]);
   });
 
   it('normal cards score only for the drawer; era and common events score for every class', () => {

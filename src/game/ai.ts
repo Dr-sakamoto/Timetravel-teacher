@@ -1,7 +1,7 @@
-import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, hasRoleBonus, iconsOf } from './calc';
+import { attrScore, countAttr, hasRoleBonus, iconsOf } from './calc';
 import { ALL_EVENT_CARDS, EVENT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { equippable, exchangeTargets, kachikomiTargets, pushTargets, slotsNow, tradeable } from './engine';
+import { droppable, equippable, exchangeTargets, kachikomiTargets, slotsNow, tradeable } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -18,7 +18,11 @@ ATTR_WEIGHT.fight += 3;
 export function classScore(p: Player): number {
   let v = 0;
   for (const a of ATTRS) v += attrScore(p, a).total * ATTR_WEIGHT[a];
-  for (const c of SWING_CARDS) v += attrScore(p, c.plus).total - (c.minus === 'heads' ? p.students.length : attrScore(p, c.minus).total);
+  for (const c of SWING_CARDS) {
+    const plus = attrScore(p, c.plus).total;
+    const minus = !c.minus ? 0 : c.minus === 'heads' ? p.students.length : attrScore(p, c.minus).total;
+    v += c.offsetOnly ? Math.min(0, plus - minus) : plus - minus;
+  }
   v += (attrScore(p, 'study').total - countAttr(p, 'fight') * TEST_YANKEE_PENALTY) * 2;
   return v;
 }
@@ -90,23 +94,16 @@ export function cpuAction(s: GameState): Action | null {
     case 'draw':
       return { type: 'drawEvent' };
     case 'push': {
+      // 一番いなくても困らない子を転校させる
       const p = s.players[ph.player];
-      const targets = pushTargets(s, ph.player);
-      if (!targets.length || p.students.length <= MIN_CLASS) return { type: 'push', uid: null };
-      let best: { uid: string; loss: number } | null = null;
-      for (const st of p.students) {
-        const loss = worth(p, st.uid);
-        if (!best || loss < best.loss) best = { uid: st.uid, loss };
-      }
-      // 席が埋まってきた時か、ほぼ損しない時だけ押しつける。相手はトップのクラス
-      if (!best || (best.loss > 2 && p.students.length < MAX_CLASS - 1)) return { type: 'push', uid: null };
-      return { type: 'push', uid: best.uid, target: leader(s, targets) };
+      const st = droppable(p).sort((x, y) => worth(p, x.uid) - worth(p, y.uid))[0];
+      return { type: 'push', uid: st.uid };
     }
     case 'kachikomi':
       return { type: 'kachikomi', target: leader(s, kachikomiTargets(s, ph.player)) };
     case 'exchange': {
       const p = s.players[ph.player];
-      const mine = tradeable(p).sort((x, y) => worth(p, x.uid) - worth(p, y.uid))[0];
+      const mine = [...p.students].sort((x, y) => worth(p, x.uid) - worth(p, y.uid))[0];
       let best: { target: number; uid: string; gain: number } | null = null;
       for (const t of exchangeTargets(s, ph.player)) {
         for (const st of tradeable(s.players[t])) {

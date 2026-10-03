@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cpuAction } from '../game/ai';
-import { MIN_CLASS } from '../game/calc';
-import { MONTHS, actingPlayer, equippable, exchangeTargets, kachikomiTargets, pushTargets, slotsNow, termOfMonth, tradeable } from '../game/engine';
+import { MONTHS, actingPlayer, droppable, equippable, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth, tradeable } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 import type { Pick } from './Center';
 import { Center } from './Center';
@@ -84,17 +83,16 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const term = termOfMonth(month);
   const slots = slotsNow(state);
 
-  // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ
+  // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ（転校は自分の生徒だけ）
   const choosing = (ph.kind === 'push' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip') && !cpuTurn && ph.player === focus ? ph.kind : null;
   const targets =
-    choosing === 'push' ? pushTargets(state, focus)
-    : choosing === 'kachikomi' ? kachikomiTargets(state, focus)
+    choosing === 'kachikomi' ? kachikomiTargets(state, focus)
     : choosing === 'exchange' ? exchangeTargets(state, focus)
     : [];
   const meNow = state.players[focus];
   const selectable =
-    choosing === 'push' ? (meNow.students.length > MIN_CLASS ? meNow.students : [])
-    : choosing === 'exchange' ? tradeable(meNow)
+    choosing === 'push' ? droppable(meNow)
+    : choosing === 'exchange' ? meNow.students
     : choosing === 'equip' ? equippable(meNow)
     : [];
   const pickOpponent = (pi: number) => {
