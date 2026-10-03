@@ -105,7 +105,7 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
       );
     }
     case 'roles':
-      return <div className="say">{who} の係決め — 手前の教室で係を選び、生徒をタップ</div>;
+      return <div className="say">{who} の係決め — 生徒のカードを係の場に置こう（ドラッグ／タップ）</div>;
     case 'draw':
       return <div className="say">{who} の番 — イベントの山札をめくろう</div>;
     case 'push': {

@@ -1,10 +1,28 @@
 import type { CSSProperties } from 'react';
 import { MAX_CLASS, slotUnlockLabel } from '../game/calc';
-import { MAX_ROLE_SEATS, ROLES, roleDesc } from '../game/data/roles';
+import { ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
 import { ERAS } from '../game/data/eras';
 import { className } from '../game/engine';
 import type { Player, RoleId, RoleSeat } from '../game/types';
 import { TcgCard } from './TcgCard';
+import { useCardDrag } from './useCardDrag';
+
+/** 係決めでカードを置ける場所：係の場（'role:<係>'）・座席（'seats'）・座席のカード（'card:<uid>'） */
+export type DropTo = { kind: 'role'; role: RoleId } | { kind: 'seats' } | { kind: 'card'; uid: string };
+
+/** 係決め：カードを係の場と座席のあいだで動かす */
+export interface Arrange {
+  /** タップで持ち上げているカード */
+  held: string | null;
+  /** 今学期に新しく解放した係 */
+  fresh: RoleId[];
+  /** まだ解放していないが、今タップすれば解放できる係 */
+  canUnlock: (r: RoleId) => boolean;
+  /** カードをタップした */
+  onTap: (uid: string) => void;
+  /** カードをどこかに置いた（タップで持ち上げたカードを置き場をタップ、またはドラッグして離した） */
+  onPlace: (uid: string | null, to: DropTo) => void;
+}
 
 interface Props {
   player: Player;
@@ -16,7 +34,6 @@ interface Props {
   acting?: boolean;
   /** 直前のイベントでの得点 */
   delta?: number;
-  onSlotClick?: (i: number) => void;
   onSeatClick?: (uid: string) => void;
   selectedUid?: string | null;
   dimUid?: (uid: string) => boolean;
@@ -24,18 +41,63 @@ interface Props {
   roles?: RoleSeat[];
   /** 係決めの下書き（解放した係） */
   unlocked?: RoleId[];
+  /** 係決め中（カードを係の場へ動かせる） */
+  arrange?: Arrange;
   /** 今のイベントに関わった生徒（光らせる） */
   lit?: Set<string>;
 }
 
-/** 教室プレイマット：名札・係ボード・9つの座席 */
+function parseDrop(v: string): DropTo {
+  if (v.startsWith('role:')) return { kind: 'role', role: v.slice(5) as RoleId };
+  if (v.startsWith('card:')) return { kind: 'card', uid: v.slice(5) };
+  return { kind: 'seats' };
+}
+
+/** 教室プレイマット：名札・係の場（そこに置いたカードがその係）・座席 */
 export function Playmat(props: Props) {
-  const { player, year, variant, acting, delta } = props;
+  const { player, year, variant, acting, delta, arrange } = props;
   const view: Player = { ...player, roles: props.roles ?? player.roles, unlocked: props.unlocked ?? player.unlocked };
-  const k = props.slots;
-  const seats = Array.from({ length: MAX_CLASS }, (_, i) => view.students[i] ?? null);
+  const { drag, grab, wasDrag } = useCardDrag((uid, to) => arrange?.onPlace(uid, parseDrop(to)));
+  const held = drag?.uid ?? arrange?.held ?? null;
+  const heldSt = held ? view.students.find((s) => s.uid === held) : undefined;
+  const holderOf = (r: RoleId) => {
+    const seat = view.roles.find((x) => x.role === r);
+    return seat ? view.students.find((s) => s.uid === seat.uid) : undefined;
+  };
+  const inRole = new Set(ROLE_ORDER.map((r) => holderOf(r)?.uid).filter(Boolean));
+  const free = view.students.filter((s) => !inRole.has(s.uid));
+  const desks = Math.max(0, MAX_CLASS - view.students.length);
+  // 係の場（4つ）＋係に就いていない子の席＋空いている席
+  const cells = ROLE_ORDER.length + free.length + desks;
+  const over = drag?.over ?? null;
+  const tap = (fn: () => void) => () => {
+    if (!wasDrag()) fn();
+  };
+
+  const card = (uid: string, inZone: boolean) => {
+    const st = view.students.find((s) => s.uid === uid)!;
+    return (
+      <TcgCard
+        student={st}
+        owner={view}
+        lit={props.lit?.has(st.uid)}
+        selected={arrange ? held === st.uid : props.selectedUid === st.uid}
+        dim={arrange ? drag?.uid === st.uid : props.dimUid?.(st.uid)}
+        onClick={arrange ? tap(() => arrange.onTap(st.uid)) : props.onSeatClick ? () => props.onSeatClick!(st.uid) : undefined}
+        onPointerDown={arrange ? grab(st.uid) : undefined}
+        drop={arrange && !inZone ? `card:${st.uid}` : undefined}
+      />
+    );
+  };
+
   return (
-    <div data-pid={player.id} className={`playmat near pm-${variant} ${acting ? 'acting' : ''}`} style={{ '--pc': player.color } as CSSProperties}>
+    <div
+      data-pid={player.id}
+      data-drop={arrange ? 'seats' : undefined}
+      className={`playmat near pm-${variant} ${acting ? 'acting' : ''} ${arrange ? 'arranging' : ''} ${held ? 'holding' : ''}`}
+      style={{ '--pc': player.color, '--cells': cells, '--half': Math.ceil(cells / 2) } as CSSProperties}
+      onClick={arrange ? tap(() => arrange.held && arrange.onPlace(null, { kind: 'seats' })) : undefined}
+    >
       <div className="plate">
         <span className="plate-name">
           {player.name}
@@ -52,49 +114,61 @@ export function Playmat(props: Props) {
           </span>
         )}
       </div>
-      <div className="roleboard">
-        {Array.from({ length: MAX_ROLE_SEATS }, (_, i) => {
-          const kind = view.unlocked[i];
-          const open = !kind && i < k;
-          const locked = !kind && !open;
-          const seat = kind && view.roles.find((r) => r.role === kind);
-          const st = seat && view.students.find((s) => s.uid === seat.uid);
+      <div className="floor">
+        {ROLE_ORDER.map((r, i) => {
+          const def = ROLES[r];
+          const st = holderOf(r);
+          const open = view.unlocked.includes(r);
+          const unlockable = !open && !!arrange?.canUnlock(r);
+          // 係の場で置けない所は、次にいつ解放できるかを出す
+          const lockNote = view.unlocked.length < props.slots ? '選べる' : slotUnlockLabel(view.unlocked.length).replace('年', '-');
+          const droppable = !!arrange && (open || unlockable);
+          const fit = !!heldSt && droppable && heldSt.attrs.includes(def.attr) && st?.uid !== heldSt.uid;
           return (
-            <button
-              key={i}
-              className={`role-slot ${locked ? 'locked' : ''}`}
-              disabled={locked || !seat || !props.onSlotClick}
-              onClick={(e) => {
-                e.stopPropagation();
-                props.onSlotClick?.(i);
-              }}
-              title={locked ? `${slotUnlockLabel(i)}で解放` : open ? '解放する係を選べる' : `${ROLES[kind].name}：${roleDesc(kind)}`}
+            <div
+              key={r}
+              data-drop={droppable ? `role:${r}` : undefined}
+              className={`role-zone ${open ? 'open' : unlockable ? 'unlockable' : 'locked'} ${arrange?.fresh.includes(r) ? 'fresh' : ''} ${fit ? 'fit' : ''} ${over === `role:${r}` ? 'over' : ''} ${i === ROLE_ORDER.length - 1 ? 'last' : ''}`}
+              title={`${def.name}：ここに置いた子は${roleDesc(r)}${open ? '' : unlockable ? '（タップで解放）' : '（まだ解放していない）'}`}
+              onClick={
+                droppable
+                  ? (e) => {
+                      e.stopPropagation();
+                      if (!wasDrag()) arrange!.onPlace(arrange!.held, { kind: 'role', role: r });
+                    }
+                  : undefined
+              }
             >
-              <span>{locked ? '🔒' : open ? '🆕' : ROLES[kind].icon}</span>
-              <span className="role-name">{locked ? slotUnlockLabel(i).replace('年', '-') : open ? '選べる' : roleDesc(kind)}</span>
-              {kind && <span className="role-who">{st ? st.icon : '·'}</span>}
-            </button>
+              {st ? (
+                card(st.uid, true)
+              ) : (
+                <span className="zone-empty">
+                  <span className="zone-badge">{def.name}</span>
+                  <span className="zone-icon">{open ? def.icon : unlockable ? '🆕' : '🔒'}</span>
+                  <span className="zone-desc">{roleDesc(r)}</span>
+                  {!open && <span className="zone-note">{unlockable ? 'タップで解放' : lockNote}</span>}
+                  {open && arrange && <span className="zone-note">ここに置く</span>}
+                </span>
+              )}
+            </div>
           );
         })}
-      </div>
-      <div className="seats">
-        {seats.map((st, i) => (
-          <div key={st?.uid ?? `e${i}`} className={`seat ${st ? '' : 'empty'}`}>
-            {st ? (
-              <TcgCard
-                student={st}
-                owner={view}
-                lit={props.lit?.has(st.uid)}
-                selected={props.selectedUid === st.uid}
-                dim={props.dimUid?.(st.uid)}
-                onClick={props.onSeatClick ? () => props.onSeatClick!(st.uid) : undefined}
-              />
-            ) : (
-              <span className="desk" />
-            )}
+        {free.map((st) => (
+          <div key={st.uid} className="seat">
+            {card(st.uid, false)}
+          </div>
+        ))}
+        {Array.from({ length: desks }, (_, i) => (
+          <div key={`e${i}`} className="seat empty">
+            <span className="desk" />
           </div>
         ))}
       </div>
+      {drag && heldSt && (
+        <div className="drag-ghost" style={{ left: drag.x, top: drag.y, width: drag.w, height: drag.h }}>
+          <TcgCard student={heldSt} owner={view} selected />
+        </div>
+      )}
     </div>
   );
 }
