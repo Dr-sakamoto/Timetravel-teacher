@@ -1,5 +1,7 @@
 import { ERAS } from '../game/data/eras';
+import { useState } from 'react';
 import { currentEra, pushTargets } from '../game/engine';
+import { DeckInfo } from './DeckInfo';
 import type { Action, GameState } from '../game/types';
 import { EventCardView } from './EventCardView';
 import { TcgCard } from './TcgCard';
@@ -20,6 +22,7 @@ export function Center({ state, dispatch, cpuBusy, push }: Props) {
   const human = actor && !actor.isCpu && !cpuBusy;
   const canDraw = human && ph.kind === 'draw';
   const canMember = human && ph.kind === 'memberDraw';
+  const [showDeck, setShowDeck] = useState(false);
 
   return (
     <div className="center">
@@ -34,25 +37,26 @@ export function Center({ state, dispatch, cpuBusy, push }: Props) {
           <span className="pile-label">イベント</span>
           <span className="pile-count">{state.eventDeck.length}</span>
         </button>
-        <div className="pile discard" title="捨て札">
+        <button className="pile discard" title="山札の内訳を見る" onClick={() => setShowDeck(true)}>
           <span className="pile-back">🗑️</span>
-          <span className="pile-label">捨て札</span>
+          <span className="pile-label">捨て札・内訳</span>
           <span className="pile-count">{state.discard.length}</span>
-        </div>
+        </button>
         {ph.kind === 'memberDraw' ? (
           <button className={`pile modern-pile ${canMember ? 'glow' : ''}`} disabled={!canMember} onClick={() => dispatch({ type: 'drawMember' })}>
             <span className="pile-back">🏫</span>
             <span className="pile-label">現代の生徒</span>
-            <span className="pile-count">{state.modernDeck.length}</span>
+            <span className="pile-count">{state.pools.present.length}</span>
           </button>
         ) : (
-          <div className="pile era-pile" style={{ borderColor: era.color }} title={era.id === 'present' ? '現代の生徒' : `まだ転入していない${era.name}の偉人`}>
+          <div className="pile era-pile" style={{ borderColor: era.color }} title={`まだ転入していない${era.name}の生徒`}>
             <span className="pile-back">{era.icon}</span>
             <span className="pile-label">{era.id === 'present' ? '現代の生徒' : `${era.name}の偉人`}</span>
-            <span className="pile-count">{era.id === 'present' ? '∞' : state.pools[era.id].length}</span>
+            <span className="pile-count">{state.pools[era.id].length}</span>
           </div>
         )}
       </div>
+      {showDeck && <DeckInfo state={state} onClose={() => setShowDeck(false)} />}
       <div className="action">
         <Action
           key={ph.kind}

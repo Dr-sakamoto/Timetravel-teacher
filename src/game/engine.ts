@@ -19,7 +19,7 @@ import {
   type NormalCard,
   type RaidCard,
 } from './data/events';
-import { ARCHETYPES, GIVEN_NAMES, STARTER_ARCHETYPES, SURNAMES, type Archetype } from './data/modern';
+import { ARCHETYPE_MAP, GIVEN_NAMES, MODERN_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
 import { ROLES, ROLE_ORDER } from './data/roles';
 import {
   type Action,
@@ -37,8 +37,6 @@ import {
 export const HISTORY_ERAS = ERAS.map((_, i) => i).filter((i) => i !== PRESENT_INDEX);
 export const MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
 export const PLAYER_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b', '#da77f2'];
-/** 現代の生徒の山札に入れる各カードの枚数 */
-const MODERN_COPIES = 2;
 
 export function termOfMonth(m: number): number {
   if (m >= 4 && m <= 7) return 1;
@@ -103,8 +101,9 @@ export interface SetupPlayer {
 export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()): GameState {
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
+  pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 10,
+    version: 11,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -126,16 +125,11 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     phase: { kind: 'memberDraw', player: 0, last: null },
     eventDeck: [],
     discard: [],
-    modernDeck: [],
     pools,
     uidCounter: 0,
     logCounter: 0,
     log: [],
   };
-  s.modernDeck = shuffle(
-    s,
-    STARTER_ARCHETYPES.flatMap((a) => Array.from({ length: MODERN_COPIES }, () => a.id)),
-  );
   drawYearEras(s, true);
   s.eventDeck = buildDeck(s);
   log(s, `時空最強クラス決定戦、開幕！ ${years}年間の勝負です。`);
@@ -153,9 +147,10 @@ function joinedLabel(s: GameState): string {
   return `${s.year}年${MONTHS[Math.min(s.monthIdx, 11)]}月`;
 }
 
-function fromArchetype(s: GameState, a: Archetype, joined: string): Student {
+function fromArchetype(s: GameState, cardId: string, a: Archetype, joined: string): Student {
   return {
     uid: `u${s.uidCounter++}`,
+    cardId,
     name: `${pick(s, SURNAMES)} ${pick(s, GIVEN_NAMES)}`,
     title: a.title,
     era: 'present',
@@ -187,21 +182,28 @@ function fromCard(s: GameState, cardId: string, joined: string): Student {
   };
 }
 
-const HISTORY_RARITY_WEIGHT: Record<Rarity, number> = { N: 60, R: 55, SR: 32, SSR: 13 };
-const PRESENT_RARITY_WEIGHT: Record<Rarity, number> = { N: 70, R: 24, SR: 6, SSR: 0 };
+const RARITY_WEIGHT: Record<Rarity, number> = { N: 60, R: 55, SR: 32, SSR: 13 };
 
-/** 現代の生徒を1人ランダムに引く（たまにレアな転校生） */
-function randomModern(s: GameState): Student {
-  const a = ARCHETYPES[weightedIndex(s, ARCHETYPES.map((x) => PRESENT_RARITY_WEIGHT[x.rarity]))];
-  return fromArchetype(s, a, joinedLabel(s));
+/** カードプールのID（偉人のカードID、または現代の生徒の 'm:<アーキタイプ>#<番号>'）から生徒を作る */
+function fromPoolId(s: GameState, id: string, joined: string): Student {
+  return isModernCard(id) ? fromArchetype(s, id, ARCHETYPE_MAP[archetypeOf(id)], joined) : fromCard(s, id, joined);
 }
 
-/** その時代の偉人を1人ランダムに引く。残っていなければ現代の生徒 */
-function randomPerson(s: GameState, eraIdx: number): Student {
+function rarityOf(id: string): Rarity {
+  return isModernCard(id) ? ARCHETYPE_MAP[archetypeOf(id)].rarity : CARD_MAP[id].rarity;
+}
+
+/** カードプールのIDがどの時代のものか */
+function eraOfId(id: string): EraId {
+  return isModernCard(id) ? 'present' : CARD_MAP[id].era;
+}
+
+/** その時代のカードプールから1人ランダムに引く（レアほど出にくい）。残っていなければ null */
+function randomPerson(s: GameState, eraIdx: number): Student | null {
   const pool = s.pools[ERAS[eraIdx].id];
-  if (pool.length === 0) return randomModern(s);
-  const id = pool[weightedIndex(s, pool.map((x) => HISTORY_RARITY_WEIGHT[CARD_MAP[x].rarity]))];
-  return fromCard(s, id, joinedLabel(s));
+  if (pool.length === 0) return null;
+  const id = pool[weightedIndex(s, pool.map((x) => RARITY_WEIGHT[rarityOf(x)]))];
+  return fromPoolId(s, id, joinedLabel(s));
 }
 
 function addStudent(s: GameState, p: Player, st: Student) {
@@ -224,12 +226,11 @@ function removeStudent(s: GameState, p: Player, uid: string, returnToPool: boole
 
 // ---------- 初期メンバー ----------
 
-/** 現代の生徒の山札から1枚引く（完全ランダム） */
+/** 現代のカードプールのNから1枚引く（完全ランダム） */
 function drawMember(s: GameState, pi: number): Student {
-  if (s.modernDeck.length === 0) s.modernDeck = shuffle(s, STARTER_ARCHETYPES.map((a) => a.id));
-  const id = s.modernDeck.pop()!;
-  const st = fromArchetype(s, ARCHETYPES.find((a) => a.id === id)!, '初期メンバー');
-  s.players[pi].students.push(st);
+  const ns = s.pools.present.filter((id) => rarityOf(id) === 'N');
+  const st = fromPoolId(s, pick(s, ns), '初期メンバー');
+  addStudent(s, s.players[pi], st);
   return st;
 }
 
@@ -271,7 +272,7 @@ export function currentEra(s: GameState): number {
   return s.yearEras[Math.max(1, t) - 1];
 }
 
-/** 山札：全時代共通のカード＋今学期の時代カード＋人物カード（その時代の偉人、足りなければ現代の生徒） */
+/** 山札：全時代共通のカード＋今学期の時代カード＋人物カード（その時代のカードプールから。プールが尽きていれば入らない） */
 function buildDeck(s: GameState): string[] {
   const era = ERAS[currentEra(s)].id;
   const deck: string[] = [];
@@ -281,7 +282,6 @@ function buildDeck(s: GameState): string[] {
   }
   const figures = shuffle(s, [...s.pools[era]]).slice(0, PERSON_CARDS_PER_TERM);
   for (const id of figures) deck.push(`person:${id}`);
-  for (let i = figures.length; i < PERSON_CARDS_PER_TERM; i++) deck.push('modern');
   return shuffle(s, deck);
 }
 
@@ -346,6 +346,10 @@ function startSummer(s: GameState) {
       continue;
     }
     const st = randomPerson(s, s.yearEras[1]);
+    if (!st) {
+      lines.push(`${p.name}：${era.name}の生徒はもう残っていない`);
+      continue;
+    }
     addStudent(s, p, st);
     students.push(st);
     lines.push(`${p.name} ← ${st.icon}${st.name}`);
@@ -480,22 +484,27 @@ function popCard(s: GameState): string {
   return s.eventDeck.pop()!;
 }
 
-const isPerson = (id: string) => id === 'modern' || id.startsWith('person:');
+const isPerson = (id: string) => id.startsWith('person:');
+const personId = (id: string) => id.slice('person:'.length);
+/** 人物カードの子がまだ誰のクラスにもいないか */
+const available = (s: GameState, id: string) => s.pools[eraOfId(personId(id))].includes(personId(id));
 
 function resolveDraw(s: GameState, pi: number) {
   const p = s.players[pi];
   let id = popCard(s);
-  // 満席なら人物カードは捨てて、もう1枚めくる
-  for (let guard = 0; isPerson(id) && p.students.length >= MAX_CLASS && guard < 50; guard++) {
+  // 満席なら人物カードは捨てて、もう1枚めくる（もう転入済みの子のカードも同様）
+  for (let guard = 0; isPerson(id) && (p.students.length >= MAX_CLASS || !available(s, id)); guard++) {
     s.discard.push(id);
+    if (guard >= 50) {
+      setResult(s, pi, { title: '満席', icon: '🪑', tone: 'personal', desc: '人物カードしか残っていなかった。', rows: [] }, 'turn');
+      return;
+    }
     log(s, `${p.name}のクラスは満席。人物カードを捨ててもう1枚めくる。`, pi);
     id = popCard(s);
   }
   // 人物カード：引いたらそのまま転入
-  if (isPerson(id) && p.students.length < MAX_CLASS) {
-    const cardId = id.slice('person:'.length);
-    const st = id !== 'modern' && s.pools[CARD_MAP[cardId].era].includes(cardId) ? fromCard(s, cardId, joinedLabel(s)) : randomModern(s);
-    welcome(s, pi, st, 'turn');
+  if (isPerson(id)) {
+    welcome(s, pi, fromPoolId(s, personId(id), joinedLabel(s)), 'turn');
     return;
   }
   s.discard.push(id);
@@ -618,4 +627,49 @@ export function step(prev: GameState, a: Action): GameState {
 
 export function finalRanking(s: GameState): Player[] {
   return [...s.players].sort((a, b) => b.points - a.points);
+}
+
+// ---------- 山札の内訳 ----------
+
+export interface DeckRow {
+  group: '通常' | 'イベント' | '時代イベント' | 'カチコミ' | '転校' | '人物';
+  icon: string;
+  name: string;
+  /** 山札に残っている枚数 */
+  left: number;
+  /** 捨て札にある枚数 */
+  used: number;
+}
+
+/** 今学期の山札の内訳（山札の残りと捨て札）。人物カードは1行にまとめる */
+export function deckBreakdown(s: GameState): DeckRow[] {
+  const era = ERAS[currentEra(s)];
+  const rows = new Map<string, DeckRow>();
+  const row = (key: string, init: () => Omit<DeckRow, 'left' | 'used'>) => {
+    if (!rows.has(key)) rows.set(key, { ...init(), left: 0, used: 0 });
+    return rows.get(key)!;
+  };
+  const define = (id: string) => {
+    if (isPerson(id)) return row('person', () => ({ group: '人物', icon: era.icon, name: `${era.name}の生徒（転入）` }));
+    const c = EVENT_MAP[id];
+    return row(id, () => {
+      switch (c.kind) {
+        case 'normal': {
+          const [name, icon] = ERA_NORMAL_NAMES[era.id][c.attr];
+          return { group: '通常', icon, name };
+        }
+        case 'contest':
+          return { group: c.era ? '時代イベント' : 'イベント', icon: c.icon, name: c.name };
+        case 'raid':
+          return { group: 'カチコミ', icon: ERA_RAIDERS[era.id][1], name: `${ERA_RAIDERS[era.id][0]}（強さ${c.threat}）` };
+        case 'push':
+          return { group: '転校', icon: c.icon, name: c.name };
+      }
+    });
+  };
+  // 並び順を固定するため、まず今学期に入りうるカードを全部登録しておく
+  for (const e of ALL_EVENT_CARDS) if (!(e.kind === 'contest' && e.era && e.era !== era.id)) define(e.id);
+  for (const id of s.eventDeck) define(id).left++;
+  for (const id of s.discard) define(id).used++;
+  return [...rows.values()].filter((r) => r.group !== '人物' || r.left + r.used > 0);
 }

@@ -51,11 +51,11 @@ export const CONTEST_POINTS: Record<number, number[]> = {
 /** イベントカード（引いた人だけ）の倍率 */
 export const EVENT_MULT = 1;
 
-/** 学期ごとの山札に入る人物カードの枚数（その時代の偉人が足りなければ現代の生徒で埋める） */
+/** 学期ごとの山札に入る人物カードの最大枚数（その時代のカードプールに残っている分だけ） */
 export const PERSON_CARDS_PER_TERM = 7;
 
 const N = (attr: Attr, count: number): NormalCard => ({ id: `n_${attr}`, kind: 'normal', attr, count });
-export const NORMAL_CARDS: NormalCard[] = [N('study', 3), N('sports', 3), N('art', 3), N('charm', 2), N('fight', 1)];
+export const NORMAL_CARDS: NormalCard[] = [N('study', 5), N('sports', 5), N('art', 5), N('charm', 4), N('fight', 2)];
 
 /** 時代ごとの通常カードの名前と絵柄（効果はどれも同じ） */
 export const ERA_NORMAL_NAMES: Record<EraId, Record<Attr, [string, string]>> = {
