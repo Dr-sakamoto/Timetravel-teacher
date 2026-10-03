@@ -109,7 +109,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 9;
+  version: 10;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */

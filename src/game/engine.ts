@@ -104,7 +104,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   const s: GameState = {
-    version: 9,
+    version: 10,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
