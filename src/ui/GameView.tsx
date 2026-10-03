@@ -5,7 +5,7 @@ import { MONTHS, actingPlayer, pushTargets, termOfMonth } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 import { Center } from './Center';
 import { GameOver } from './GameOver';
-import { Playmat } from './Playmat';
+import { OpponentSeat, Playmat } from './Playmat';
 import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
 
@@ -16,20 +16,6 @@ interface Props {
   onRules: () => void;
 }
 
-/** 卓の配置：手前以外のプレイヤーを左・奥・右に座らせる */
-function seating(others: number[]): { left: number[]; top: number[]; right: number[] } {
-  switch (others.length) {
-    case 1:
-      return { left: [], top: others, right: [] };
-    case 2:
-      return { left: [others[0]], top: [], right: [others[1]] };
-    case 3:
-      return { left: [others[0]], top: [others[1]], right: [others[2]] };
-    default:
-      return { left: [others[0]], top: others.slice(1, -1), right: [others[others.length - 1]] };
-  }
-}
-
 export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const ph = state.phase;
   const actor = actingPlayer(state);
@@ -37,6 +23,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const [speed, setSpeed] = useState<'normal' | 'fast'>('normal');
   const [showLog, setShowLog] = useState(false);
   const [portraitOk, setPortraitOk] = useState(false);
+  /** タップして中身を見ている相手 */
+  const [peek, setPeek] = useState<number | null>(null);
   const [focus, setFocus] = useState(() => state.players.find((p) => !p.isCpu)?.id ?? 0);
   const [push, setPush] = useState<{ uid: string | null; target: number | null }>({ uid: null, target: null });
   const logRef = useRef<HTMLDivElement>(null);
@@ -77,9 +65,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
 
   const n = state.players.length;
   const others = Array.from({ length: n - 1 }, (_, i) => (focus + 1 + i) % n);
-  const seat = seating(others);
   const deltas = new Map<number, number>();
-  // 今のイベントに関わったカード：相手の教室でもこれだけ表に返して見せる
+  // 今のイベントに関わったカード（光らせる。相手の席には絵柄を出す）
   const lit = new Set<string>();
   if (ph.kind === 'result') {
     for (const r of ph.result.rows) {
@@ -93,20 +80,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
 
   const pushing = ph.kind === 'push' && !cpuTurn && ph.player === focus;
   const targets = pushing ? pushTargets(state, ph.player) : [];
-  const far = (pi: number) => (
-    <Playmat
-      key={pi}
-      player={state.players[pi]}
-      year={state.year}
-      near={false}
-      acting={actor === pi}
-      delta={deltas.get(pi)}
-      lit={lit}
-      targetable={targets.includes(pi)}
-      targeted={push.target === pi}
-      onTarget={() => setPush((x) => ({ ...x, target: pi }))}
-    />
-  );
+  // 手番の人が相手なら、その人の教室を卓の中央に出す
+  const stage = actor !== null && actor !== focus ? actor : null;
   const me = state.players[focus];
   const editingRoles = ph.kind === 'roles' && ph.player === focus && !me.isCpu;
 
@@ -141,11 +116,36 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
         </div>
       </header>
 
-      <div className={`felt seats-${n}`}>
-        <div className="side left">{seat.left.map(far)}</div>
-        <div className="side top">{seat.top.map(far)}</div>
-        <div className="side right">{seat.right.map(far)}</div>
-        <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn} push={push} />
+      <div className="felt">
+        <div className="opponents">
+          {others.map((pi) => (
+            <OpponentSeat
+              key={pi}
+              player={state.players[pi]}
+              year={state.year}
+              acting={actor === pi}
+              delta={deltas.get(pi)}
+              litIcons={state.players[pi].students.filter((st) => lit.has(st.uid)).map((st) => st.icon)}
+              targetable={targets.includes(pi)}
+              targeted={push.target === pi}
+              onClick={() => (targets.includes(pi) ? setPush((x) => ({ ...x, target: pi })) : setPeek(pi))}
+            />
+          ))}
+        </div>
+        <div className={`stage ${stage !== null ? 'with-mat' : ''}`}>
+          {stage !== null && (
+            <Playmat
+              key={stage}
+              player={state.players[stage]}
+              year={state.year}
+              variant="stage"
+              acting
+              delta={deltas.get(stage)}
+              lit={lit}
+            />
+          )}
+          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn} push={push} />
+        </div>
         <div className="near-seat">
           {editingRoles ? (
             <RoleEditor
@@ -158,7 +158,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
             <Playmat
               player={me}
               year={state.year}
-              near
+              variant="near"
               acting={actor === focus}
               delta={deltas.get(focus)}
               lit={lit}
@@ -168,6 +168,17 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
           )}
         </div>
       </div>
+
+      {peek !== null && (
+        <div className="modal-back" onClick={() => setPeek(null)}>
+          <div className="peek" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
+              ✕
+            </button>
+            <Playmat player={state.players[peek]} year={state.year} variant="peek" delta={deltas.get(peek)} lit={lit} />
+          </div>
+        </div>
+      )}
 
       {!portraitOk && (
         <div className="rotate-hint">

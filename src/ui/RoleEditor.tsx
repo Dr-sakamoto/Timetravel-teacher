@@ -46,7 +46,7 @@ export function RoleEditor({ player, year, onConfirm }: Props) {
       <Playmat
         player={player}
         year={year}
-        near
+        variant="near"
         acting
         roles={roles}
         activeSlot={active}

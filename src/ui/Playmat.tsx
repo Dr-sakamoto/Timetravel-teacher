@@ -8,15 +8,11 @@ import { TcgCard } from './TcgCard';
 interface Props {
   player: Player;
   year: number;
-  /** 手前（大きく表示）か、向かい側（コンパクト） */
-  near: boolean;
+  /** near＝手前の自分の教室／stage＝手番の人の教室（卓の中央）／peek＝タップで開いた教室 */
+  variant: 'near' | 'stage' | 'peek';
   acting?: boolean;
   /** 直前のイベントでの得点 */
   delta?: number;
-  /** 転校の押しつけ先として選べる */
-  targetable?: boolean;
-  targeted?: boolean;
-  onTarget?: () => void;
   activeSlot?: number;
   onSlotClick?: (i: number) => void;
   onSeatClick?: (uid: string) => void;
@@ -24,22 +20,18 @@ interface Props {
   dimUid?: (uid: string) => boolean;
   /** 係決めの下書き */
   roles?: (string | null)[];
-  /** 今のイベントに関わった生徒。相手の教室ではこのカードだけ表に返る */
+  /** 今のイベントに関わった生徒（光らせる） */
   lit?: Set<string>;
 }
 
-/** 教室プレイマット：名札・係ボード・12の座席。相手の教室は裏向きで、イベントに関わったカードだけ表に返る */
+/** 教室プレイマット：名札・係ボード・12の座席 */
 export function Playmat(props: Props) {
-  const { player, year, near, acting, delta, targetable, targeted, onTarget } = props;
+  const { player, year, variant, acting, delta } = props;
   const view: Player = props.roles ? { ...player, roles: props.roles } : player;
   const k = roleSlots(view);
   const seats = Array.from({ length: MAX_CLASS }, (_, i) => view.students[i] ?? null);
   return (
-    <div
-      className={`playmat ${near ? 'near' : 'far'} ${acting ? 'acting' : ''} ${targetable ? 'targetable' : ''} ${targeted ? 'targeted' : ''}`}
-      style={{ '--pc': player.color } as CSSProperties}
-      onClick={targetable ? onTarget : undefined}
-    >
+    <div className={`playmat near pm-${variant} ${acting ? 'acting' : ''}`} style={{ '--pc': player.color } as CSSProperties}>
       <div className="plate">
         <span className="plate-name">
           {player.name}
@@ -56,40 +48,35 @@ export function Playmat(props: Props) {
           </span>
         )}
       </div>
-      {near && (
-        <div className="roleboard">
-          {ROLE_ORDER.map((r, i) => {
-            const locked = i >= k;
-            const st = view.students.find((s) => s.uid === view.roles[i]);
-            return (
-              <button
-                key={r}
-                className={`role-slot ${locked ? 'locked' : ''} ${props.activeSlot === i ? 'active' : ''}`}
-                disabled={locked || !props.onSlotClick}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  props.onSlotClick?.(i);
-                }}
-                title={locked ? `${slotUnlockAt(i)}人で解放` : `${ROLES[r].name}：${roleDesc(r)}`}
-              >
-                <span>{locked ? '🔒' : ROLES[r].icon}</span>
-                {near && <span className="role-name">{locked ? `${slotUnlockAt(i)}人` : roleDesc(r)}</span>}
-                {!locked && <span className="role-who">{st ? st.icon : '·'}</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <div className="roleboard">
+        {ROLE_ORDER.map((r, i) => {
+          const locked = i >= k;
+          const st = view.students.find((s) => s.uid === view.roles[i]);
+          return (
+            <button
+              key={r}
+              className={`role-slot ${locked ? 'locked' : ''} ${props.activeSlot === i ? 'active' : ''}`}
+              disabled={locked || !props.onSlotClick}
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onSlotClick?.(i);
+              }}
+              title={locked ? `${slotUnlockAt(i)}人で解放` : `${ROLES[r].name}：${roleDesc(r)}`}
+            >
+              <span>{locked ? '🔒' : ROLES[r].icon}</span>
+              <span className="role-name">{locked ? `${slotUnlockAt(i)}人` : roleDesc(r)}</span>
+              {!locked && <span className="role-who">{st ? st.icon : '·'}</span>}
+            </button>
+          );
+        })}
+      </div>
       <div className="seats">
         {seats.map((st, i) => (
           <div key={st?.uid ?? `e${i}`} className={`seat ${st ? '' : 'empty'}`}>
-            {st && !near && !props.lit?.has(st.uid) ? (
-              <span className="card-back" />
-            ) : st ? (
+            {st ? (
               <TcgCard
                 student={st}
                 owner={view}
-                size={near ? 'full' : 'mini'}
                 lit={props.lit?.has(st.uid)}
                 selected={props.selectedUid === st.uid}
                 dim={props.dimUid?.(st.uid)}
@@ -102,5 +89,54 @@ export function Playmat(props: Props) {
         ))}
       </div>
     </div>
+  );
+}
+
+interface SeatProps {
+  player: Player;
+  year: number;
+  acting: boolean;
+  delta?: number;
+  /** 今のイベントに関わったこの人の生徒 */
+  litIcons: string[];
+  targetable: boolean;
+  targeted: boolean;
+  onClick: () => void;
+}
+
+/** 相手の席：名札だけのコンパクト表示。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
+export function OpponentSeat({ player, year, acting, delta, litIcons, targetable, targeted, onClick }: SeatProps) {
+  return (
+    <button
+      className={`opp ${acting ? 'acting' : ''} ${targetable ? 'targetable' : ''} ${targeted ? 'targeted' : ''}`}
+      style={{ '--pc': player.color } as CSSProperties}
+      onClick={onClick}
+      title={targetable ? `${player.name}に押しつける` : `${player.name}の教室を見る`}
+    >
+      <span className="opp-name">
+        {player.name}
+        {player.isCpu && <small>🤖</small>}
+      </span>
+      <span className="opp-class">
+        {className(player.id, year)} 👥{player.students.length}
+      </span>
+      {litIcons.length > 0 && (
+        <span className="opp-lit">
+          {litIcons.slice(0, 6).map((ic, i) => (
+            <span key={i} style={{ animationDelay: `${i * 60}ms` }}>
+              {ic}
+            </span>
+          ))}
+          {litIcons.length > 6 && <small>+{litIcons.length - 6}</small>}
+        </span>
+      )}
+      <span className="opp-pts">{player.points}</span>
+      {delta !== undefined && delta !== 0 && (
+        <span className={`plate-delta ${delta > 0 ? 'up' : 'down'}`} key={`${delta}-${player.points}`}>
+          {delta > 0 ? '+' : ''}
+          {delta}
+        </span>
+      )}
+    </button>
   );
 }

@@ -275,14 +275,10 @@ h3 {
 
 /* ---------- 卓 ---------- */
 .felt {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1fr);
-  grid-template-areas:
-    'left top right'
-    'left center right'
-    'near near near';
-  gap: 0.7rem;
-  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.8rem;
   border-radius: 28px;
   border: 14px solid var(--rim);
   background:
@@ -292,38 +288,91 @@ h3 {
     0 12px 30px rgba(0, 0, 0, 0.5),
     inset 0 0 0 3px #8a5a33;
 }
-.felt.seats-2 {
-  grid-template-areas:
-    'top top top'
-    'center center center'
-    'near near near';
-}
-.side {
+/* 相手の席：名札だけ */
+.opponents {
   display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.opp {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  font: inherit;
+  color: var(--chalk);
+  background: #24453a;
+  border: 3px solid var(--pc);
+  border-radius: 10px;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.opp:hover {
+  background: #2c5446;
+}
+.opp.acting {
+  box-shadow:
+    0 0 0 3px var(--yellow),
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.opp.targetable {
+  animation: glow 1.2s ease-in-out infinite;
+}
+.opp.targeted {
+  outline: 4px solid var(--yellow);
+}
+.opp-name {
+  font-weight: 900;
+  white-space: nowrap;
+}
+.opp-class {
+  font-size: 0.72rem;
+  color: var(--chalk-dim);
+  white-space: nowrap;
+}
+.opp-pts {
+  font-weight: 900;
+  font-size: 1.2rem;
+  color: var(--yellow);
+}
+.opp-pts::after {
+  content: 'pt';
+  font-size: 0.6em;
+}
+.opp-lit {
+  display: flex;
+  gap: 1px;
+  background: rgba(246, 216, 96, 0.2);
+  border-radius: 999px;
+  padding: 0 0.3rem;
+}
+.opp-lit > span {
+  animation: pop-in 0.35s ease-out both;
+}
+@keyframes pop-in {
+  from {
+    transform: scale(0.2) translateY(6px);
+    opacity: 0;
+  }
+}
+/* 卓の中央：手番の人の教室と、山札・めくったカード */
+.stage {
+  flex: 1;
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
   min-width: 0;
 }
-.side.left {
-  grid-area: left;
-}
-.side.right {
-  grid-area: right;
-}
-.side.top {
-  grid-area: top;
-  flex-direction: row;
-  justify-content: center;
-}
-.side.top > * {
-  flex: 1 1 0;
-  max-width: 520px;
-}
-.side:empty {
-  display: none;
+.stage > .playmat {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .center {
-  grid-area: center;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -334,27 +383,40 @@ h3 {
   background: radial-gradient(ellipse, rgba(255, 255, 255, 0.05), transparent 70%);
 }
 .near-seat {
-  grid-area: near;
   min-width: 0;
 }
+.playmat.pm-stage .seats {
+  grid-template-columns: repeat(6, minmax(0, 84px));
+  gap: 0.5rem 0.4rem;
+}
+.playmat.pm-stage .roleboard {
+  max-width: 560px;
+}
+.playmat.pm-stage .tcg-type,
+.playmat.pm-stage .tcg-foot,
+.playmat.pm-peek .tcg-foot {
+  display: none;
+}
+.peek {
+  position: relative;
+  width: min(900px, 96vw);
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+.peek .modal-close {
+  position: absolute;
+  top: -0.6rem;
+  right: -0.6rem;
+  z-index: 5;
+}
 @media (max-width: 1000px) {
-  .felt,
-  .felt.seats-2 {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'top' 'left' 'right' 'center' 'near';
+  .felt {
     border-width: 8px;
     padding: 0.5rem;
     border-radius: 18px;
   }
-  .side.top {
-    flex-wrap: wrap;
-  }
-  .side.left,
-  .side.right {
-    flex-direction: row;
-  }
-  .side > * {
-    flex: 1 1 260px;
+  .stage {
+    flex-direction: column;
   }
 }
 
@@ -1293,42 +1355,112 @@ h3 {
   }
 
   /* 卓 */
-  .felt,
-  .felt.seats-2 {
+  .felt {
     flex: 1;
     min-height: 0;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      'left top right'
-      'left center right'
-      'near near near';
-    gap: 0.25rem 0.35rem;
+    gap: 0.3rem;
     padding: 0.3rem;
     border-width: 5px;
     border-radius: 14px;
   }
-  .felt.seats-2 {
-    grid-template-areas:
-      'top top top'
-      'center center center'
-      'near near near';
+  .opponents {
+    gap: 0.3rem;
+    flex-wrap: nowrap;
   }
-  .side {
-    gap: 0.25rem;
-    min-height: 0;
-    overflow: hidden;
+  .opp {
+    gap: 0.3rem;
+    padding: 0 0.4rem;
+    border-width: 2px;
+    border-radius: 7px;
+    font-size: 0.72rem;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   }
-  .side.left,
-  .side.right {
-    flex-direction: column;
+  .opp-class {
+    font-size: 0.56rem;
   }
-  .side > *,
-  .side.top > * {
+  .opp {
     flex: 0 1 auto;
   }
-  .side.top {
-    flex-wrap: nowrap;
+  .opp-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* 相手が4人いるときはクラス名を省いて詰める */
+  .opponents:has(> :nth-child(4)) .opp-class {
+    display: none;
+  }
+  .opp-pts {
+    font-size: 0.9rem;
+  }
+  .opp .plate-delta {
+    font-size: 0.75rem;
+    top: -0.75rem;
+  }
+  .stage {
+    flex-direction: row;
+    gap: 0.4rem;
+    align-items: stretch;
+  }
+  .stage > .center {
+    flex: 1 1 0;
+  }
+  /* 手番の人の教室：12席を2列 */
+  .playmat.pm-stage {
+    flex: 0 1 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 0.2rem 0.25rem;
+    border-width: 2px;
+  }
+  .playmat.pm-stage .roleboard {
+    margin: 0.15rem 0;
+    gap: 0.15rem;
+  }
+  .playmat.pm-stage .role-slot {
+    font-size: 0.56rem;
+    padding: 0 0.1rem;
+    border-width: 1px;
+  }
+  .playmat.pm-stage .role-name {
+    display: none;
+  }
+  .playmat.pm-stage .seats {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: repeat(6, minmax(0, 12dvh));
+    gap: 0.15rem;
+  }
+  .playmat.pm-stage .tcg-head {
+    min-height: 0;
+    padding: 0 2px;
+  }
+  .playmat.pm-stage .tcg-name {
+    font-size: 0.45rem;
+    -webkit-line-clamp: 1;
+  }
+  .playmat.pm-stage .tcg-art {
+    font-size: 0.95rem;
+    margin: 1px;
+  }
+  .playmat.pm-stage .tcg-attrs {
+    padding: 0;
+    gap: 0;
+    min-height: 0;
+  }
+  .playmat.pm-stage .tcg-attr,
+  .playmat.pm-stage .tcg-attrs.n4 .tcg-attr,
+  .playmat.pm-stage .tcg-attrs.n5 .tcg-attr {
+    font-size: 0.5rem;
+    padding: 0;
+  }
+  .playmat.pm-stage .tcg-role {
+    font-size: 0.4rem;
+    top: -5px;
+    padding: 0 0.15rem;
+    border-width: 1px;
+  }
+  .peek {
+    max-height: 94dvh;
   }
 
   /* 教室プレイマット（共通） */
@@ -1367,7 +1499,7 @@ h3 {
     padding-bottom: 3px;
   }
   .seat::after,
-  .playmat.near .seat::after {
+  :is(.near-seat, .peek) .playmat .seat::after {
     height: 5px;
     box-shadow: 0 1px 0 #8a6236;
   }
@@ -1376,45 +1508,8 @@ h3 {
     border-radius: 4px;
   }
 
-  /* 相手の教室：係ボードは省略（カードの係バッジで分かる） */
-  .playmat.far .roleboard {
-    display: none;
-  }
-  .playmat.far .plate {
-    margin-bottom: 0.2rem;
-  }
-  .playmat.far .seats {
-    gap: 0.2rem 0.15rem;
-    justify-content: center;
-  }
-  .side.left .playmat.far .seats,
-  .side.right .playmat.far .seats {
-    grid-template-columns: repeat(4, minmax(0, 36px));
-  }
-  .side.top .playmat.far .seats {
-    grid-template-columns: repeat(12, minmax(0, 32px));
-  }
-  .felt.seats-5 .side.top .playmat.far .seats {
-    grid-template-columns: repeat(6, minmax(0, 28px));
-  }
-  .tcg.mini {
-    padding: 1px;
-    border-radius: 4px;
-  }
-  .tcg.mini .tcg-art {
-    font-size: 0.85rem;
-  }
-  .tcg.mini .tcg-attr {
-    font-size: 0.4rem;
-    padding: 0;
-  }
-  .tcg.mini .tcg-role {
-    font-size: 0.4rem;
-    top: -4px;
-  }
-
   /* 手前の教室：名札と係ボードを1行に、座席は12席を1列に */
-  .playmat.near {
+  :is(.near-seat, .peek) .playmat {
     padding: 0.25rem 0.3rem 0.15rem;
     border-width: 3px;
     display: grid;
@@ -1424,63 +1519,63 @@ h3 {
       'seats seats';
     column-gap: 0.4rem;
   }
-  .playmat.near .plate {
+  :is(.near-seat, .peek) .playmat .plate {
     grid-area: plate;
   }
-  .playmat.near .roleboard {
+  :is(.near-seat, .peek) .playmat .roleboard {
     grid-area: roles;
     grid-template-columns: repeat(6, minmax(0, 1fr));
     max-width: none;
     margin: 0;
     gap: 0.2rem;
   }
-  .playmat.near .role-slot {
+  :is(.near-seat, .peek) .playmat .role-slot {
     font-size: 0.68rem;
     padding: 0 0.15rem;
     border-width: 1px;
   }
-  .playmat.near .role-name {
+  :is(.near-seat, .peek) .playmat .role-name {
     display: inline;
     font-size: 0.56rem;
   }
-  .playmat.near .seats {
+  :is(.near-seat, .peek) .playmat .seats {
     grid-area: seats;
     grid-template-columns: repeat(12, minmax(0, 15dvh));
     justify-content: center;
     gap: 0.2rem;
     margin-top: 0.45rem;
   }
-  .playmat.near .tcg {
+  :is(.near-seat, .peek) .playmat .tcg {
     max-width: none;
   }
-  .playmat.near .tcg-type,
-  .playmat.near .tcg-foot {
+  :is(.near-seat, .peek) .playmat .tcg-type,
+  :is(.near-seat, .peek) .playmat .tcg-foot {
     display: none;
   }
-  .playmat.near .tcg-head {
+  :is(.near-seat, .peek) .playmat .tcg-head {
     min-height: 0;
     padding: 1px 2px;
   }
-  .playmat.near .tcg-name {
+  :is(.near-seat, .peek) .playmat .tcg-name {
     font-size: 0.5rem;
     -webkit-line-clamp: 1;
   }
-  .playmat.near .tcg-art {
+  :is(.near-seat, .peek) .playmat .tcg-art {
     font-size: 1.15rem;
     margin: 1px;
   }
-  .playmat.near .tcg-attrs {
+  :is(.near-seat, .peek) .playmat .tcg-attrs {
     gap: 1px;
     padding: 1px;
     min-height: 0;
   }
-  .playmat.near .tcg-attr,
-  .playmat.near .tcg-attrs.n4 .tcg-attr,
-  .playmat.near .tcg-attrs.n5 .tcg-attr {
+  :is(.near-seat, .peek) .playmat .tcg-attr,
+  :is(.near-seat, .peek) .playmat .tcg-attrs.n4 .tcg-attr,
+  :is(.near-seat, .peek) .playmat .tcg-attrs.n5 .tcg-attr {
     font-size: 0.6rem;
     padding: 0;
   }
-  .playmat.near .tcg-role {
+  :is(.near-seat, .peek) .playmat .tcg-role {
     font-size: 0.45rem;
     top: -6px;
     padding: 0 0.25rem;
@@ -1670,42 +1765,11 @@ h3 {
   }
 }
 
-/* ---------- 相手のカードは裏向き。イベントに関わったカードだけ表に返す ---------- */
-.card-back {
-  display: block;
-  width: 100%;
-  aspect-ratio: 5 / 7;
-  border-radius: 5px;
-  border: 2px solid #e9d9b0;
-  background:
-    radial-gradient(circle, rgba(246, 216, 96, 0.35) 0 22%, transparent 24%),
-    repeating-linear-gradient(45deg, #2c4a7a, #2c4a7a 4px, #22395f 4px, #22395f 8px);
-  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
-}
-.playmat.far .tcg.lit {
-  z-index: 5;
-  transform-origin: 50% 10%;
-  animation:
-    flip-in 0.45s ease-out both,
-    lit-pop 0.45s 0.45s ease-out both;
-}
-@keyframes flip-in {
-  from {
-    transform: perspective(300px) rotateY(90deg);
-    filter: brightness(0.6);
-  }
-}
-@keyframes lit-pop {
-  to {
-    transform: scale(1.35);
-  }
-}
+/* ---------- 今のイベントに関わったカードを光らせる ---------- */
 .tcg.lit {
   box-shadow:
     0 0 0 2px var(--yellow),
     0 0 14px rgba(246, 216, 96, 0.9);
-}
-.playmat.near .tcg.lit {
   animation: lit-bob 0.5s ease-out both;
 }
 @keyframes lit-bob {
@@ -1714,31 +1778,5 @@ h3 {
   }
   to {
     transform: translateY(-4px);
-  }
-}
-@media (orientation: landscape) and (max-height: 600px) {
-  .side {
-    overflow: visible;
-  }
-  .card-back {
-    border-width: 1px;
-    border-radius: 3px;
-  }
-  @keyframes lit-pop {
-    to {
-      transform: scale(1.7);
-    }
-  }
-}
-@media (orientation: landscape) and (max-height: 600px) {
-  .side.top .playmat.far .tcg.lit {
-    animation:
-      flip-in 0.45s ease-out both,
-      lit-pop-sm 0.45s 0.45s ease-out both;
-  }
-  @keyframes lit-pop-sm {
-    to {
-      transform: scale(1.25);
-    }
   }
 }

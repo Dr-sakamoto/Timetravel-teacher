@@ -96,7 +96,7 @@ function Action({ state, dispatch, cpuBusy, push }: Props) {
       const targets = pushTargets(state, ph.player);
       return (
         <div className="say">
-          📦 {who} の転校 — 手前の教室から生徒を選び、押しつける相手のマットをタップ
+          📦 {who} の転校 — 手前の教室から生徒を選び、押しつける相手の名札をタップ
           <div className="say-sub">
             {targets.map((t) => (
               <span key={t} className={`chip ${push.target === t ? 'on' : ''}`} style={{ borderColor: state.players[t].color }}>
