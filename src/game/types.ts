@@ -126,7 +126,7 @@ export type Phase =
   | { kind: 'draw'; player: number }
   /** 転校：全クラスが順番に、係に就いていない生徒を1人ずつクラスから外す（player は今選んでいる人、left はこの後に選ぶ人） */
   | { kind: 'push'; player: number; drawer: number; left: number[]; gone: Student[] }
-  /** 突撃：他のクラスを1つ選んで、自分の👊の数×3だけ減点させる */
+  /** カチコミ：他のクラスを1つ選んで、自分の👊の数×3だけ減点させる */
   | { kind: 'kachikomi'; player: number }
   /** クラス替え：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える */
   | { kind: 'exchange'; player: number }

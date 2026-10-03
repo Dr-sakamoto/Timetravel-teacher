@@ -12,7 +12,7 @@ interface Props {
   state: GameState;
   dispatch: (a: Action) => void;
   cpuBusy: boolean;
-  /** 転校・突撃・クラス替え・グッズで選んだもの */
+  /** 転校・カチコミ・クラス替え・グッズで選んだもの */
   pick: Pick;
   /** 得点演出の明細（襲来）。点数表の上に出す */
   side?: ReactNode;
@@ -127,14 +127,14 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
       const target = pick.target !== null ? state.players[pick.target] : null;
       return (
         <div className="say">
-          👊 {who} の突撃 — 突撃する相手の名札をタップ（相手は−{power}）
+          👊 {who} のカチコミ — 殴りこむ相手の名札をタップ（相手は−{power}）
           <div className="say-sub">→ {target ? target.name : '相手：未選択'}</div>
           <div className="say-sub">
             <button className="btn ghost" onClick={() => dispatch({ type: 'kachikomi', target: null })}>
               やめる
             </button>
             <button className="btn primary" disabled={pick.target === null} onClick={() => dispatch({ type: 'kachikomi', target: pick.target })}>
-              突撃する
+              カチコむ
             </button>
           </div>
         </div>

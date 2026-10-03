@@ -10,7 +10,7 @@ export interface NormalCard {
   count: number;
 }
 
-/** 突撃：めくった人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させる */
+/** カチコミ：めくった人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させる */
 export interface KachikomiCard {
   id: string;
   kind: 'kachikomi';
@@ -139,7 +139,7 @@ export const NORMAL_CARDS: NormalCard[] = [
   N('charm', '学活の時間', '🙋', 4),
 ];
 
-export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: '突撃', icon: '👊', mult: 3, count: 3 }];
+export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, count: 3 }];
 
 const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | 'heads' | undefined, desc: string, offsetOnly?: boolean): SwingCard => ({
   id, kind: 'swing', name, icon, plus, minus, offsetOnly, desc, count: 1,

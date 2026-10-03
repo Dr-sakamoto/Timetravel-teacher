@@ -200,10 +200,13 @@ describe('engine', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('every figure and transfer student has a different set of icons', () => {
+  it('every figure and transfer student has a different set of icons (dinosaurs are 👊 only)', () => {
     const key = (attrs: Attr[]) => [...attrs].sort().join(',');
+    // 恐竜は👊の個数だけのキャラなので、組み合わせの重複は許す
+    const dinos = CARDS.filter((c) => c.tags.includes('恐竜'));
+    for (const d of dinos) expect(d.attrs.every((x) => x === 'fight'), d.name).toBe(true);
     const all = [
-      ...CARDS.map((c) => ({ name: c.name, k: key(c.attrs) })),
+      ...CARDS.filter((c) => !c.tags.includes('恐竜')).map((c) => ({ name: c.name, k: key(c.attrs) })),
       ...ARCHETYPES.filter((a) => a.rarity !== 'N').map((a) => ({ name: a.title, k: key(toIcons(a.attrs, a.rarity, a.power)) })),
     ];
     for (const x of all) expect(all.filter((y) => y.k === x.k).map((y) => y.name), x.name).toEqual([x.name]);
@@ -243,7 +246,7 @@ describe('engine', () => {
     expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(3 - 4);
   });
 
-  it('totsugeki (kachikomi) takes 3× the drawer\'s 👊 count from the chosen school', () => {
+  it('kachikomi takes 3× the drawer\'s 👊 count from the chosen school', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
