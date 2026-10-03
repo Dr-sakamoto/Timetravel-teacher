@@ -243,7 +243,7 @@ describe('engine', () => {
     expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(3 - 4);
   });
 
-  it('kachikomi takes the drawer\'s 👊 count from the chosen school', () => {
+  it('totsugeki (kachikomi) takes 3× the drawer\'s 👊 count from the chosen school', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -255,7 +255,7 @@ describe('engine', () => {
     const k = step(t, { type: 'drawEvent' });
     expect(k.phase.kind).toBe('kachikomi');
     const done = step(k, { type: 'kachikomi', target });
-    expect(done.players[target].points - t.players[target].points).toBe(-3);
+    expect(done.players[target].points - t.players[target].points).toBe(-9);
     expect(done.players[pi].points).toBe(t.players[pi].points);
     // 👊がいなければカチコミに行けない
     const u = structuredClone(t);

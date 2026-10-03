@@ -10,12 +10,14 @@ export interface NormalCard {
   count: number;
 }
 
-/** カチコミ：めくった人が他のクラスを1つ選び、自分のクラスの👊の数だけそのクラスを減点させる */
+/** 突撃：めくった人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させる */
 export interface KachikomiCard {
   id: string;
   kind: 'kachikomi';
   name: string;
   icon: string;
+  /** 減点の倍率 */
+  mult: number;
   count: number;
 }
 
@@ -137,7 +139,7 @@ export const NORMAL_CARDS: NormalCard[] = [
   N('charm', '学活の時間', '🙋', 4),
 ];
 
-export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', count: 3 }];
+export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: '突撃', icon: '👊', mult: 3, count: 3 }];
 
 const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | 'heads' | undefined, desc: string, offsetOnly?: boolean): SwingCard => ({
   id, kind: 'swing', name, icon, plus, minus, offsetOnly, desc, count: 1,
@@ -293,7 +295,7 @@ export function cardRule(c: EventCard): string {
     case 'normal':
       return `めくった人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return '他のクラスを1つ選び、自分のクラスの👊の数だけ減点させる';
+      return `他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
     case 'swing':
       if (!c.minus) return `全クラス：クラス全員の${ATTR_ICON[c.plus]}の数を加点`;
       if (c.offsetOnly) return `全クラス：${ATTR_ICON[c.minus === 'heads' ? c.plus : c.minus]}の数だけ減点。${ATTR_ICON[c.plus]}の数だけ打ち消す（プラスにはならない）`;

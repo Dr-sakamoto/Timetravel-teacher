@@ -135,7 +135,7 @@ function counter(c: FxCtx, body: ReactNode, cls = '', key?: number): ReactNode {
 const FINALE_FLY = 550;
 const finaleLength = (card: FxCard) => (isRaid(card) ? 900 : 250) + FINALE_FLY;
 
-/** 最後に合計点が名札へ飛ぶ（カチコミは敵の強さとの差を出してから） */
+/** 最後に合計点が名札へ飛ぶ（襲来は敵の強さとの差を出してから） */
 function finale(c: FxCtx, from: Pt, t0: number, f: Frame) {
   const { t, delta, total, card, rects } = c;
   if (t < t0) return;

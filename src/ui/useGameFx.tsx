@@ -54,7 +54,7 @@ function planOf(s: GameState): Plan | null {
   return { pid, variant, base, others, othersAt, length: others.size ? Math.max(own, othersAt + 400) : own };
 }
 
-/** 今めくられたカードの得点演出。演出のないカード（学校行事・転入・カチコミなど）なら null */
+/** 今めくられたカードの得点演出。演出のないカード（学校行事・転入・突撃など）なら null */
 export function useGameFx(state: GameState, root: RefObject<HTMLElement>, scale: number): GameFx | null {
   const result = state.phase.kind === 'result' ? state.phase.result : null;
   // 結果が変わったときだけ計画し直す（演出中は毎フレーム描き直すので）

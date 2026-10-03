@@ -83,7 +83,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const term = termOfMonth(month);
   const slots = slotsNow(state);
 
-  // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ（転校は自分の生徒だけ）
+  // 転校・突撃・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ（転校は自分の生徒だけ）
   const choosing = (ph.kind === 'push' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg') && !cpuTurn && ph.player === focus ? ph.kind : null;
   const targets =
     choosing === 'kachikomi' ? kachikomiTargets(state, focus)

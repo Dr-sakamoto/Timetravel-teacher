@@ -3,6 +3,7 @@ import { CARDS, CARD_MAP, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX, favorLabel } from './data/eras';
 import {
   ALL_EVENT_CARDS,
+  KACHIKOMI_CARDS,
   CONTEST_POINTS,
   CYBORG_ATTRS,
   EVENT_MAP,
@@ -553,7 +554,7 @@ export function equippable(p: Player): Student[] {
   return p.students.filter((x) => !x.goods);
 }
 
-/** カチコミの相手 */
+/** 突撃の相手 */
 export function kachikomiTargets(s: GameState, pi: number): number[] {
   return s.players.filter((p) => p.id !== pi).map((p) => p.id);
 }
@@ -640,7 +641,7 @@ function resolveDraw(s: GameState, pi: number) {
       setResult(s, pi, resolveRaid(s, c), 'turn');
       return;
     case 'kachikomi':
-      if (attrScore(p, 'fight').total === 0) personal('👊を持つ子がいないので、カチコミに行けなかった。');
+      if (attrScore(p, 'fight').total === 0) personal('👊を持つ子がいないので、突撃できなかった。');
       else s.phase = { kind: 'kachikomi', player: pi };
       return;
     case 'goods':
@@ -743,23 +744,24 @@ export function step(prev: GameState, a: Action): GameState {
       if (ph.kind !== 'kachikomi') return prev;
       const p = s.players[ph.player];
       if (a.target === null) {
-        setResult(s, ph.player, { title: 'カチコミ', icon: '👊', tone: 'personal', desc: 'やっぱりやめた。', rows: [] }, 'turn');
+        setResult(s, ph.player, { title: '突撃', icon: '👊', tone: 'personal', desc: 'やっぱりやめた。', rows: [] }, 'turn');
         return s;
       }
       if (!kachikomiTargets(s, ph.player).includes(a.target)) return prev;
       const sc = attrScore(p, 'fight');
+      const damage = sc.total * KACHIKOMI_CARDS[0].mult;
       const to = s.players[a.target];
-      to.points -= sc.total;
+      to.points -= damage;
       sc.holders.forEach((h) => h.mvp++);
       const rows: ResultRow[] = [
-        { player: ph.player, count: sc.total, delta: 0, note: 'カチコミ', uids: sc.holders.map((h) => h.uid) },
-        { player: a.target, delta: -sc.total, note: '被害' },
+        { player: ph.player, count: sc.total, delta: 0, note: '突撃', uids: sc.holders.map((h) => h.uid) },
+        { player: a.target, delta: -damage, note: '被害' },
       ];
-      logRows(s, `カチコミ（${p.name}→${to.name}）`, rows);
+      logRows(s, `突撃（${p.name}→${to.name}）`, rows);
       setResult(
         s,
         ph.player,
-        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: `${p.name}のクラスが${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, rows },
+        { title: '突撃', icon: '👊', attr: 'fight', tone: 'personal', desc: `${p.name}のクラスが${to.name}のクラスに突撃した！`, rule: EVENT_RULE.kachikomi, rows },
         'turn',
       );
       return s;
@@ -853,7 +855,7 @@ export function finalRanking(s: GameState): Player[] {
 
 // ---------- 山札の内訳 ----------
 
-export const DECK_GROUPS = ['通常', 'カチコミ', '共通イベント', '転校・クラス替え', 'グッズ', '時代イベント', '人物'] as const;
+export const DECK_GROUPS = ['通常', '突撃', '共通イベント', '転校・クラス替え', 'グッズ', '時代イベント', '人物'] as const;
 export type DeckGroup = (typeof DECK_GROUPS)[number];
 
 export interface DeckRow {
@@ -883,7 +885,7 @@ export function deckBreakdown(s: GameState): DeckRow[] {
         case 'normal':
           return { ...base, group: '通常' };
         case 'kachikomi':
-          return { ...base, group: 'カチコミ' };
+          return { ...base, group: '突撃' };
         case 'swing':
           return { ...base, group: '共通イベント' };
         case 'push':
