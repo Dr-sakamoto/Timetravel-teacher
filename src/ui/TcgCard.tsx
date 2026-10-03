@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { hasRoleBonus, roleOf } from '../game/calc';
 import { ERAS } from '../game/data/eras';
 import { ROLES } from '../game/data/roles';
+import { Portrait, hasPortrait } from './art/Portrait';
 import { ATTR_ICON, ATTR_LABEL, type Player, type Student } from '../game/types';
 
 interface Props {
@@ -19,6 +20,8 @@ const RARITY_MARK = { N: '●', R: '◆', SR: '★', SSR: '✦' } as const;
 
 /** TCG風の生徒カード：中央にイラスト、下段に属性アイコン（重なるほど強い） */
 export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onClick }: Props) {
+  // 古いセーブデータの生徒は art を持たないので、歴史カードはIDから引き、現代の生徒は絵文字で出す
+  const art = student.art ?? student.cardId;
   const era = ERAS.find((e) => e.id === student.era)!;
   const role = owner ? roleOf(owner, student.uid) : null;
   return (
@@ -36,7 +39,7 @@ export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onC
           <span className="tcg-name">{student.name}</span>
         </div>
         <div className="tcg-art">
-          <span>{student.icon}</span>
+          {hasPortrait(art) ? <Portrait art={art} /> : <span>{student.icon}</span>}
         </div>
         {size === 'full' && (
           <div className="tcg-type">
