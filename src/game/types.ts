@@ -107,7 +107,7 @@ export interface EventResult {
   students?: Student[];
 }
 
-export type ResultCtx = 'turn' | 'summer' | 'monthEnd' | 'yearEnd' | 'final';
+export type ResultCtx = 'turn' | 'monthEnd' | 'yearEnd' | 'final';
 
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
@@ -133,7 +133,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 12;
+  version: 13;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -151,6 +151,8 @@ export interface GameState {
   eventDeck: string[];
   /** 捨て札（末尾が一番上） */
   discard: string[];
+  /** 初期メンバー用の山（現代の普通の生徒） */
+  starters: string[];
   pools: Record<EraId, string[]>;
   uidCounter: number;
   logCounter: number;

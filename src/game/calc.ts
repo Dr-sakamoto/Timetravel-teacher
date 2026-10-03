@@ -4,17 +4,17 @@ import type { Attr, EraId, Player, RoleId, RoleSeat, Student } from './types';
 /** 教室の席の数（クラスの定員） */
 export const MAX_CLASS = 9;
 /** 転校・交換で手放してもこれより少なくはならない */
-export const MIN_CLASS = 2;
-export const STARTING_MEMBERS = 3;
+export const MIN_CLASS = 4;
+export const STARTING_MEMBERS = 6;
 
 /** ゲーム開始からの通算学期（1年1学期＝1、1年2学期＝2、…）。夏休みは直前の1学期として数える */
 export function termNo(year: number, term: number): number {
   return (year - 1) * 3 + Math.max(term, 1);
 }
 
-/** 係の席の数：1年1学期は1人で、学期が進むごとに1人ずつ増える（最大6人） */
+/** 係の席の数：1年1学期は3人で、学期が進むごとに1人ずつ増える（最大6人） */
 export function roleSlots(no: number): number {
-  return Math.max(1, Math.min(MAX_ROLE_SEATS, no));
+  return Math.max(3, Math.min(MAX_ROLE_SEATS, 2 + no));
 }
 
 /** 係の編成が決まりを守っているか（席の数・1人1つ・1つの係に2人まで・係の種類は3つまで） */
@@ -28,9 +28,10 @@ export function validRoles(p: Player, roles: RoleSeat[], slots: number): boolean
   return [...kinds].every((k) => roles.filter((r) => r.role === k).length <= MAX_PER_ROLE);
 }
 
-/** i番目（0始まり）の係の席が解放される学期の名前（例：「1年2学期」） */
+/** i番目（0始まり）の係の席が解放される学期の名前（例：「1年2学期」）。最初の3席は最初から */
 export function slotUnlockLabel(i: number): string {
-  return `${Math.floor(i / 3) + 1}年${(i % 3) + 1}学期`;
+  const no = Math.max(1, i - 1);
+  return `${Math.ceil(no / 3)}年${((no - 1) % 3) + 1}学期`;
 }
 
 /** 係は1人につき1つまで（係に就いていない生徒はnull） */

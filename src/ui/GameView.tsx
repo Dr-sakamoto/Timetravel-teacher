@@ -75,7 +75,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
     }
     ph.result.students?.forEach((st) => lit.add(st.uid));
   }
-  const month = MONTHS[Math.min(state.monthIdx, 11)];
+  const month = MONTHS[Math.min(state.monthIdx, MONTHS.length - 1)];
   const term = termOfMonth(month);
   const slots = slotsNow(state);
 

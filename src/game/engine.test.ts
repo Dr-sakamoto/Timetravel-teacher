@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, roleSlots, termNo, testScore, validRoles } from './calc';
-import { CARDS, parseAttrs } from './data/cards';
+import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
@@ -51,7 +51,7 @@ describe('engine', () => {
     }
   }
 
-  it('deals 3 random modern students one card at a time, alternating', () => {
+  it('deals 6 random modern students one card at a time, alternating', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 1);
     const order: number[] = [];
     while (s.phase.kind === 'memberDraw') {
@@ -59,10 +59,10 @@ describe('engine', () => {
       s = step(s, { type: 'drawMember' });
     }
     expect(order.slice(0, 4)).toEqual([0, 1, 0, 1]);
-    expect(order).toHaveLength(6);
+    expect(order).toHaveLength(12);
     expect(s.phase.kind).toBe('roles');
     for (const p of s.players) {
-      expect(p.students).toHaveLength(3);
+      expect(p.students).toHaveLength(6);
       expect(p.students.every((x) => x.era === 'present' && x.attrs.length >= 1 && x.attrs.length <= 3)).toBe(true);
     }
   });
@@ -89,9 +89,9 @@ describe('engine', () => {
     expect(testScore(y, 1)).toBeLessThan(0);
   });
 
-  it('unlocks one role seat per term, starting with 1 (1年1学期→1 … 2年3学期→6)', () => {
+  it('unlocks one role seat per term, starting with 3 (1年1学期→3 … 2年1学期→6)', () => {
     const slots = (year: number, term: number) => roleSlots(termNo(year, term));
-    expect([[1, 1], [1, 0], [1, 2], [1, 3], [2, 1], [2, 2], [2, 3], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([1, 1, 2, 3, 4, 5, 6, 6]);
+    expect([[1, 1], [1, 2], [1, 3], [2, 1], [2, 2], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([3, 4, 5, 6, 6, 6]);
   });
 
   it('regular modern students have 1 icon about 70% of the time and 2 icons otherwise', () => {
@@ -179,15 +179,25 @@ describe('engine', () => {
     expect(full.phase.kind).toBe('result');
   });
 
-  it('modern students are a finite pool: drawn students leave it and never duplicate', () => {
+  it('starting members come from the regular modern students; later only the rare transfer students come from the present', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 9);
-    const before = s.pools.present.length;
-    expect(before).toBe(MODERN_POOL.length);
+    expect(s.pools.present).toEqual(MODERN_POOL);
+    expect(s.eventDeck.filter((id) => id.startsWith('person:')).every((id) => MODERN_POOL.includes(id.slice(7)))).toBe(true);
+    const before = s.starters.length;
     while (s.phase.kind === 'memberDraw') s = step(s, cpuAction(s)!);
-    expect(s.pools.present).toHaveLength(before - 3 * STARTING_MEMBERS);
+    expect(s.starters).toHaveLength(before - 3 * STARTING_MEMBERS);
     const ids = s.players.flatMap((p) => p.students.map((x) => x.cardId));
-    expect(ids.every((id) => id && !s.pools.present.includes(id))).toBe(true);
+    expect(ids.every((id) => id && !s.starters.includes(id) && !MODERN_POOL.includes(id))).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('every figure and transfer student has a different set of icons', () => {
+    const key = (attrs: Attr[]) => [...attrs].sort().join(',');
+    const all = [
+      ...CARDS.map((c) => ({ name: c.name, k: key(c.attrs) })),
+      ...ARCHETYPES.filter((a) => a.rarity !== 'N').map((a) => ({ name: a.title, k: key(toIcons(a.attrs, a.rarity, a.power)) })),
+    ];
+    for (const x of all) expect(all.filter((y) => y.k === x.k).map((y) => y.name), x.name).toEqual([x.name]);
   });
 
   it('deck breakdown counts every card in the deck and discard pile', () => {
@@ -304,7 +314,7 @@ describe('engine', () => {
     s.phase = { kind: 'push', player: 0 };
     const uid = s.players[0].students[0].uid;
     const next = step(s, { type: 'push', uid, target: 1 });
-    expect(next.players[0].students).toHaveLength(2);
+    expect(next.players[0].students).toHaveLength(5);
     expect(next.players[1].students.map((x) => x.uid)).toContain(uid);
   });
 

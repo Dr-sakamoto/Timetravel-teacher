@@ -55,7 +55,7 @@ export function Center({ state, dispatch, cpuBusy, pick }: Props) {
           <button className={`pile modern-pile ${canMember ? 'glow' : ''}`} disabled={!canMember} onClick={() => dispatch({ type: 'drawMember' })}>
             <span className="pile-back">🏫</span>
             <span className="pile-label">現代の生徒</span>
-            <span className="pile-count">{state.pools.present.length}</span>
+            <span className="pile-count">{state.starters.length}</span>
           </button>
         ) : (
           <div className="pile era-pile" style={{ borderColor: era.color }} title={`まだ転入していない${era.name}の生徒`}>

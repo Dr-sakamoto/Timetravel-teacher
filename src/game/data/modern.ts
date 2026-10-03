@@ -51,25 +51,23 @@ export const ARCHETYPES: Archetype[] = [
   a('sukeban', 'スケバン', '💄', 'N', 4, '=fc', 'スカートが長い。'),
   a('furyo', '不良', '👊', 'N', 6, '=f', '授業中はだいたい寝ている。'),
   // 転校生限定（現代）
-  a('returnee', '帰国子女', '✈️', 'R', 4, 'sac', '英語の発音がネイティブ。'),
-  a('childstar', '天才子役', '🎬', 'R', 6, 'ac', 'ドラマ撮影で早退しがち。'),
-  a('topscore', '全国模試1位', '🥇', 'R', 9, 's', '塾を3つ掛け持ち。'),
-  a('esports', 'eスポーツ選手', '🕹️', 'R', 6, 'sa', '反射神経はプロ級。'),
-  a('influencer', '人気インフルエンサー', '📱', 'R', 7, 'c', 'フォロワー50万人。'),
+  a('returnee', '帰国子女', '✈️', 'R', 4, '=ssc', '英語の発音がネイティブ。'),
+  a('childstar', '天才子役', '🎬', 'R', 6, '=ac', 'ドラマ撮影で早退しがち。'),
+  a('topscore', '全国模試1位', '🥇', 'R', 9, '=sss', '塾を3つ掛け持ち。'),
+  a('esports', 'eスポーツ選手', '🕹️', 'R', 6, '=saa', '反射神経はプロ級。'),
+  a('influencer', '人気インフルエンサー', '📱', 'R', 7, '=ccc', 'フォロワー50万人。'),
   a('banchou', '伝説の番長', '🔱', 'SR', 7, '=ff', '隣町まで名前が知れ渡っている。'),
-  a('olympian', 'オリンピック候補', '🏅', 'SR', 9, 'sp', '練習で授業をよく休む。'),
-  a('genius', '飛び級の天才', '🧠', 'SR', 10, 'sa', '実はまだ10歳。'),
+  a('olympian', 'オリンピック候補', '🏅', 'SR', 9, '=sppp', '練習で授業をよく休む。'),
+  a('genius', '飛び級の天才', '🧠', 'SR', 10, '=ssac', '実はまだ10歳。'),
 ];
 
 export const ARCHETYPE_MAP: Record<string, Archetype> = Object.fromEntries(ARCHETYPES.map((a) => [a.id, a]));
 
-/** 現代のカードプールに入る枚数（Nは2枚ずつ、R以上は1枚ずつ） */
-export const MODERN_COPIES: Record<Rarity, number> = { N: 2, R: 1, SR: 1, SSR: 1 };
+/** 初期メンバー用の山：普通の生徒（N）を2枚ずつ。カードIDは 'm:<アーキタイプ>#<番号>' */
+export const STARTER_POOL: string[] = ARCHETYPES.filter((a) => a.rarity === 'N').flatMap((a) => [1, 2].map((i) => `m:${a.id}#${i}`));
 
-/** 現代のカードプール。カードIDは 'm:<アーキタイプ>#<番号>'。初期メンバーと現代の学期の転校生はここから引く */
-export const MODERN_POOL: string[] = ARCHETYPES.flatMap((a) =>
-  Array.from({ length: MODERN_COPIES[a.rarity] }, (_, i) => `m:${a.id}#${i + 1}`),
-);
+/** 現代の学期のカードプール：転校生限定の生徒（R以上）を1枚ずつ。スタート以降に現代から来るのはこの子たちだけ */
+export const MODERN_POOL: string[] = ARCHETYPES.filter((a) => a.rarity !== 'N').map((a) => `m:${a.id}#1`);
 
 export const isModernCard = (id: string) => id.startsWith('m:');
 export const archetypeOf = (id: string) => id.slice(2).split('#')[0];

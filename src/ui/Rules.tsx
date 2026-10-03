@@ -14,7 +14,7 @@ import {
   cardRule,
   fixedRule,
 } from '../game/data/events';
-import { ARCHETYPES, MODERN_POOL } from '../game/data/modern';
+import { ARCHETYPES } from '../game/data/modern';
 import { MAX_PER_ROLE, MAX_ROLE_KINDS, MAX_ROLE_SEATS, ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
 import { ATTRS, ATTR_ICON, ATTR_LABEL } from '../game/types';
 
@@ -41,10 +41,10 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <h3>準備</h3>
         <ol className="rule-list">
           <li>
-            現代のカードプール（N）から、全員で順番に1枚ずつ引いて{STARTING_MEMBERS}人そろえる。
+            現代の普通の生徒（N）の山から、全員で順番に1枚ずつ引いて{STARTING_MEMBERS}人そろえる。スタート以降に現代から来るのは、現代の学期の転校生（R以上）だけ。
           </li>
           <li>
-            <b>係</b>：1年1学期は1人だけ。学期が進むごとに1席ずつ増え、最大{MAX_ROLE_SEATS}人。1つの係に{MAX_PER_ROLE}人まで、係の種類は{MAX_ROLE_KINDS}つまで。
+            <b>係</b>：1年1学期は3人。学期が進むごとに1席ずつ増え、最大{MAX_ROLE_SEATS}人。1つの係に{MAX_PER_ROLE}人まで、係の種類は{MAX_ROLE_KINDS}つまで。
             係に就いた子は、その係のアイコンが<b>2倍</b>に数えられる。学期の頭に決め直せる。
             <div className="rule-roles">
               {ROLE_ORDER.map((r) => (
@@ -118,7 +118,10 @@ export function Rules({ onClose }: { onClose: () => void }) {
                 {era.icon} <b>{era.name}</b>：
                 {era.id === 'present' ? (
                   <>
-                    現代の生徒 {MODERN_POOL.length}枚（{ARCHETYPES.length}種）
+                    転校生{' '}
+                    {ARCHETYPES.filter((a) => a.rarity !== 'N')
+                      .map((a) => a.icon + a.title)
+                      .join('・')}
                   </>
                 ) : (
                   <>
@@ -149,7 +152,6 @@ export function Rules({ onClose }: { onClose: () => void }) {
               {f.icon} <b>{f.name}</b>：{fixedRule(f)}。順位点は5／3／2／1点×倍率。
             </li>
           ))}
-          <li>🌻 8月 夏休み合宿：2学期の時代から1人ずつランダムに転入。</li>
         </ul>
       </div>
     </div>

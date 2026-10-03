@@ -19,7 +19,7 @@ import {
   type RaidCard,
   type SwingCard,
 } from './data/events';
-import { ARCHETYPE_MAP, GIVEN_NAMES, MODERN_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
+import { ARCHETYPE_MAP, GIVEN_NAMES, MODERN_POOL, STARTER_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
 import { ROLES } from './data/roles';
 import {
   type Action,
@@ -27,7 +27,6 @@ import {
   type EventResult,
   type GameState,
   type Player,
-  type Rarity,
   type ResultCtx,
   type ResultRow,
   type Student,
@@ -36,7 +35,8 @@ import { ATTR_ICON } from './types';
 
 /** 転校生がやってくる歴史上の時代（現代以外） */
 export const HISTORY_ERAS = ERAS.map((_, i) => i).filter((i) => i !== PRESENT_INDEX);
-export const MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+/** 手番のある月（8月の夏休みは飛ばす） */
+export const MONTHS = [4, 5, 6, 7, 9, 10, 11, 12, 1, 2, 3];
 export const PLAYER_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b', '#da77f2'];
 
 export function termOfMonth(m: number): number {
@@ -48,11 +48,11 @@ export function termOfMonth(m: number): number {
 
 /** 今の学期に使える係の数 */
 export function slotsNow(s: GameState): number {
-  return roleSlots(termNo(s.year, termOfMonth(MONTHS[Math.min(s.monthIdx, 11)])));
+  return roleSlots(termNo(s.year, termOfMonth(MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)])));
 }
 
 export function calendarLabel(s: GameState): string {
-  const m = MONTHS[Math.min(s.monthIdx, 11)];
+  const m = MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)];
   const t = termOfMonth(m);
   return `${s.year}年生 ${m}月${t === 0 ? '（夏休み）' : `（${t}学期）`}`;
 }
@@ -82,15 +82,6 @@ function shuffle<T>(s: GameState, arr: T[]): T[] {
   }
   return arr;
 }
-function weightedIndex(s: GameState, weights: number[]): number {
-  const total = weights.reduce((a, b) => a + b, 0);
-  let r = rand(s) * total;
-  for (let i = 0; i < weights.length; i++) {
-    r -= weights[i];
-    if (r < 0) return i;
-  }
-  return weights.length - 1;
-}
 
 // ---------- 初期化 ----------
 
@@ -104,7 +95,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 12,
+    version: 13,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -126,6 +117,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     phase: { kind: 'memberDraw', player: 0, last: null },
     eventDeck: [],
     discard: [],
+    starters: [...STARTER_POOL],
     pools,
     uidCounter: 0,
     logCounter: 0,
@@ -145,7 +137,7 @@ function log(s: GameState, text: string, player?: number) {
 // ---------- 生徒カード ----------
 
 function joinedLabel(s: GameState): string {
-  return `${s.year}年${MONTHS[Math.min(s.monthIdx, 11)]}月`;
+  return `${s.year}年${MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)]}月`;
 }
 
 function fromArchetype(s: GameState, cardId: string, a: Archetype, joined: string): Student {
@@ -183,28 +175,14 @@ function fromCard(s: GameState, cardId: string, joined: string): Student {
   };
 }
 
-const RARITY_WEIGHT: Record<Rarity, number> = { N: 60, R: 55, SR: 32, SSR: 13 };
-
 /** カードプールのID（偉人のカードID、または現代の生徒の 'm:<アーキタイプ>#<番号>'）から生徒を作る */
 function fromPoolId(s: GameState, id: string, joined: string): Student {
   return isModernCard(id) ? fromArchetype(s, id, ARCHETYPE_MAP[archetypeOf(id)], joined) : fromCard(s, id, joined);
 }
 
-function rarityOf(id: string): Rarity {
-  return isModernCard(id) ? ARCHETYPE_MAP[archetypeOf(id)].rarity : CARD_MAP[id].rarity;
-}
-
 /** カードプールのIDがどの時代のものか */
 function eraOfId(id: string): EraId {
   return isModernCard(id) ? 'present' : CARD_MAP[id].era;
-}
-
-/** その時代のカードプールから1人ランダムに引く（レアほど出にくい）。残っていなければ null */
-function randomPerson(s: GameState, eraIdx: number): Student | null {
-  const pool = s.pools[ERAS[eraIdx].id];
-  if (pool.length === 0) return null;
-  const id = pool[weightedIndex(s, pool.map((x) => RARITY_WEIGHT[rarityOf(x)]))];
-  return fromPoolId(s, id, joinedLabel(s));
 }
 
 function addStudent(s: GameState, p: Player, st: Student) {
@@ -227,11 +205,12 @@ function removeStudent(s: GameState, p: Player, uid: string, returnToPool: boole
 
 // ---------- 初期メンバー ----------
 
-/** 現代のカードプールのNから1枚引く（完全ランダム） */
+/** 初期メンバー用の山（現代の普通の生徒）から1枚引く（完全ランダム） */
 function drawMember(s: GameState, pi: number): Student {
-  const ns = s.pools.present.filter((id) => rarityOf(id) === 'N');
-  const st = fromPoolId(s, pick(s, ns), '初期メンバー');
-  addStudent(s, s.players[pi], st);
+  const i = randInt(s, s.starters.length);
+  const [id] = s.starters.splice(i, 1);
+  const st = fromPoolId(s, id, '初期メンバー');
+  s.players[pi].students.push(st);
   return st;
 }
 
@@ -267,9 +246,9 @@ function drawYearEras(s: GameState, first = false) {
   }
 }
 
-/** 今の学期の時代（夏休み中は2学期の時代） */
+/** 今の学期の時代 */
 export function currentEra(s: GameState): number {
-  const t = termOfMonth(MONTHS[Math.min(s.monthIdx, 11)]);
+  const t = termOfMonth(MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)]);
   return s.yearEras[Math.max(1, t) - 1];
 }
 
@@ -331,38 +310,8 @@ function advanceMonth(s: GameState) {
     return;
   }
   const m = MONTHS[s.monthIdx];
-  if (m === 8) startSummer(s);
-  else if (m === 9 || m === 1) startTerm(s);
+  if (m === 9 || m === 1) startTerm(s);
   else startTurns(s);
-}
-
-/** 夏休み合宿：全員が2学期の時代から1人ずつランダムに迎える */
-function startSummer(s: GameState) {
-  const era = ERAS[s.yearEras[1]];
-  const lines: string[] = [];
-  const students: Student[] = [];
-  for (const pi of order(s)) {
-    const p = s.players[pi];
-    if (p.students.length >= MAX_CLASS) {
-      lines.push(`${p.name}：満席なので見送り`);
-      continue;
-    }
-    const st = randomPerson(s, s.yearEras[1]);
-    if (!st) {
-      lines.push(`${p.name}：${era.name}の生徒はもう残っていない`);
-      continue;
-    }
-    addStudent(s, p, st);
-    students.push(st);
-    lines.push(`${p.name} ← ${st.icon}${st.name}`);
-  }
-  log(s, `夏休み合宿（${era.name}）：` + lines.join(' / '));
-  s.phase = {
-    kind: 'result',
-    player: null,
-    ctx: 'summer',
-    result: { title: '夏休み合宿', icon: '🌻', tone: 'fixed', desc: `${era.icon}${era.name}から全員に1人ずつ転入`, rows: [], lines, students },
-  };
 }
 
 function yearEnd(s: GameState) {
@@ -607,9 +556,6 @@ export function step(prev: GameState, a: Action): GameState {
       switch (ph.ctx) {
         case 'turn':
           endTurn(s);
-          break;
-        case 'summer':
-          advanceMonth(s);
           break;
         case 'monthEnd':
           advanceMonth(s);
