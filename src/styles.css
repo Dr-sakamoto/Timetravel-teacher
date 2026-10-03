@@ -1698,3 +1698,338 @@ h3 {
 .last-draw.latest {
   opacity: 1;
 }
+
+/* ===== v5：トレカ風カードと教室プレイマット ===== */
+.card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+}
+.card-grid.center {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 140px));
+}
+.tcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  aspect-ratio: 5 / 7;
+  width: 100%;
+  min-width: 0;
+  padding: 0.35rem 0.35rem 0.4rem;
+  border-radius: 10px;
+  border: 3px solid #a9a9a9;
+  background:
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--era) 35%, #fff) 0 30%, transparent 31%),
+    linear-gradient(180deg, color-mix(in srgb, var(--era) 18%, var(--paper)), var(--paper) 60%);
+  color: var(--ink);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s;
+}
+.tcard.r-R {
+  border-color: #4f9de0;
+}
+.tcard.r-SR {
+  border-color: #a463d8;
+}
+.tcard.r-SSR {
+  border-color: #e0a91d;
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.3),
+    0 0 14px rgba(255, 200, 40, 0.55);
+}
+.tcard.clickable {
+  cursor: pointer;
+}
+.tcard.clickable:hover {
+  transform: translateY(-3px);
+}
+.tcard.selected {
+  outline: 4px solid var(--yellow);
+  transform: translateY(-3px);
+}
+.tcard.dim {
+  opacity: 0.45;
+}
+.tcard-top {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 0.2rem;
+}
+.tcard .power {
+  width: 1.7rem;
+  height: 1.7rem;
+  font-size: 0.95rem;
+}
+.tcard-tags {
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+.tcard-star {
+  color: #d08a00;
+  font-size: 0.9rem;
+  margin-left: auto;
+}
+.tcard-tags + .tcard-star {
+  margin-left: 0.1rem;
+}
+.tcard-art {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  line-height: 1;
+}
+.tcard-name {
+  font-weight: 900;
+  font-size: 0.72rem;
+  text-align: center;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 1.6em;
+}
+.tcard-attrs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.12rem;
+  margin-top: 0.2rem;
+}
+.tcard .attr {
+  font-size: 0.85rem;
+  padding: 0.05rem 0.15rem;
+  border-radius: 6px;
+}
+.tcard .attr small {
+  font-size: 0.6rem;
+}
+.tcard-role {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--yellow);
+  color: #2b2410;
+  font-size: 0.62rem;
+  font-weight: 900;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 2px solid #2b2410;
+}
+
+/* 教室 */
+.classroom {
+  margin-top: 0.6rem;
+  border: 10px solid #7a4e2b;
+  border-radius: 16px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0 2px, transparent 2px 60px),
+    #b98a5a;
+  padding: 0.7rem;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.35);
+}
+.blackboard {
+  background: #24453a;
+  border: 6px solid #8a5a33;
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  color: var(--chalk);
+  box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.4);
+  margin-bottom: 0.8rem;
+}
+.bb-title {
+  font-weight: 900;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.bb-count {
+  color: var(--yellow);
+}
+.bb-roles {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+@media (max-width: 640px) {
+  .bb-roles {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.bb-role {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px dashed rgba(244, 241, 232, 0.5);
+  color: var(--chalk);
+  border-radius: 8px;
+  padding: 0.25rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: default;
+}
+.bb-role:not(:disabled) {
+  cursor: pointer;
+}
+.bb-role.active {
+  border: 2px solid var(--yellow);
+  background: rgba(246, 216, 96, 0.15);
+}
+.bb-role.locked {
+  opacity: 0.4;
+}
+.bb-role-icon {
+  font-size: 1rem;
+}
+.bb-role-name {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bb-role-who {
+  font-size: 1rem;
+}
+.bb-hint {
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  color: var(--chalk-dim);
+}
+.seats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.7rem 0.6rem;
+}
+@media (max-width: 900px) {
+  .seats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .seats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem 0.4rem;
+  }
+}
+.seat {
+  position: relative;
+  padding-bottom: 10px;
+}
+.seat::after {
+  /* 机の天板 */
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: 0;
+  height: 14px;
+  border-radius: 4px;
+  background: #e2c393;
+  box-shadow: 0 3px 0 #8a6236;
+  z-index: 0;
+}
+.seat > .tcard {
+  position: relative;
+  z-index: 1;
+}
+.seat.empty .desk {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 5 / 7;
+  border: 2px dashed rgba(60, 35, 15, 0.45);
+  border-radius: 10px;
+  color: rgba(60, 35, 15, 0.6);
+  font-size: 0.75rem;
+  font-weight: 700;
+  position: relative;
+  z-index: 1;
+}
+.role-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.role-now small {
+  color: var(--chalk-dim);
+}
+.summary-row.inline {
+  display: inline-flex;
+  margin: 0 0 0 auto;
+}
+.push-targets {
+  margin-bottom: 0.3rem;
+}
+.last-draw {
+  width: 130px;
+}
+.option-wrap {
+  width: 100%;
+}
+.roster .classroom {
+  margin-top: 0.5rem;
+}
+.tcard {
+  max-width: 132px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--era) 22%, var(--paper)), var(--paper) 65%);
+}
+.tcard-art {
+  width: 72%;
+  flex: none;
+  aspect-ratio: 1;
+  margin: 0.25rem auto 0.3rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--era) 40%, #fff) 0 62%, color-mix(in srgb, var(--era) 20%, #fff) 63%);
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+}
+.seats {
+  grid-template-columns: repeat(6, minmax(0, 132px));
+  justify-content: center;
+}
+@media (max-width: 900px) {
+  .seats {
+    grid-template-columns: repeat(4, minmax(0, 132px));
+  }
+}
+@media (max-width: 480px) {
+  .seats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.seat {
+  display: flex;
+  justify-content: center;
+}
+.seat.empty .desk {
+  width: 100%;
+  max-width: 132px;
+}
+.final-mvp {
+  width: 132px;
+}
+.card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(112px, 132px));
+}
+@media (max-width: 640px) {
+  .bb-role:not(.locked) .bb-role-name {
+    display: none;
+  }
+  .bb-role {
+    min-width: 0;
+  }
+  .classroom {
+    border-width: 6px;
+    padding: 0.45rem;
+  }
+  .blackboard {
+    border-width: 4px;
+    padding: 0.4rem;
+  }
+}

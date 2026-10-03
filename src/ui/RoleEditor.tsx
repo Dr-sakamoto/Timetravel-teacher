@@ -1,26 +1,31 @@
 import { useMemo, useState } from 'react';
 import { autoRoles, classSummary } from '../game/ai';
-import { attrValues } from '../game/calc';
+import { roleSlots } from '../game/calc';
 import { CLASS_MAP } from '../game/data/classes';
 import { ROLES, roleDesc } from '../game/data/roles';
-import { ATTR_ICON, type Attr, type Player } from '../game/types';
-import { StudentCard } from './StudentCard';
+import type { Player } from '../game/types';
+import { Classroom } from './Classroom';
 
 interface Props {
   player: Player;
+  year: number;
   termLabel: string;
   onConfirm: (roles: (string | null)[]) => void;
 }
 
-export function RoleEditor({ player, termLabel, onConfirm }: Props) {
+/** 係決め：黒板の係を選んでから、座席の生徒をタップ */
+export function RoleEditor({ player, year, termLabel, onConfirm }: Props) {
   const card = CLASS_MAP[player.classCardId!];
+  const k = roleSlots(player);
   const [roles, setRoles] = useState<(string | null)[]>(() =>
-    player.roles.map((r) => (r && player.students.some((s) => s.uid === r) ? r : null)),
+    card.roles.map((_, i) => {
+      const r = player.roles[i];
+      return i < k && r && player.students.some((s) => s.uid === r) ? r : null;
+    }),
   );
   const [activeSlot, setActiveSlot] = useState(0);
   const draft: Player = useMemo(() => ({ ...player, roles }), [player, roles]);
   const summary = useMemo(() => classSummary(draft), [draft]);
-  const current = useMemo(() => classSummary(player), [player]);
 
   const assign = (uid: string) => {
     setRoles((prev) => {
@@ -28,17 +33,10 @@ export function RoleEditor({ player, termLabel, onConfirm }: Props) {
       next[activeSlot] = prev[activeSlot] === uid ? null : uid;
       return next;
     });
-    setActiveSlot((i) => Math.min(card.roles.length - 1, i + 1));
+    setActiveSlot((i) => (i + 1 < k ? i + 1 : i));
   };
 
-  const roleKey = card.roles[activeSlot];
-  const focusAttrs = Object.keys(ROLES[roleKey].mult) as Attr[];
-  const fit = (st: Player['students'][number]) =>
-    ROLES[roleKey].animal && (st.tags.includes('恐竜') || st.tags.includes('動物'))
-      ? 99
-      : focusAttrs.filter((a) => st.attrs.includes(a)).length;
-  const sorted = [...player.students].sort((a, b) => fit(b) - fit(a) || b.power - a.power);
-
+  const role = card.roles[activeSlot];
   return (
     <div className="role-editor">
       <div className="panel-head">
@@ -54,52 +52,26 @@ export function RoleEditor({ player, termLabel, onConfirm }: Props) {
           </button>
         </div>
       </div>
-      <div className="slots">
-        {card.roles.map((r, i) => {
-          const st = player.students.find((s) => s.uid === roles[i]);
-          const vals = st ? attrValues(draft, st) : null;
-          return (
-            <button key={i} className={`slot ${activeSlot === i ? 'active' : ''}`} onClick={() => setActiveSlot(i)} title={roleDesc(r)}>
-              <span className="slot-role">
-                {ROLES[r].icon} {ROLES[r].name}
-              </span>
-              <span className="slot-mult">{roleDesc(r)}</span>
-              <span className="slot-who">{st ? `${st.icon} ${st.name}` : '—'}</span>
-              {vals && (
-                <span className="slot-eff">
-                  {Object.entries(vals)
-                    .map(([k, v]) => `${ATTR_ICON[k as Attr]}${v}`)
-                    .join(' ')}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      <div className="summary-row">
-        {summary.map((c, i) => {
-          const diff = Math.round((c.value - current[i].value) * 10) / 10;
-          return (
-            <div key={c.label} className="summary" title={c.hint}>
+      <div className="role-now">
+        {ROLES[role].icon} <b>{ROLES[role].name}</b> <small>{roleDesc(role)}</small>
+        <span className="summary-row inline">
+          {summary.map((c) => (
+            <span key={c.label} className="summary" title={c.hint}>
               {c.icon}
               <b>{Math.round(c.value * 10) / 10}</b>
-              {diff !== 0 && <small className={diff > 0 ? 'up' : 'down'}>{diff > 0 ? `+${diff}` : diff}</small>}
-            </div>
-          );
-        })}
+            </span>
+          ))}
+        </span>
       </div>
-      <div className="card-grid">
-        {sorted.map((s) => (
-          <StudentCard
-            key={s.uid}
-            student={s}
-            owner={draft}
-            selected={roles[activeSlot] === s.uid}
-            dim={roles.includes(s.uid) && roles[activeSlot] !== s.uid}
-            onClick={() => assign(s.uid)}
-          />
-        ))}
-      </div>
+      <Classroom
+        player={draft}
+        year={year}
+        activeSlot={activeSlot}
+        onSlotClick={setActiveSlot}
+        onSeatClick={assign}
+        selectedUid={roles[activeSlot]}
+        dimUid={(uid) => roles.includes(uid) && roles[activeSlot] !== uid}
+      />
     </div>
   );
 }

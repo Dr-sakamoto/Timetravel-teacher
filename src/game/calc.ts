@@ -3,13 +3,29 @@ import type { SchoolEventDef } from './data/events';
 import { ANIMAL_MULT, ROLES } from './data/roles';
 import { ATTRS, type Attr, type Player, type RoleId, type Student } from './types';
 
-export const MAX_CLASS = 30;
+/** 教室の席の数（クラスの定員） */
+export const MAX_CLASS = 12;
+/** 転校で押しつけてもこれより少なくはならない */
+export const MIN_CLASS = 4;
 export const POWER_CAP = 12;
+
+/** 使える係の数：6人で3つ、8人で4つ、10人で5つ、12人で6つ */
+export function roleSlots(p: Player): number {
+  const max = p.classCardId ? CLASS_MAP[p.classCardId].roles.length : 0;
+  return Math.max(3, Math.min(max, 3 + Math.floor((p.students.length - 6) / 2)));
+}
+
+/** 次の係が解放される人数（全部解放済みなら null） */
+export function nextSlotAt(p: Player): number | null {
+  const max = p.classCardId ? CLASS_MAP[p.classCardId].roles.length : 0;
+  const k = roleSlots(p);
+  return k >= max ? null : 6 + (k - 2) * 2;
+}
 
 export function roleOf(p: Player, uid: string): RoleId | null {
   if (!p.classCardId) return null;
   const idx = p.roles.indexOf(uid);
-  return idx >= 0 ? CLASS_MAP[p.classCardId].roles[idx] : null;
+  return idx >= 0 && idx < roleSlots(p) ? CLASS_MAP[p.classCardId].roles[idx] : null;
 }
 
 export type AttrValues = Partial<Record<Attr, number>>;
@@ -106,7 +122,7 @@ export function classGuard(p: Player): number {
   for (const s of p.students) if (s.ability?.kind === 'guard') g += s.ability.ratio;
   if (p.classCardId) {
     CLASS_MAP[p.classCardId].roles.forEach((r, i) => {
-      if (p.roles[i] && ROLES[r].guard) g += ROLES[r].guard!;
+      if (i < roleSlots(p) && p.roles[i] && ROLES[r].guard) g += ROLES[r].guard!;
     });
   }
   return Math.min(0.6, g);
@@ -135,4 +151,18 @@ export function studentTotal(s: Student): number {
 
 export function countAttr(p: Player, a: Attr): number {
   return p.students.filter((s) => s.attrs.includes(a)).length;
+}
+
+/** 通常イベント（アイコン）の得点：持っている生徒1人につき1pt、係で強化されていればさらに+1 */
+export function iconPoints(p: Player, a: Attr): { count: number; points: number } {
+  let count = 0;
+  let points = 0;
+  for (const s of p.students) {
+    if (!s.attrs.includes(a)) continue;
+    count++;
+    points += 1;
+    const r = roleOf(p, s.uid);
+    if (r && ((ROLES[r].animal && isAnimal(s)) || ROLES[r].mult[a] !== undefined)) points += 1;
+  }
+  return { count, points };
 }

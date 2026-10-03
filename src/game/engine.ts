@@ -1,14 +1,4 @@
-import {
-  MAX_CLASS,
-  POWER_CAP,
-  RANK_POINTS,
-  applyDelta,
-  attrValues,
-  auraTotals,
-  classPower,
-  countAttr,
-  isAnimal,
-} from './calc';
+import { MAX_CLASS, MIN_CLASS, POWER_CAP, RANK_POINTS, applyDelta, classPower, iconPoints, roleSlots } from './calc';
 import { CARDS, CARD_MAP, parseAttrs } from './data/cards';
 import { CLASS_CARDS, CLASS_MAP, className } from './data/classes';
 import { ERAS, PRESENT_INDEX } from './data/eras';
@@ -16,12 +6,15 @@ import { ERAS, PRESENT_INDEX } from './data/eras';
 /** 転校生がやってくる歴史上の時代（現代以外） */
 export const HISTORY_ERAS = ERAS.map((_, i) => i).filter((i) => i !== PRESENT_INDEX);
 import {
+  ERA_EVENTS,
   EVENT_MAP,
   FIXED_BY_MONTH,
+  ICON_EVENTS,
   PERSONAL_EVENTS,
   SCHOOL_EVENTS,
   aggText,
   effectText,
+  type IconEventDef,
   type PersonalEventDef,
   type SchoolEventDef,
 } from './data/events';
@@ -94,9 +87,12 @@ export interface SetupPlayer {
   isCpu: boolean;
 }
 
+/** 山札：全時代共通のカード＋今学期の時代の固有カード */
 function buildDeck(s: GameState): string[] {
+  const era = ERAS[currentEra(s)].id;
   const deck: string[] = [];
-  for (const e of [...SCHOOL_EVENTS, ...PERSONAL_EVENTS]) for (let i = 0; i < e.count; i++) deck.push(e.id);
+  const cards = [...ICON_EVENTS, ...SCHOOL_EVENTS, ...PERSONAL_EVENTS, ...ERA_EVENTS.filter((e) => e.era === era)];
+  for (const e of cards) for (let i = 0; i < e.count; i++) deck.push(e.id);
   return shuffle(s, deck);
 }
 
@@ -104,7 +100,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   const s: GameState = {
-    version: 4,
+    version: 5,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -132,8 +128,8 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     logCounter: 0,
     log: [],
   };
-  s.eventDeck = buildDeck(s);
   drawYearEras(s);
+  s.eventDeck = buildDeck(s);
   log(s, `時空最強クラス決定戦、開幕！ ${years}年間の勝負です。`);
   return s;
 }
@@ -251,7 +247,7 @@ function drawClass(s: GameState, pi: number) {
   log(s, `${p.name}は「${card.nick}」（${className(card.id, s.year)}）を引いた！`, pi);
 }
 
-export const STARTING_MEMBERS = 12;
+export const STARTING_MEMBERS = 6;
 
 /** 初期メンバーを1人引く（クラスカードの傾向で出やすい生徒が変わる） */
 function drawMember(s: GameState, pi: number): Student {
@@ -305,6 +301,7 @@ function startTerm(s: GameState) {
   const t = termOfMonth(MONTHS[s.monthIdx]);
   const era = ERAS[currentEra(s)];
   log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name}。`);
+  s.eventDeck = buildDeck(s);
   s.phase = { kind: 'roles', player: s.queue[0] };
 }
 
@@ -475,7 +472,7 @@ function personalResult(
   const p = s.players[pi];
   const d = delta === 0 ? 0 : applyDelta(p, delta);
   log(s, `${p.name}：${ev.name}${d !== 0 ? ` ${d > 0 ? '+' : ''}${d}pt` : ''}`, pi);
-  return { title: ev.name, icon: ev.icon, attr: ev.attr, tone: ev.tone, desc: ev.desc, rows: [{ player: pi, delta: d }], lines };
+  return { title: ev.name, icon: ev.icon, tone: 'special', desc: ev.desc, rows: [{ player: pi, delta: d }], lines };
 }
 
 function setResult(s: GameState, pi: number | null, result: EventResult, ctx: ResultCtx) {
@@ -505,11 +502,6 @@ function startTransfer(
   s.phase = { kind: 'transfer', player: pi, options, picks, added: [], title, reason, ctx };
 }
 
-function maxCharm(p: Player): number {
-  const auras = auraTotals(p);
-  return Math.max(0, ...p.students.map((st) => attrValues(p, st, auras).charm ?? 0));
-}
-
 function resolveDraw(s: GameState, pi: number) {
   if (s.eventDeck.length === 0) {
     s.eventDeck = buildDeck(s);
@@ -524,124 +516,36 @@ function resolveDraw(s: GameState, pi: number) {
     setResult(s, pi, resolveSchool(s, ev, pi), 'turn');
     return;
   }
-  switch (ev.kind) {
-    case 'transfer':
-      startTransfer(s, pi, eraIdx, 3, 1, ev.name, `${era.icon} ${era.name}から`, 'turn');
-      return;
-    case 'rush':
-      startTransfer(s, pi, eraIdx, 4, 2, ev.name, `${era.icon} ${era.name}から`, 'turn');
-      return;
-    case 'storm': {
-      let to = eraIdx;
-      while (to === eraIdx) to = pick(s, HISTORY_ERAS);
-      log(s, `${p.name}のクラスが時空嵐で${ERAS[to].name}へ飛ばされた！`, pi);
-      startTransfer(s, pi, to, 2, 1, ev.name, `${ERAS[to].icon} ${ERAS[to].name}から`, 'turn');
-      return;
-    }
-    case 'warp':
-      s.phase = { kind: 'warp', player: pi };
-      return;
-    case 'train':
-      s.phase = { kind: 'train', player: pi };
-      return;
-    case 'poach': {
-      if (p.students.length >= MAX_CLASS || poachable(s, pi).length === 0) {
-        setResult(s, pi, personalResult(s, pi, ev, 0, ['引き抜ける生徒がいなかった…。']), 'turn');
-      } else {
-        s.phase = { kind: 'poach', player: pi };
-      }
-      return;
-    }
-    case 'bonus':
-      setResult(s, pi, personalResult(s, pi, ev, 3, []), 'turn');
-      return;
-    case 'lunch':
-      setResult(s, pi, personalResult(s, pi, ev, 2, []), 'turn');
-      return;
-    case 'oversleep':
-      setResult(s, pi, personalResult(s, pi, ev, -1, []), 'turn');
-      return;
-    case 'lesson': {
-      const c = countAttr(p, 'study');
-      setResult(s, pi, personalResult(s, pi, ev, Math.floor(c / 3), [`${ATTR_ICON.study}持ち：${c}人`]), 'turn');
-      return;
-    }
-    case 'club': {
-      const c = countAttr(p, 'sports') + countAttr(p, 'art');
-      setResult(s, pi, personalResult(s, pi, ev, Math.floor(c / 4), [`${ATTR_ICON.sports}持ち＋${ATTR_ICON.art}持ち：のべ${c}人`]), 'turn');
-      return;
-    }
-    case 'homework': {
-      const c = countAttr(p, 'study');
-      const ok = c >= 8;
-      setResult(
-        s,
-        pi,
-        personalResult(s, pi, ev, ok ? 0 : -2, [`${ATTR_ICON.study}持ち：${c}人`, ok ? '優等生がノートを見せてくれた！' : '誰も宿題をやっていなかった…'] ),
-        'turn',
-      );
-      return;
-    }
-    case 'inspection': {
-      const y = countAttr(p, 'fight');
-      const delta = y === 0 ? 2 : -2 * y;
-      setResult(
-        s,
-        pi,
-        personalResult(s, pi, ev, delta, [y === 0 ? 'ヤンキーはいなかった。模範的なクラス！' : `${ATTR_ICON.fight}持ちが${y}人…色々出てきた。`]),
-        'turn',
-      );
-      return;
-    }
-    case 'crisis': {
-      const c = maxCharm(p);
-      const ok = c >= 9;
-      setResult(
-        s,
-        pi,
-        personalResult(s, pi, ev, ok ? 5 : -5, [
-          `クラスで一番の${ATTR_ICON.charm}：${Math.round(c * 10) / 10}`,
-          ok ? 'カリスマがクラスをまとめ上げた！' : 'まとめ役がいない…クラスがバラバラに。',
-        ]),
-        'turn',
-      );
-      return;
-    }
-    case 'zoo': {
-      const animals = p.students.filter(isAnimal);
-      if (animals.length === 0) {
-        setResult(s, pi, personalResult(s, pi, ev, 1, ['動物はいないけど小屋はピカピカ。+1pt']), 'turn');
-        return;
-      }
-      const card = CLASS_MAP[p.classCardId!];
-      const hasKeeper = card.roles.some((r, i) => ROLES[r].animal && p.roles[i]);
-      const delta = hasKeeper ? 3 * animals.length : -2 * animals.length;
-      setResult(
-        s,
-        pi,
-        personalResult(s, pi, ev, delta, [
-          `恐竜・動物：${animals.map((a) => a.name).join('、')}`,
-          hasKeeper ? '飼育係がしっかりお世話していた！' : '飼育係がいない！小屋が大惨事に…。',
-        ]),
-        'turn',
-      );
-      return;
-    }
-    case 'parents': {
-      const c = countAttr(p, 'charm');
-      setResult(s, pi, personalResult(s, pi, ev, Math.min(6, c), [`${ATTR_ICON.charm}持ち：${c}人`]), 'turn');
-      return;
-    }
+  if (ev.kind === 'icon') {
+    setResult(s, pi, resolveIcon(s, ev, pi), 'turn');
+    return;
   }
+  if (ev.kind === 'transfer') {
+    startTransfer(s, pi, eraIdx, 3, 1, ev.name, `${era.icon} ${era.name}から`, 'turn');
+    return;
+  }
+  // 転校：押しつけられる生徒と相手がいなければ不発
+  if (pushTargets(s, pi).length === 0 || p.students.length <= MIN_CLASS) {
+    setResult(s, pi, { title: ev.name, icon: ev.icon, desc: '押しつけられる相手がいなかった。', rows: [{ player: pi, delta: 0 }] }, 'turn');
+    return;
+  }
+  s.phase = { kind: 'push', player: pi };
 }
 
-export function poachable(s: GameState, pi: number): { player: number; student: Student }[] {
-  const out: { player: number; student: Student }[] = [];
-  s.players.forEach((p, i) => {
-    if (i === pi) return;
-    for (const st of p.students) if (!p.roles.includes(st.uid) && p.students.length > 6) out.push({ player: i, student: st });
+/** 通常イベント：その属性を持つ生徒1人につき1pt（係で強化していれば+1） */
+function resolveIcon(s: GameState, ev: IconEventDef, drawer: number): EventResult {
+  const rows: ResultRow[] = s.players.map((p, i) => {
+    const h = iconPoints(p, ev.attr);
+    return { player: i, delta: applyDelta(p, h.points), note: `${h.count}人` };
   });
-  return out;
+  rows.sort((x, y) => y.delta - x.delta);
+  log(s, `${ev.icon}${ev.name}（${s.players[drawer].name}） ` + rows.map((r) => `${s.players[r.player].name} +${r.delta}`).join(' / '));
+  return { title: ev.name, icon: ev.icon, attr: ev.attr, tone: 'blue', desc: ev.desc, scoring: `${ATTR_ICON[ev.attr]} 1人+1pt（係で強化中は+2）`, rows, school: true };
+}
+
+/** 転校で押しつけられる相手（定員に空きがあるクラス） */
+export function pushTargets(s: GameState, pi: number): number[] {
+  return s.players.filter((p) => p.id !== pi && p.students.length < MAX_CLASS).map((p) => p.id);
 }
 
 function finishTransfer(s: GameState) {
@@ -727,7 +631,8 @@ export function step(prev: GameState, a: Action): GameState {
       const ids = new Set(p.students.map((x) => x.uid));
       const used = a.roles.filter((r): r is string => r !== null);
       if (used.some((u) => !ids.has(u)) || new Set(used).size !== used.length) return prev;
-      p.roles = [...a.roles];
+      const k = roleSlots(p);
+      p.roles = a.roles.map((r, i) => (i < k ? r : null));
       const card = CLASS_MAP[p.classCardId!];
       const desc = card.roles
         .map((r, i) => `${ROLES[r].name}:${p.students.find((x) => x.uid === p.roles[i])?.name ?? 'なし'}`)
@@ -741,11 +646,6 @@ export function step(prev: GameState, a: Action): GameState {
     case 'travel': {
       if (a.era < 0 || a.era >= ERAS.length) return prev;
       if (a.era === PRESENT_INDEX) return prev;
-      if (ph.kind === 'warp') {
-        const ev = EVENT_MAP.warp as PersonalEventDef;
-        startTransfer(s, ph.player, a.era, 3, 1, ev.name, `${ERAS[a.era].icon} ${ERAS[a.era].name}から`, 'turn');
-        return s;
-      }
       if (ph.kind === 'summerTravel') {
         if (!s.yearEras.includes(a.era)) return prev;
         const p = s.players[ph.player];
@@ -782,56 +682,24 @@ export function step(prev: GameState, a: Action): GameState {
       if (ph.picks <= 0 || ph.options.length === 0) finishTransfer(s);
       return s;
     }
-    case 'train': {
-      if (ph.kind !== 'train') return prev;
+    case 'push': {
+      if (ph.kind !== 'push') return prev;
       const p = s.players[ph.player];
-      const st = p.students.find((x) => x.uid === a.uid);
-      if (!st) return prev;
-      const ev = EVENT_MAP.train as PersonalEventDef;
-      let line: string;
-      if (a.mode === 'power') {
-        if (st.power >= POWER_CAP) return prev;
-        st.power += 1;
-        line = `${st.name}の数値が+1！（${st.power}）`;
-      } else {
-        if (!canLearn(st, a.attr)) return prev;
-        st.attrs.push(a.attr);
-        line = `${st.name}が${ATTR_ICON[a.attr]}を覚えた！`;
-      }
-      setResult(s, ph.player, personalResult(s, ph.player, ev, 0, [line]), 'turn');
-      return s;
-    }
-    case 'poach': {
-      if (ph.kind !== 'poach') return prev;
-      const ev = EVENT_MAP.poach as PersonalEventDef;
+      const ev = EVENT_MAP.push as PersonalEventDef;
       if (a.uid === null) {
-        setResult(s, ph.player, personalResult(s, ph.player, ev, 0, ['引き抜きはやめておいた。']), 'turn');
+        setResult(s, ph.player, personalResult(s, ph.player, ev, 0, ['やっぱりやめた。']), 'turn');
         return s;
       }
-      const target = poachable(s, ph.player).find((x) => x.student.uid === a.uid);
-      if (!target) return prev;
-      const victim = s.players[target.player];
-      const st = removeStudent(s, victim, a.uid, false)!;
-      s.players[ph.player].students.push(st);
-      victim.points += 3;
-      setResult(
-        s,
-        ph.player,
-        personalResult(s, ph.player, ev, 0, [`${victim.name}のクラスから${st.name}を引き抜いた！`, `${victim.name}には移籍金+3pt`]),
-        'turn',
-      );
+      if (a.target === undefined || !pushTargets(s, ph.player).includes(a.target)) return prev;
+      if (!p.students.some((x) => x.uid === a.uid) || p.students.length <= MIN_CLASS) return prev;
+      const st = removeStudent(s, p, a.uid, false)!;
+      const to = s.players[a.target];
+      to.students.push(st);
+      setResult(s, ph.player, personalResult(s, ph.player, ev, 0, [`${st.icon}${st.name} を ${to.name} のクラスへ押しつけた！`]), 'turn');
       return s;
     }
   }
   return prev;
-}
-
-/** 特訓で覚えられる属性か（👊は覚えられない／👊持ちは📚を覚えられない） */
-export function canLearn(st: Student, attr: Student['attrs'][number]): boolean {
-  if (st.attrs.includes(attr)) return false;
-  if (attr === 'fight') return false;
-  if (attr === 'study' && st.attrs.includes('fight')) return false;
-  return true;
 }
 
 export function finalRanking(s: GameState): Player[] {

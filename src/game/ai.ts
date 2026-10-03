@@ -1,29 +1,30 @@
-import { MAX_CLASS, POWER_CAP, classPower, roleOf, studentTotal } from './calc';
+import { MAX_CLASS, MIN_CLASS, classPower, iconPoints, roleOf, roleSlots, studentTotal } from './calc';
 import { CARD_MAP } from './data/cards';
 import { CLASS_MAP } from './data/classes';
 import { ERAS } from './data/eras';
-import { EVENT_MAP, type SchoolEventDef } from './data/events';
-import { HISTORY_ERAS, canLearn, poachable } from './engine';
-import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type Student } from './types';
+import { EVENT_MAP, ICON_EVENTS, type SchoolEventDef } from './data/events';
+import { pushTargets } from './engine';
+import { ATTR_ICON, type Action, type GameState, type Player, type Student } from './types';
 
 /** クラスの強さを測る代表イベント（scaleで正規化、wは重要度） */
 const REPRESENTATIVE: { id: string; scale: number; w: number }[] = [
-  { id: 'test1', scale: 3, w: 2 },
-  { id: 'sportsday', scale: 30, w: 1.2 },
-  { id: 'festival', scale: 30, w: 1.2 },
-  { id: 'yankee', scale: 14, w: 0.8 },
-  { id: 'election', scale: 8, w: 0.6 },
-  { id: 'quiz', scale: 20, w: 0.5 },
-  { id: 'marathon', scale: 2, w: 0.4 },
-  { id: 'chorus', scale: 2, w: 0.4 },
-  { id: 'eating', scale: 8, w: 0.3 },
-  { id: 'graduation', scale: 120, w: 1 },
+  { id: 'test1', scale: 3, w: 1.5 },
+  { id: 'sportsday', scale: 20, w: 1 },
+  { id: 'festival', scale: 20, w: 1 },
+  { id: 'yankee', scale: 10, w: 0.8 },
+  { id: 'election', scale: 7, w: 0.5 },
+  { id: 'chorus', scale: 2, w: 0.3 },
+  { id: 'graduation', scale: 100, w: 1 },
 ];
+const ICON_TOTAL = ICON_EVENTS.reduce((a, e) => a + e.count, 0);
 
 export function classScore(p: Player): number {
   let total = 0;
   for (const r of REPRESENTATIVE) total += (classPower(p, EVENT_MAP[r.id] as SchoolEventDef).power / r.scale) * r.w;
-  return total;
+  // 通常イベント（アイコン）の期待点：持っている生徒が多いほど稼げる
+  let icon = 0;
+  for (const e of ICON_EVENTS) icon += (iconPoints(p, e.attr).points * e.count) / ICON_TOTAL;
+  return total + (icon / 3) * 2;
 }
 
 export interface CategorySummary {
@@ -49,9 +50,10 @@ export function classSummary(p: Player): CategorySummary[] {
 export function autoRoles(p: Player): (string | null)[] {
   if (!p.classCardId) return [];
   const n = CLASS_MAP[p.classCardId].roles.length;
+  const k = roleSlots(p);
   const work: Player = { ...p, roles: Array(n).fill(null) };
   for (let pass = 0; pass < 2; pass++) {
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < k; i++) {
       let best: string | null = work.roles[i];
       let bestScore = -Infinity;
       for (const st of p.students) {
@@ -138,35 +140,21 @@ export function cpuAction(s: GameState): Action | null {
       }
       return { type: 'pickTransfer', index: bestIdx, releaseUid: best.release };
     }
-    case 'train': {
+    case 'push': {
       const p = s.players[ph.player];
+      const targets = pushTargets(s, ph.player);
+      if (!targets.length || p.students.length <= MIN_CLASS) return { type: 'push', uid: null };
       const base = classScore(p);
-      let best: { action: Action; gain: number } = { action: { type: 'train', uid: p.students[0].uid, mode: 'power' }, gain: -Infinity };
-      const tryStudent = (uid: string, mod: (x: Student) => Student, action: Action) => {
-        const students = p.students.map((x) => (x.uid === uid ? mod(x) : x));
-        const g = classScore({ ...p, students }) - base;
-        if (g > best.gain) best = { action, gain: g };
-      };
+      let best: { uid: string; loss: number } | null = null;
       for (const st of p.students) {
-        if (st.power < POWER_CAP) tryStudent(st.uid, (x) => ({ ...x, power: x.power + 1 }), { type: 'train', uid: st.uid, mode: 'power' });
-        for (const a of ATTRS as Attr[]) {
-          if (!canLearn(st, a)) continue;
-          tryStudent(st.uid, (x) => ({ ...x, attrs: [...x.attrs, a] }), { type: 'train', uid: st.uid, mode: 'attr', attr: a });
-        }
+        const loss = base - classScore(withStudents(p, p.students.filter((x) => x.uid !== st.uid)));
+        if (!best || loss < best.loss) best = { uid: st.uid, loss };
       }
-      return best.action;
+      // 席が埋まってきた時か、ほぼ損しない時だけ押しつける。相手はトップのクラス
+      if (!best || (best.loss > 0.05 && p.students.length < MAX_CLASS - 2)) return { type: 'push', uid: null };
+      const target = [...targets].sort((x, y) => s.players[y].points - s.players[x].points)[0];
+      return { type: 'push', uid: best.uid, target };
     }
-    case 'poach': {
-      const p = s.players[ph.player];
-      let best: { uid: string | null; gain: number } = { uid: null, gain: 0 };
-      for (const { student } of poachable(s, ph.player)) {
-        const g = evaluateTransfer(p, student).gain;
-        if (g > best.gain) best = { uid: student.uid, gain: g };
-      }
-      return { type: 'poach', uid: best.uid };
-    }
-    case 'warp':
-      return { type: 'travel', era: bestEra(s, HISTORY_ERAS) };
     case 'summerTravel':
       return { type: 'travel', era: bestEra(s, s.yearEras) };
     case 'result':

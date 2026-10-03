@@ -126,9 +126,8 @@ export type Phase =
       reason: string;
       ctx: ResultCtx;
     }
-  | { kind: 'train'; player: number }
-  | { kind: 'poach'; player: number }
-  | { kind: 'warp'; player: number }
+  /** 転校：いらない生徒を別のクラスに押しつける */
+  | { kind: 'push'; player: number }
   | { kind: 'summerTravel'; player: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
   | { kind: 'gameOver' };
@@ -141,7 +140,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 4;
+  version: 5;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎学期ここから引く） */
@@ -172,5 +171,4 @@ export type Action =
   | { type: 'travel'; era: number }
   | { type: 'drawEvent' }
   | { type: 'pickTransfer'; index: number | null; releaseUid?: string }
-  | { type: 'train'; uid: string; mode: 'power' } | { type: 'train'; uid: string; mode: 'attr'; attr: Attr }
-  | { type: 'poach'; uid: string | null };
+  | { type: 'push'; uid: string | null; target?: number };

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { classScore, evaluateTransfer } from '../game/ai';
-import { MAX_CLASS, POWER_CAP, roleOf } from '../game/calc';
+import { MAX_CLASS, roleOf } from '../game/calc';
 import { CLASS_MAP } from '../game/data/classes';
 import { ERAS } from '../game/data/eras';
 import { roleDesc, ROLES } from '../game/data/roles';
-import { HISTORY_ERAS, MONTHS, STARTING_MEMBERS, canLearn, currentEra, poachable, termOfMonth } from '../game/engine';
-import { ATTRS, ATTR_ICON, ATTR_LABEL, type Action, type Attr, type GameState } from '../game/types';
+import { MONTHS, STARTING_MEMBERS, currentEra, pushTargets, termOfMonth } from '../game/engine';
+import type { Action, GameState } from '../game/types';
+import { Classroom } from './Classroom';
 import { ResultView } from './ResultView';
 import { RoleEditor } from './RoleEditor';
 import { StudentCard } from './StudentCard';
@@ -114,6 +115,7 @@ export function PhasePanel({ state, dispatch, cpuBusy }: Props) {
           <RoleEditor
             key={`${p.id}-${state.year}-${state.monthIdx}`}
             player={p}
+            year={state.year}
             termLabel={`${t}学期`}
             onConfirm={(roles) => dispatch({ type: 'setRoles', roles })}
           />
@@ -139,45 +141,13 @@ export function PhasePanel({ state, dispatch, cpuBusy }: Props) {
     }
     case 'transfer':
       return <TransferPanel state={state} dispatch={dispatch} />;
-    case 'train':
-      return <TrainPanel state={state} dispatch={dispatch} />;
-    case 'poach': {
-      const list = poachable(state, ph.player);
-      return (
-        <div className="panel">
-          <div className="panel-head">
-            <h2>🕵️ 引き抜き</h2>
-            <button className="btn ghost" onClick={() => dispatch({ type: 'poach', uid: null })}>
-              やめる
-            </button>
-          </div>
-          {state.players
-            .filter((p) => p.id !== ph.player)
-            .map((p) => {
-              const mine = list.filter((x) => x.player === p.id);
-              if (mine.length === 0) return null;
-              return (
-                <div key={p.id}>
-                  <h3>
-                    <span className="dot" style={{ background: p.color }} /> {p.name}
-                  </h3>
-                  <div className="card-grid">
-                    {mine.map(({ student }) => (
-                      <StudentCard key={student.uid} student={student} owner={p} onClick={() => dispatch({ type: 'poach', uid: student.uid })} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      );
-    }
-    case 'warp':
+    case 'push':
+      return <PushPanel state={state} dispatch={dispatch} />;
     case 'summerTravel': {
-      const choices = ph.kind === 'warp' ? HISTORY_ERAS : state.yearEras;
+      const choices = state.yearEras;
       return (
         <div className="panel center">
-          <h2>{ph.kind === 'warp' ? '✨ ワープ先を選ぶ' : '🌻 夏休み合宿 — 行き先'}</h2>
+          <h2>🌻 夏休み合宿 — 行き先</h2>
           <div className="era-buttons">
             {choices.map((i) => {
               const e = ERAS[i];
@@ -274,47 +244,43 @@ function TransferPanel({ state, dispatch }: { state: GameState; dispatch: (a: Ac
   );
 }
 
-function TrainPanel({ state, dispatch }: { state: GameState; dispatch: (a: Action) => void }) {
+function PushPanel({ state, dispatch }: { state: GameState; dispatch: (a: Action) => void }) {
   const ph = state.phase;
   const [uid, setUid] = useState<string | null>(null);
-  const [mode, setMode] = useState<'power' | Attr>('power');
-  if (ph.kind !== 'train') return null;
+  const [target, setTarget] = useState<number | null>(null);
+  if (ph.kind !== 'push') return null;
   const p = state.players[ph.player];
-  const st = p.students.find((x) => x.uid === uid);
-  const ok = st ? (mode === 'power' ? st.power < POWER_CAP : canLearn(st, mode)) : false;
-  const can = (s: (typeof p.students)[number]) => (mode === 'power' ? s.power < POWER_CAP : canLearn(s, mode));
-  const list = [...p.students].sort((a, b) => Number(can(b)) - Number(can(a)) || b.power - a.power);
+  const targets = pushTargets(state, ph.player);
   return (
     <div className="panel">
       <div className="panel-head">
-        <h2>💪 特訓</h2>
-        <div className="stat-picker">
-          <button className={`btn small ${mode === 'power' ? 'primary' : 'ghost'}`} onClick={() => setMode('power')}>
-            数値+1
+        <h2>📦 転校 — 押しつける生徒と相手を選ぶ</h2>
+        <div className="role-actions">
+          <button className="btn ghost" onClick={() => dispatch({ type: 'push', uid: null })}>
+            やめる
           </button>
-          {(ATTRS as Attr[])
-            .filter((a) => a !== 'fight')
-            .map((a) => (
-              <button key={a} className={`btn small ${mode === a ? 'primary' : 'ghost'}`} onClick={() => setMode(a)} title={`${ATTR_LABEL[a]}を覚える`}>
-                +{ATTR_ICON[a]}
-              </button>
-            ))}
+          <button
+            className="btn primary"
+            disabled={!uid || target === null}
+            onClick={() => uid && target !== null && dispatch({ type: 'push', uid, target })}
+          >
+            押しつける
+          </button>
         </div>
-        <button
-          className="btn primary"
-          disabled={!ok}
-          onClick={() =>
-            uid && dispatch(mode === 'power' ? { type: 'train', uid, mode: 'power' } : { type: 'train', uid, mode: 'attr', attr: mode })
-          }
-        >
-          決定
-        </button>
       </div>
-      <div className="card-grid">
-        {list.map((s) => (
-          <StudentCard key={s.uid} student={s} owner={p} selected={uid === s.uid} dim={!can(s)} onClick={() => setUid(s.uid)} />
+      <div className="seg push-targets">
+        {targets.map((t) => (
+          <button
+            key={t}
+            className={`btn small ${target === t ? 'primary' : 'ghost'}`}
+            style={{ borderColor: state.players[t].color }}
+            onClick={() => setTarget(t)}
+          >
+            → {state.players[t].name}
+          </button>
         ))}
       </div>
+      <Classroom player={p} year={state.year} onSeatClick={setUid} selectedUid={uid} />
     </div>
   );
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
-import { attrValues, classPower } from './calc';
+import { attrValues, classPower, iconPoints, roleSlots } from './calc';
 import { CARDS, parseAttrs } from './data/cards';
 import { ARCHETYPES } from './data/modern';
-import { EVENT_MAP, type SchoolEventDef } from './data/events';
+import { ERA_EVENTS, EVENT_MAP, type SchoolEventDef } from './data/events';
 import { currentEra, newGame, step } from './engine';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import type { Attr, GameState, Student } from './types';
@@ -34,8 +34,8 @@ describe('engine', () => {
         expect(s.year).toBe(years);
         for (const p of s.players) {
           expect(Number.isFinite(p.points)).toBe(true);
-          expect(p.students.length).toBeGreaterThanOrEqual(6);
-          expect(p.students.length).toBeLessThanOrEqual(30);
+          expect(p.students.length).toBeGreaterThanOrEqual(4);
+          expect(p.students.length).toBeLessThanOrEqual(12);
           expect(new Set(p.students.map((x) => x.uid)).size).toBe(p.students.length);
         }
         // 歴史カードは同時に2人存在しない
@@ -45,7 +45,7 @@ describe('engine', () => {
     }
   }
 
-  it('deals the 12 starting members one card at a time, alternating between players', () => {
+  it('deals the 6 starting members one card at a time, alternating between players', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 1);
     s = step(s, { type: 'drawClass' });
     s = step(s, { type: 'continue' });
@@ -61,10 +61,10 @@ describe('engine', () => {
       expect(s.players[who].students.length).toBe(before + 1);
     }
     expect(order.slice(0, 4)).toEqual([0, 1, 0, 1]);
-    expect(order).toHaveLength(24);
+    expect(order).toHaveLength(12);
     expect(s.phase.kind).toBe('roles');
     for (const p of s.players) {
-      expect(p.students).toHaveLength(12);
+      expect(p.students).toHaveLength(6);
       expect(p.students.every((x) => x.era === 'present')).toBe(true);
     }
     expect(s.players[0].classCardId).not.toBe(s.players[1].classCardId);
@@ -124,12 +124,52 @@ describe('engine', () => {
       expect(new Set(s.yearEras).size).toBe(3);
       expect(s.yearEras).not.toContain(PRESENT_INDEX);
       const ph = s.phase;
-      if (ph.kind === 'transfer' && ph.title === '転校生がやってくる！') {
+      if (ph.kind === 'transfer' && ph.title === '転入') {
         const era = ERAS[currentEra(s)].id;
         for (const o of ph.options) expect(o.era).toBe(era);
       }
       s = step(s, cpuAction(s)!);
     }
     expect(seen.length).toBe(2);
+  });
+
+  it('unlocks role slots as the class grows (6→3, 8→4, 10→5, 12→6)', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 5);
+    s = step(s, { type: 'drawClass' });
+    const p = s.players[0];
+    const base = { ...p.students[0] };
+    const sized = (n: number) => ({ ...p, students: Array.from({ length: n }, (_, i) => ({ ...base, uid: `x${i}` })) });
+    expect([6, 7, 8, 10, 12].map((n) => roleSlots(sized(n)))).toEqual([3, 3, 4, 5, 6]);
+  });
+
+  it('icon cards give 1pt per holder, +1 when a role boosts that attribute', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 9);
+    s = step(s, { type: 'drawClass' });
+    const p = s.players[0];
+    p.classCardId = 'elite'; // 0番目の係は学習係（📚×1.5）
+    const mk = (uid: string, attrs: Attr[]): Student => ({ uid, name: uid, title: '', era: 'present', rarity: 'N', icon: '', power: 3, attrs, tags: ['現代'], flavor: '', joined: '', mvp: 0 });
+    p.students = [mk('a', ['study']), mk('b', ['study', 'art']), mk('c', ['sports'])];
+    p.roles = ['a', null, null, null, null, null];
+    expect(iconPoints(p, 'study')).toEqual({ count: 2, points: 3 });
+    expect(iconPoints(p, 'fight')).toEqual({ count: 0, points: 0 });
+  });
+
+  it('era-specific event cards only appear in their own term', () => {
+    const s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 77);
+    const era = ERAS[currentEra(s)].id;
+    const eraIds = new Set(ERA_EVENTS.filter((e) => e.era === era).map((e) => e.id));
+    const others = new Set(ERA_EVENTS.filter((e) => e.era !== era).map((e) => e.id));
+    expect(s.eventDeck.some((id) => eraIds.has(id))).toBe(true);
+    expect(s.eventDeck.some((id) => others.has(id))).toBe(false);
+  });
+
+  it('push moves an unwanted student to another class', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
+    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
+    s.phase = { kind: 'push', player: 0 };
+    const uid = s.players[0].students[0].uid;
+    const next = step(s, { type: 'push', uid, target: 1 });
+    expect(next.players[0].students).toHaveLength(5);
+    expect(next.players[1].students.map((x) => x.uid)).toContain(uid);
   });
 });

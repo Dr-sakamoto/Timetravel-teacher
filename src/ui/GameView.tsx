@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { classSummary, cpuAction } from '../game/ai';
-import { MAX_CLASS, classGuard, roleOf } from '../game/calc';
-import { CLASS_MAP, className } from '../game/data/classes';
+import { classGuard } from '../game/calc';
+import { CLASS_MAP } from '../game/data/classes';
 import { actingPlayer, MONTHS, termOfMonth } from '../game/engine';
-import { ATTR_ICON, type Action, type Attr, type GameState } from '../game/types';
+import type { Action, GameState } from '../game/types';
 import { GameOver } from './GameOver';
 import { PhasePanel } from './PhasePanel';
-import { StudentCard } from './StudentCard';
+import { Classroom } from './Classroom';
 import { EraBar } from './Timeline';
 
 interface Props {
@@ -16,15 +16,12 @@ interface Props {
   onRules: () => void;
 }
 
-type SortKey = 'role' | 'new' | 'power' | Attr;
-
 export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const ph = state.phase;
   const actor = actingPlayer(state);
   const allCpu = state.players.every((p) => p.isCpu);
   const [speed, setSpeed] = useState<'normal' | 'fast'>('normal');
   const [viewPlayer, setViewPlayer] = useState<number>(actor ?? 0);
-  const [sortKey, setSortKey] = useState<SortKey>('role');
   const [showLog, setShowLog] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -40,9 +37,10 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
     if (ph.kind === 'gameOver') return;
     const mul = speed === 'fast' ? 0.35 : 1;
     if (ph.kind === 'result') {
-      const auto = (ph.player !== null && state.players[ph.player].isCpu) || allCpu;
+      const iconCard = ph.result.tone === 'blue';
+      const auto = (ph.player !== null && state.players[ph.player].isCpu) || allCpu || iconCard;
       if (!auto) return;
-      const t = setTimeout(() => dispatch({ type: 'continue' }), 2600 * mul);
+      const t = setTimeout(() => dispatch({ type: 'continue' }), (iconCard ? 1800 : 2600) * mul);
       return () => clearTimeout(t);
     }
     if (!cpuTurn) return;
@@ -63,16 +61,6 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const ranking = [...state.players].sort((a, b) => b.points - a.points);
   const vp = state.players[viewPlayer];
   const card = vp.classCardId ? CLASS_MAP[vp.classCardId] : null;
-  const sorted = [...vp.students].sort((a, b) => {
-    if (sortKey === 'role') {
-      const ra = roleOf(vp, a.uid) ? 0 : 1;
-      const rb = roleOf(vp, b.uid) ? 0 : 1;
-      return ra - rb;
-    }
-    if (sortKey === 'new') return b.uid.localeCompare(a.uid, undefined, { numeric: true });
-    if (sortKey === 'power') return b.power - a.power;
-    return Number(b.attrs.includes(sortKey)) - Number(a.attrs.includes(sortKey)) || b.power - a.power;
-  });
   const month = MONTHS[Math.min(state.monthIdx, 11)];
   const term = termOfMonth(month);
 
@@ -159,9 +147,6 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               ))}
             </div>
             <div className="summary-row small">
-              <div className="summary" title={`${className(card.id, state.year)}「${card.nick}」`}>
-                👥<b>{vp.students.length}</b>/{MAX_CLASS}
-              </div>
               {classSummary(vp).map((c) => (
                 <div key={c.label} className="summary" title={c.hint}>
                   {c.icon}
@@ -174,30 +159,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
                 </div>
               )}
             </div>
-            <div className="sort">
-              {(
-                [
-                  ['role', '🎖️'],
-                  ['new', '🆕'],
-                  ['power', '🔢'],
-                  ['study', ATTR_ICON.study],
-                  ['sports', ATTR_ICON.sports],
-                  ['art', ATTR_ICON.art],
-                  ['charm', ATTR_ICON.charm],
-                  ['fight', ATTR_ICON.fight],
-                ] as [SortKey, string][]
-              ).map(([k, l]) => (
-                <button key={k} className={`btn small ${sortKey === k ? 'primary' : 'ghost'}`} onClick={() => setSortKey(k)}>
-                  {l}
-                </button>
-              ))}
-            </div>
           </div>
-          <div className="card-grid">
-            {sorted.map((s) => (
-              <StudentCard key={s.uid} student={s} owner={vp} />
-            ))}
-          </div>
+          {!(ph.kind === 'roles' || ph.kind === 'push') && <Classroom player={vp} year={state.year} />}
         </section>
       )}
     </div>
