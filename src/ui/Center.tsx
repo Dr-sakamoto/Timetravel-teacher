@@ -168,21 +168,16 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
       );
     }
     case 'cyborg': {
-      const mine = state.players[ph.player].students.find((x) => x.uid === pick.uid);
-      const target = pick.target !== null ? state.players[pick.target] : null;
-      const theirs = target?.students.find((x) => x.uid === pick.theirUid);
-      const chosen = mine ? { uid: mine.uid, target: ph.player } : theirs ? { uid: theirs.uid, target: pick.target! } : null;
+      const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
       return (
         <div className="say">
-          🦾 {who} のサイボーグ化 — {cardRule(EVENT_MAP.cyborg)}。手前の教室の生徒か、相手の名札をタップしてその教室の生徒を選ぶ
-          <div className="say-sub">
-            {mine ? `${mine.icon}${mine.name}（自分のクラス）` : theirs ? `${theirs.icon}${theirs.name}（${target!.name}）` : '生徒：未選択'}
-          </div>
+          🦾 {who} のサイボーグ化 — {cardRule(EVENT_MAP.cyborg)}。手前の教室から生徒をタップ
+          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
           <div className="say-sub">
             <button className="btn ghost" onClick={() => dispatch({ type: 'cyborg', uid: null })}>
               使わない
             </button>
-            <button className="btn primary" disabled={!chosen} onClick={() => chosen && dispatch({ type: 'cyborg', ...chosen })}>
+            <button className="btn primary" disabled={!pick.uid} onClick={() => dispatch({ type: 'cyborg', uid: pick.uid })}>
               サイボーグにする
             </button>
           </div>

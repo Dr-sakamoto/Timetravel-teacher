@@ -1,6 +1,6 @@
 import { MAX_CLASS, STARTING_MEMBERS } from '../game/calc';
 import { CARDS } from '../game/data/cards';
-import { ERAS } from '../game/data/eras';
+import { ERAS, favorLabel } from '../game/data/eras';
 import {
   CYBORG_CARDS,
   ERA_CARDS,
@@ -104,7 +104,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             <b>グッズ</b>（共通：{GOODS_CARDS.filter((g) => !g.era).map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`).join('・')}＋時代ごとに2種）：生徒1人に装備して、そのアイコンを＋1。
           </li>
           <li>
-            <b>時代イベント</b>（全クラス・2種×2枚）：<b>時代ごとに有利なアイコンが決まっていて</b>、2種ともそのアイコンで競う（効果はカードごとに違う）。<b>その時代出身の子のアイコンは2倍</b>。1年の3つの時代は年の初めに決まって上に出ているので、次の学期に向けてクラスを作っておこう。
+            <b>時代イベント</b>（全クラス・2種×2枚）：<b>時代ごとに有利なアイコン（0〜2個）が決まっていて</b>、そのアイコンで競う（効果はカードごとに違う。現代は優遇なしで全アイコン勝負）。<b>その時代出身の子のアイコンは2倍</b>。1年の3つの時代は年の初めに決まって上に出ているので、次の学期に向けてクラスを作っておこう。
           </li>
           <li>
             <b>襲来</b>（全クラス・時代ごとに1枚）：クラスの👊の数 − 敵の強さ（その時代出身の子は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス。
@@ -120,7 +120,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             const raid = RAID_CARDS.find((c) => c.era === era.id)!;
             return (
               <li key={era.id}>
-                {era.icon} <b>{era.name}</b>（<b>{ATTR_ICON[era.favor]}有利</b>）：
+                {era.icon} <b>{era.name}</b>（<b>{favorLabel(era)}</b>）：
                 {era.id === 'present' ? (
                   <>
                     転校生{' '}

@@ -1,6 +1,6 @@
-import { ERAS } from '../game/data/eras';
+import { ERAS, favorLabel } from '../game/data/eras';
 import { DECK_GROUPS, currentEra, deckBreakdown, type DeckGroup, type DeckRow } from '../game/engine';
-import { ATTR_ICON, type GameState } from '../game/types';
+import type { GameState } from '../game/types';
 
 const GROUP_NOTE: Record<DeckGroup, string> = {
   通常: 'めくった人：クラス全員のそのアイコンの数',
@@ -27,7 +27,7 @@ export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => 
         </button>
         <h2>
           {era.icon}
-          {era.name}の山札（{ATTR_ICON[era.favor]}有利）
+          {era.name}の山札（{favorLabel(era)}）
         </h2>
         <p>
           山札の残り {state.eventDeck.length}枚／捨て札 {state.discard.length}枚（合わせて {total}枚。装備されたグッズと転入した人物は含まない）

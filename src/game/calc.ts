@@ -1,5 +1,5 @@
 import { MAX_PER_ROLE, MAX_ROLE_SEATS, ROLES } from './data/roles';
-import type { Attr, EraId, Player, RoleId, RoleSeat, Student } from './types';
+import { ATTRS, type Attr, type EraId, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 教室の席の数（クラスの定員） */
 export const MAX_CLASS = 9;
@@ -63,8 +63,14 @@ export interface AttrScore {
   holders: Student[];
 }
 
-/** クラス全員のアイコンaの合計数＋係ボーナス。doubleEra の生徒のアイコンは2倍 */
-export function attrScore(p: Player, a: Attr, doubleEra?: EraId): AttrScore {
+/** クラス全員のアイコンaの合計数＋係ボーナス。doubleEra の生徒のアイコンは2倍。'all' は全種類の合計 */
+export function attrScore(p: Player, a: Attr | 'all', doubleEra?: EraId): AttrScore {
+  if (a === 'all') {
+    const parts = ATTRS.map((x) => attrScore(p, x, doubleEra));
+    const sum = parts.reduce((t, x) => t + x.sum, 0);
+    const bonus = parts.reduce((t, x) => t + x.bonus, 0);
+    return { sum, bonus, total: sum + bonus, holders: p.students.filter((s) => s.attrs.length > 0) };
+  }
   let sum = 0;
   let bonus = 0;
   const holders: Student[] = [];
@@ -110,8 +116,16 @@ export interface Contribution {
   pts: number;
 }
 
-/** アイコンaの点を1枚ずつに分けたもの（合計は attrScore と同じ）。doubleEra の生徒は×2 */
-export function contributions(p: Player, a: Attr, doubleEra?: EraId): Contribution[] {
+/** アイコンaの点を1枚ずつに分けたもの（合計は attrScore と同じ）。doubleEra の生徒は×2。'all' は全種類の合計 */
+export function contributions(p: Player, a: Attr | 'all', doubleEra?: EraId): Contribution[] {
+  if (a === 'all') {
+    return p.students
+      .filter((s) => s.attrs.length > 0)
+      .map((s) => {
+        const parts = ATTRS.filter((x) => s.attrs.includes(x)).map((x) => contributions({ ...p, students: [s] }, x, doubleEra)[0]);
+        return { student: s, icons: s.attrs.length, era: s.era === doubleEra, role: parts.some((x) => x.role), pts: parts.reduce((t, x) => t + x.pts, 0) };
+      });
+  }
   return p.students
     .filter((s) => s.attrs.includes(a))
     .map((s) => {

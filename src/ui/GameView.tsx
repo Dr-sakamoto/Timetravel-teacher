@@ -88,7 +88,6 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const targets =
     choosing === 'kachikomi' ? kachikomiTargets(state, focus)
     : choosing === 'exchange' ? exchangeTargets(state, focus)
-    : choosing === 'cyborg' ? state.players.filter((p) => p.id !== focus && cyborgable(p).length > 0).map((p) => p.id)
     : [];
   const meNow = state.players[focus];
   const selectable =
@@ -100,12 +99,12 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const pickOpponent = (pi: number) => {
     if (!targets.includes(pi)) return setPeek(pi);
     setPick((x) => ({ ...x, target: pi, theirUid: x.target === pi ? x.theirUid : null }));
-    // クラス替え・サイボーグ化は相手の教室を開いて、生徒を選ぶ
-    if (choosing === 'exchange' || choosing === 'cyborg') setPeek(pi);
+    // クラス替えは相手の教室を開いて、交換する生徒を選ぶ
+    if (choosing === 'exchange') setPeek(pi);
   };
-  const peekPicking = (choosing === 'exchange' || choosing === 'cyborg') && peek !== null && peek === pick.target;
+  const peekPicking = choosing === 'exchange' && peek !== null && peek === pick.target;
   /** 相手の教室で選べる生徒 */
-  const peekable = (pi: number) => (choosing === 'cyborg' ? cyborgable(state.players[pi]) : tradeable(state.players[pi]));
+  const peekable = (pi: number) => tradeable(state.players[pi]);
   // 手番の人が相手なら、その人の教室を卓の中央に出す
   const stage = actor !== null && actor !== focus ? actor : null;
   // 演出中は、まだ届いていない点を名札から引いて見せる
@@ -200,8 +199,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
                 selectable.length
                   ? (uid) =>
                       selectable.some((x) => x.uid === uid) &&
-                      // サイボーグ化は自分か相手のどちらか1人なので、自分の子を選んだら相手の選択は外す
-                      setPick((x) => (choosing === 'cyborg' ? { uid, target: null, theirUid: null } : { ...x, uid }))
+                      setPick((x) => ({ ...x, uid }))
                   : undefined
               }
               selectedUid={choosing ? pick.uid : null}
@@ -217,11 +215,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
             <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
               ✕
             </button>
-            {peekPicking && (
-              <div className="peek-hint">
-                {choosing === 'cyborg' ? '🦾 サイボーグにする生徒をタップ' : '🔁 こちらのクラスに来てもらう生徒をタップ（係の子は選べない）'}
-              </div>
-            )}
+            {peekPicking && <div className="peek-hint">🔁 こちらのクラスに来てもらう生徒をタップ（係の子は選べない）</div>}
             <Playmat
               player={state.players[peek]}
               year={state.year}
@@ -233,7 +227,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
                 peekPicking
                   ? (uid) => {
                       if (!peekable(peek).some((x) => x.uid === uid)) return;
-                      setPick((x) => (choosing === 'cyborg' ? { uid: null, target: x.target, theirUid: uid } : { ...x, theirUid: uid }));
+                      setPick((x) => ({ ...x, theirUid: uid }));
                       setPeek(null);
                     }
                   : undefined
