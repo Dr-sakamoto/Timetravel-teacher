@@ -96,7 +96,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 18,
+    version: 19,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -395,12 +395,10 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
   /** その子が競うアイコンを持っているか */
   const has = (x: Student) => (c.attr === 'all' ? x.attrs.length > 0 : x.attrs.includes(c.attr));
   const icon = c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr];
-  const table = CONTEST_POINTS[s.players.length] ?? CONTEST_POINTS[5];
   const scores = s.players.map((p) => attrScore(p, c.attr, c.era));
   // 代表：クラスで一番そのアイコンの点が多い1人
   const aces = s.players.map((p) => contributions(p, c.attr, c.era).sort((x, y) => y.pts - x.pts)[0]);
-  const values = s.players.map((_, i) => (e.type === 'ace' || e.type === 'duel' ? aces[i]?.pts ?? 0 : scores[i].total));
-  const rk = ranks(values);
+  const values = s.players.map((_, i) => (e.type === 'ace' || e.type === 'champion' ? aces[i]?.pts ?? 0 : scores[i].total));
   const best = Math.max(...values);
   const worst = Math.min(...values);
   const rows = s.players.map((p, i): ResultRow => {
@@ -408,16 +406,14 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
     let holders = sc.holders;
     let delta = 0;
     let count: number | undefined = values[i];
-    let rank: number | undefined;
     let note: string | undefined;
     switch (e.type) {
       case 'sum':
         delta = values[i] * e.mult;
         break;
-      case 'rank':
-      case 'duel':
-        rank = rk[i];
-        delta = (table[rk[i]] ?? 0) * e.mult;
+      case 'champion':
+        delta = values[i] > 0 && values[i] === best ? values[i] * e.mult : 0;
+        note = delta > 0 ? '優勝' : undefined;
         break;
       case 'top':
         delta = values[i] > 0 && values[i] === best ? values[i] * e.mult : 0;
@@ -458,14 +454,14 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
         break;
       }
     }
-    if (e.type === 'ace' || e.type === 'duel') holders = aces[i] ? [aces[i].student] : [];
+    if (e.type === 'ace' || e.type === 'champion') holders = aces[i] ? [aces[i].student] : [];
     p.points += delta;
     if (delta > 0) holders.filter(has).forEach((h) => h.mvp++);
-    return { player: i, count, rank, delta, note, uids: holders.map((h) => h.uid) };
+    return { player: i, count, delta, note, uids: holders.map((h) => h.uid) };
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, art: c.id, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows };
 }
 
 /** 火星人の侵略：空席のあるクラス全部に、アイコンのないエイリアンが1人ずつ転入する */
@@ -475,11 +471,12 @@ function resolveInvasion(s: GameState, c: ContestCard): EventResult {
     if (p.students.length >= MAX_CLASS) return { player: i, delta: 0, note: '満席' };
     const st: Student = {
       uid: `u${s.uidCounter++}`,
-      name: 'エイリアン',
-      title: '火星人',
+      name: '火星人',
+      title: 'エイリアン',
       era: 'future',
       rarity: 'N',
       icon: '👽',
+      art: 'martian',
       attrs: [],
       flavor: '何もできない。ただ席に座っている。',
       joined: joinedLabel(s),
@@ -490,7 +487,7 @@ function resolveInvasion(s: GameState, c: ContestCard): EventResult {
     return { player: i, delta: 0, note: '👽転入', uids: [st.uid] };
   });
   log(s, `【${c.name}】 空席のあるクラスにエイリアンが転入した。`);
-  return { title: c.name, icon: c.icon, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows, students: aliens.slice(0, 1) };
+  return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows, students: aliens.slice(0, 1) };
 }
 
 /** サイボーグ化の対象（自分のクラスの子。もうサイボーグの子は除く） */
@@ -509,7 +506,7 @@ function resolveRaid(s: GameState, c: RaidCard): EventResult {
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, art: c.id, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
 }
 
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {
@@ -817,7 +814,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'サイボーグ化', icon: '🦾', tone: 'personal', desc: `${was}がサイボーグになった！`, rule: cardRule(EVENT_MAP.cyborg), rows: [], students: [st] },
+        { title: 'サイボーグ化', icon: '🦾', art: 'cyborg', tone: 'personal', desc: `${was}がサイボーグになった！`, rule: cardRule(EVENT_MAP.cyborg), rows: [], students: [st] },
         'turn',
       );
       return s;

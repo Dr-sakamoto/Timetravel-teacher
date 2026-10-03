@@ -35,12 +35,11 @@ export interface SwingCard {
 }
 
 /**
- * 時代イベントの効果（数えるアイコンはカードの attr。その時代出身の生徒のアイコンはどれも2倍）
+ * 時代イベントの効果（数えるアイコンはカードの attr。その時代出身の生徒のアイコンはどれも2倍、係ボーナスも乗る）
  *   sum       … クラスのアイコンの合計 × mult
- *   rank      … アイコンの合計で順位をつけ、順位点 × mult
  *   top       … アイコンの合計が一番多いクラスだけ、合計 × mult（同点ならどちらも）
- *   ace       … クラスで一番アイコンの多い1人（代表）の数 × mult
- *   duel      … 代表1人どうしで順位をつけ、順位点 × mult
+ *   ace       … どのクラスも、クラスで一番アイコンの多い1人（代表）の数 × mult
+ *   champion  … 全クラスで一番アイコンの多い1人がいるクラスだけ、その子の数 × mult（同点ならどちらも）
  *   heads     … そのアイコンを持つ子1人につき per 点（その時代出身の子は2人分）
  *   threshold … アイコンの合計が need 以上なら +win、届かなければ −lose
  *   battle    … アイコンの合計が1位のクラスに +win、最下位のクラスに −lose
@@ -50,10 +49,9 @@ export interface SwingCard {
  */
 export type EraEffect =
   | { type: 'sum'; mult: number }
-  | { type: 'rank'; mult: number }
   | { type: 'top'; mult: number }
   | { type: 'ace'; mult: number }
-  | { type: 'duel'; mult: number }
+  | { type: 'champion'; mult: number }
   | { type: 'heads'; per: number }
   | { type: 'threshold'; need: number; win: number; lose: number }
   | { type: 'battle'; win: number; lose: number }
@@ -158,31 +156,31 @@ export const MOVE_CARDS: MoveCard[] = [
 ];
 
 const G = (id: string, name: string, icon: string, attr: Attr, era?: EraId): GoodsCard => ({ id, kind: 'goods', name, icon, attr, era, count: 1 });
-/** グッズ：全時代共通3種＋時代ごとに2種（時代のグッズはその時代の優遇アイコン。未来の片方はサイボーグ化） */
+/** グッズ：全時代共通3種＋時代ごとに2種（時代のグッズはその時代の優遇アイコン。歴史の時代は実在の品。未来の片方はサイボーグ化） */
 export const GOODS_CARDS: GoodsCard[] = [
   G('g_book', '参考書', '📕', 'study'),
   G('g_shoes', 'スポーツシューズ', '👟', 'sports'),
   G('g_paint', '絵の具セット', '🖍️', 'art'),
   G('g_phone', 'スマホ', '📱', 'charm', 'present'),
   G('g_tablet', 'タブレット', '💻', 'study', 'present'),
-  G('g_fang', '恐竜の牙', '🦷', 'fight', 'cretaceous'),
+  G('g_fang', 'ティラノサウルスの牙', '🦷', 'fight', 'cretaceous'),
   G('g_amber', '琥珀', '🟠', 'art', 'cretaceous'),
-  G('g_scarab', 'スカラベのお守り', '🪲', 'charm', 'egypt'),
-  G('g_sandal', 'ファラオのサンダル', '🩴', 'sports', 'egypt'),
-  G('g_laurel', '月桂冠', '🌿', 'sports', 'greece'),
-  G('g_owl', 'フクロウのお守り', '🦉', 'study', 'greece'),
-  G('g_bamboo', '竹簡', '🎋', 'study', 'china'),
+  G('g_mask', 'ツタンカーメンの黄金のマスク', '🎭', 'charm', 'egypt'),
+  G('g_sandal', 'ツタンカーメンのサンダル', '🩴', 'sports', 'egypt'),
+  G('g_olive', 'オリンピアのオリーブ冠', '🌿', 'sports', 'greece'),
+  G('g_republic', 'プラトンの『国家』', '📜', 'study', 'greece'),
+  G('g_sunzi', '『孫子』の兵法書', '🎋', 'study', 'china'),
   G('g_halberd', '青龍偃月刀', '🗡️', 'fight', 'china'),
-  G('g_junihitoe', '十二単', '👘', 'art', 'heian'),
-  G('g_ougi', '檜扇', '🪭', 'charm', 'heian'),
-  G('g_shield', '騎士の盾', '🛡️', 'fight', 'europe'),
-  G('g_quill', '羽ペン', '🪶', 'art', 'europe'),
-  G('g_matchlock', '火縄銃', '🔫', 'fight', 'sengoku'),
-  G('g_teabowl', '名物の茶器', '🍵', 'charm', 'sengoku'),
-  G('g_soroban', 'そろばん', '🧮', 'study', 'edo'),
-  G('g_kasa', '飛脚の笠', '👒', 'sports', 'edo'),
-  G('g_tophat', 'シルクハット', '🎩', 'charm', 'modern'),
-  G('g_gramophone', '蓄音機', '📻', 'art', 'modern'),
+  G('g_genjiemaki', '源氏物語絵巻', '🖼️', 'art', 'heian'),
+  G('g_junihitoe', '十二単', '👘', 'charm', 'heian'),
+  G('g_chisel', 'ミケランジェロのノミ', '🔨', 'art', 'europe'),
+  G('g_templar', 'テンプル騎士団の盾', '🛡️', 'fight', 'europe'),
+  G('g_tanegashima', '種子島（火縄銃）', '🔫', 'fight', 'sengoku'),
+  G('g_hyotan', '秀吉の千成瓢箪', '🍶', 'charm', 'sengoku'),
+  G('g_fugaku', '北斎の『富嶽三十六景』', '🗻', 'art', 'edo'),
+  G('g_ryoteisha', '伊能忠敬の量程車', '🛞', 'sports', 'edo'),
+  G('g_bulb', 'エジソンの電球', '💡', 'study', 'modern'),
+  G('g_legion', 'レジオンドヌール勲章', '🎖️', 'charm', 'modern'),
   G('g_chip', '電脳チップ', '💾', 'study', 'future'),
 ];
 
@@ -191,18 +189,18 @@ export const CYBORG_CARDS: CyborgCard[] = [{ id: 'cyborg', kind: 'cyborg', name:
 /** サイボーグになった生徒のアイコン */
 export const CYBORG_ATTRS: Attr[] = ['study', 'sports'];
 
-/** 時代ごとの襲来：攻めてくる敵の名前・絵柄・強さ */
+/** 時代ごとの襲来：攻めてくる敵の名前・絵柄・強さ（歴史の時代は実在の出来事） */
 export const ERA_RAIDERS: Record<EraId, [string, string, number]> = {
   present: ['他校のヤンキー', '🏍️', 4],
-  cretaceous: ['肉食恐竜の群れ', '🦖', 9],
-  egypt: ['墓泥棒の一味', '🏺', 4],
-  greece: ['ペルシア軍', '🛡️', 6],
-  china: ['黄巾の乱', '🔥', 7],
-  heian: ['鬼の軍団', '👹', 5],
+  cretaceous: ['ヴェロキラプトルの群れ', '🦖', 9],
+  egypt: ['海の民', '⛵', 4],
+  greece: ['クセルクセスのペルシア軍', '🏹', 6],
+  china: ['黄巾の乱', '🟡', 7],
+  heian: ['平将門の乱', '🐎', 5],
   europe: ['ヴァイキング', '🏴‍☠️', 6],
-  sengoku: ['野武士の群れ', '⚔️', 8],
-  edo: ['浪人の殴り込み', '🗡️', 5],
-  modern: ['マフィア', '🕴️', 5],
+  sengoku: ['本能寺の変', '🔥', 8],
+  edo: ['赤穂浪士の討ち入り', '🏮', 5],
+  modern: ['アル・カポネ一味', '🕴️', 5],
   future: ['宇宙海賊', '👾', 6],
 };
 
@@ -218,38 +216,38 @@ const C = (id: string, name: string, icon: string, attr: Attr | 'all', effect: E
 /** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代の優遇アイコン（ERAS の favor）で競う。その時代出身の生徒はアイコン2倍 */
 export const ERA_CARDS: ContestCard[] = [
   // 現代：優遇なし（全アイコンで競う）
-  C('bukatsu', '部活動紹介', '📣', 'all', { type: 'variety', per: 2 }, '新入生の前でいろんな部が出し物。得意の種類が多いクラスほど盛り上がる。', 'present'),
-  C('festival', '文化祭', '🎪', 'all', { type: 'rank', mult: 2 }, 'クラス総出の出し物。全員の力を合わせた総合点で人気投票。', 'present'),
+  C('bunkasai', '文化祭', '🎪', 'all', { type: 'variety', per: 2 }, 'クラスの出し物。いろんな得意がそろうほど盛り上がる。', 'present'),
+  C('seitokai', '生徒会長選挙', '🗳️', 'all', { type: 'champion', mult: 2 }, '全校で一番の万能な子が会長に。そのクラスだけが鼻が高い。', 'present'),
   // 白亜紀：👊のみ
   C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'top', mult: 2 }, '一番強い群れが縄張りを総取り。2番手以下は何も得られない。', 'cretaceous'),
-  C('dino_sumo', '恐竜と力くらべ', '🦕', 'fight', { type: 'ace', mult: 2 }, 'クラスの代表1人が恐竜と押しあう。', 'cretaceous'),
+  C('trex_sumo', 'ティラノサウルスと力くらべ', '🦖', 'fight', { type: 'ace', mult: 2 }, 'どのクラスも代表1人が、ティラノサウルスと押しあう。', 'cretaceous'),
   // 古代エジプト：🏃👑
-  C('pyramid', 'ピラミッド建設', '🔺', 'sports', { type: 'threshold', need: 8, win: 8, lose: 3 }, '石を運んで積み上げろ。完成しなければ罰。', 'egypt'),
-  C('pharaoh', 'ファラオの謁見', '🤴', 'charm', { type: 'duel', mult: 2 }, '代表1人がファラオに謁見。気に入られた順に褒美。', 'egypt'),
+  C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'threshold', need: 8, win: 8, lose: 3 }, '巨大な石を運んで積み上げろ。期日までに完成しなければ罰。', 'egypt'),
+  C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'champion', mult: 3 }, 'ファラオのお気に入りになれるのは、一番人望のある1人だけ。', 'egypt'),
   // ギリシャ・ローマ：🏃📚
-  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'rank', mult: 2 }, 'クラス総出で全競技に出場。総合得点で順位を決める。', 'greece'),
-  C('dialogue', '哲学問答', '🧔', 'study', { type: 'minus', minus: 'without' }, 'ソクラテス式に問い詰められる。答えられない子は減点。', 'greece'),
-  // 古代中国：👊📚
-  C('chibi', '赤壁の戦い', '🔥', 'fight', { type: 'battle', win: 8, lose: 4 }, '勝てば大手柄、負ければ火計で焼かれる。', 'china'),
-  C('keju', '科挙', '📜', 'study', { type: 'ace', mult: 3 }, '超難関の官僚試験。受かるのは一番の秀才だけ。', 'china'),
-  // 平安：👑🎨
-  C('gyoko', '帝の行幸', '🎎', 'charm', { type: 'threshold', need: 5, win: 6, lose: 4 }, '帝がお越しになる。もてなせる人望がそろわなければ無礼として罰。', 'heian'),
-  C('eshi', '宮廷絵師の選抜', '🖌️', 'art', { type: 'ace', mult: 2 }, '一番の腕の絵師が1人だけ宮中に召し抱えられる。', 'heian'),
+  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'champion', mult: 3 }, 'オリーブ冠をもらえるのは優勝者1人だけ。その子のクラスに栄光。', 'greece'),
+  C('socrates_q', 'ソクラテスの問答', '🧔', 'study', { type: 'minus', minus: 'without' }, 'アテネの広場で問い詰められる。答えられない子は恥をかく。', 'greece'),
+  // 古代中国：📚👊
+  C('keju', '科挙', '📜', 'study', { type: 'threshold', need: 8, win: 8, lose: 3 }, '超難関の官僚登用試験。合格ラインに届かなければ不名誉。', 'china'),
+  C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 8, lose: 4 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
+  // 平安：🎨👑
+  C('tentoku', '天徳内裏歌合', '🌸', 'art', { type: 'battle', win: 6, lose: 3 }, '村上天皇の御前で和歌の勝負。勝ち負けがはっきりつく。', 'heian'),
+  C('michinaga', '藤原道長の宴', '🌕', 'charm', { type: 'heads', per: 2 }, '「この世をば…」。招かれるほど人望のある子が多いクラスが得をする。', 'heian'),
   // 中世・ルネサンス：🎨👊
-  C('medici', 'メディチ家のパトロン選び', '💰', 'art', { type: 'top', mult: 2 }, '大富豪が援助するのは一番のクラスだけ。', 'europe'),
-  C('joust', '馬上槍試合', '🏇', 'fight', { type: 'duel', mult: 2 }, '代表1人どうしの一騎打ち。', 'europe'),
+  C('medici', 'メディチ家のパトロン選び', '💰', 'art', { type: 'top', mult: 2 }, 'フィレンツェの大富豪が援助するのは一番のクラスだけ。', 'europe'),
+  C('joust', '馬上槍試合', '🏇', 'fight', { type: 'ace', mult: 2 }, 'どのクラスも代表の騎士1人が一騎打ちに出る。', 'europe'),
   // 戦国：👊👑
-  C('kassen', '天下分け目の合戦', '⚔️', 'fight', { type: 'battle', win: 10, lose: 5 }, '関ヶ原で全軍激突！', 'sengoku'),
-  C('shusse', '家臣の出世争い', '🎌', 'charm', { type: 'rank', mult: 2 }, '人望の厚い家臣団ほど殿に取り立てられる。', 'sengoku'),
-  // 江戸・幕末：📚🏃
-  C('kurofune', '黒船来航', '⚓', 'study', { type: 'threshold', need: 8, win: 8, lose: 4 }, '蒸気船の仕組みを解き明かせ。わからなければ不平等条約。', 'edo'),
-  C('hikyaku', '飛脚の早駆け', '🏃', 'sports', { type: 'ace', mult: 2 }, '江戸から大坂まで、一番の健脚が手紙を運ぶ。', 'edo'),
-  // 近代：🎨👑
-  C('orchestra', '交響楽団の演奏会', '🎻', 'art', { type: 'minus', minus: 'without' }, '全員で1曲を演奏。楽器を弾けない子は雑音になる。', 'modern'),
-  C('ball', '舞踏会', '💃', 'charm', { type: 'heads', per: 2 }, '社交界デビュー。踊りに誘われる子が多いほど評判が上がる。', 'modern'),
+  C('sekigahara', '関ヶ原の戦い', '⚔️', 'fight', { type: 'battle', win: 10, lose: 5 }, '天下分け目の大合戦。勝てば大出世、負ければ大損。', 'sengoku'),
+  C('rakuichi', '楽市・楽座', '🏮', 'charm', { type: 'sum', mult: 1 }, '信長の城下町。人望のある子がいるほど商人が集まる。', 'sengoku'),
+  // 江戸・幕末：🎨🏃
+  C('nakamuraza', '中村座の歌舞伎興行', '🎭', 'art', { type: 'minus', minus: 'without' }, '江戸三座の大舞台。演技のできない子は大根役者として足を引っぱる。', 'edo'),
+  C('ino', '伊能忠敬の日本地図測量', '🗾', 'sports', { type: 'heads', per: 2 }, '日本中を歩いて測る。歩ける子が多いほど地図が早くできる。', 'edo'),
+  // 近代：📚👑
+  C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'champion', mult: 3 }, '受賞できるのは世界で一番の頭脳1人だけ。そのクラスに栄誉。', 'modern'),
+  C('rokumeikan', '鹿鳴館の舞踏会', '💃', 'charm', { type: 'heads', per: 2 }, '文明開化の社交界。踊りに誘われる子が多いほど評判が上がる。', 'modern'),
   // 未来：📚のみ
-  C('robocon', 'ロボコン', '🤖', 'study', { type: 'ace', mult: 3 }, '一番の天才が作ったロボットで勝負。', 'future'),
-  C('martian', '火星人の侵略', '👽', 'study', { type: 'alien' }, '空いている席に、何もできないエイリアンが勝手に座る。', 'future'),
+  C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'ace', mult: 3 }, 'どのクラスも、一番の天才が作ったロボットで勝負。', 'future'),
+  C('martian', '火星人の侵略', '👽', 'study', { type: 'alien' }, '空いている席に、何もできない火星人が勝手に座る。', 'future'),
 ];
 
 /** 固定イベント（学期末のテストと卒業式） */
@@ -320,26 +318,24 @@ export function eraEffectRule(c: ContestCard): string {
   switch (e.type) {
     case 'sum':
       return `クラス全員の${a}の数${e.mult !== 1 ? `×${e.mult}` : ''}を加点`;
-    case 'rank':
-      return `${a}の数で順位を競い、順位点×${e.mult}`;
     case 'top':
       return `${a}の数が一番多いクラスだけ、その数×${e.mult}を加点`;
     case 'ace':
-      return `${a}が一番多い代表1人の${a}の数×${e.mult}を加点`;
-    case 'duel':
-      return `${a}が一番多い代表1人どうしで順位を競い、順位点×${e.mult}`;
+      return `どのクラスも、${a}が一番多い代表1人の${a}の数×${e.mult}を加点`;
+    case 'champion':
+      return `全クラスで${a}が一番多い1人のクラスだけ、その子の${a}の数×${e.mult}を加点`;
     case 'heads':
       return `${a}を持つ子1人につき+${e.per}`;
-    case 'variety':
-      return `クラスにそろっているアイコンの種類数×${e.per}を加点`;
     case 'threshold':
       return `${a}の数が${e.need}以上なら+${e.win}、足りなければ−${e.lose}`;
     case 'battle':
       return `${a}の数が1位のクラスは+${e.win}、最下位のクラスは−${e.lose}`;
     case 'minus':
       return e.minus === 'without' ? `${a}の数 − ${a}を持たない子の人数（マイナスもある）` : `${a}の数 − ${ATTR_ICON[e.minus]}の数（マイナスもある）`;
+    case 'variety':
+      return `クラスにそろっているアイコンの種類数×${e.per}を加点`;
     case 'alien':
-      return '空席のあるクラスに、アイコンのないエイリアンが1人ずつ転入';
+      return '空席のあるクラスに、アイコンのない火星人が1人ずつ転入';
   }
 }
 

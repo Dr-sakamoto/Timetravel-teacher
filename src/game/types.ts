@@ -99,6 +99,8 @@ export type CardTone = 'normal' | 'contest' | 'era' | 'fixed' | 'personal';
 export interface EventResult {
   title: string;
   icon: string;
+  /** カードのイラストのキー（なければ icon の絵文字を出す） */
+  art?: string;
   attr?: Attr | 'all';
   tone: CardTone;
   desc: string;
@@ -143,7 +145,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 18;
+  version: 19;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */

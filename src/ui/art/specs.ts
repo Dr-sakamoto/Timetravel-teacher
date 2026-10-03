@@ -102,6 +102,9 @@ export const ART: Record<string, ArtSpec> = {
   marsgirl: { skin: SKIN.fair, back: 'bob', hair: 'short', hairColor: pink, outfit: 'spacesuit', c1: '#e5534b', hat: 'space', expr: 'grin' },
   alien: { creature: 'alien' },
   robodog: { creature: 'robodog' },
+  // 火星人の侵略で座るエイリアン、サイボーグ化した子
+  martian: { creature: 'martian' },
+  cyborg: { creature: 'cyborg' },
 
   // ---- 現代の生徒 ----
   baseball: { hair: 'buzz', hairColor: black, outfit: 'uniform', c1: '#2c4fa3', expr: 'grin', prop: 'bat' },

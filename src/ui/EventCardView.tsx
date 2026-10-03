@@ -1,4 +1,5 @@
 import { ATTR_ICON, type EventResult } from '../game/types';
+import { EventArt, hasEventArt } from './art/events';
 
 /** 卓の中央でめくられたイベントカード */
 export function EventCardView({ result }: { result: EventResult }) {
@@ -12,7 +13,7 @@ export function EventCardView({ result }: { result: EventResult }) {
           {attr && <span className="ecard-attr">{attr}</span>}
         </div>
         <div className="ecard-title">{result.title}</div>
-        <div className="ecard-art">{result.icon}</div>
+        <div className={`ecard-art ${hasEventArt(result.art) ? 'has-art' : ''}`}>{hasEventArt(result.art) ? <EventArt id={result.art} /> : result.icon}</div>
         <div className="ecard-text">
           {result.rule && <div className="ecard-rule">{result.rule}</div>}
           {result.desc && <div className="ecard-desc">{result.desc}</div>}
