@@ -96,7 +96,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 17,
+    version: 18,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,

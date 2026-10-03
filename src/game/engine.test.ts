@@ -367,16 +367,16 @@ describe('engine', () => {
     expect(run('pyramid', [[...A, mk('a3', ['sports', 'sports', 'sports', 'sports'])], B, C])).toEqual([8, -3, -3]);
     // 天下分け目の合戦：1位+10、最下位−5
     expect(run('kassen', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([10, 0, -5]);
-    // 雄叫びコンテスト：一番のクラスだけ👊×2
-    expect(run('roar', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([4, 0, 0]);
-    // 修学旅行：そろっているアイコンの種類×2
-    expect(run('trip', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([6, 2, 2]);
+    // 縄張り争い：一番のクラスだけ👊×2
+    expect(run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([4, 0, 0]);
+    // 部活動紹介：そろっているアイコンの種類×2
+    expect(run('bukatsu', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([6, 2, 2]);
     // 文化祭：全アイコンの合計で順位点×2（現代の子は2倍）
     expect(run('festival', [A, B, C])).toEqual([10, 6, 2]);
     // 舞踏会：👑を持つ子1人につき+2（近代の子は2人分）
     expect(run('ball', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'modern')], B, C])).toEqual([6, 0, 0]);
-    // 演奏会：🎨 − 🎨を持たない子の人数
-    expect(run('concert', [[mk('a', ['art', 'art']), mk('b', ['study'])], B, C])).toEqual([1, -1, -1]);
+    // 交響楽団の演奏会：🎨 − 🎨を持たない子の人数
+    expect(run('orchestra', [[mk('a', ['art', 'art']), mk('b', ['study'])], B, C])).toEqual([1, -1, -1]);
   });
 
   it('goods add an icon to one student, one item each', () => {
@@ -474,7 +474,7 @@ describe('engine', () => {
       expect(r.rows, id).toBe(1);
       r.d.forEach((d, i) => i !== drawer && expect(d, id).toBe(0));
     }
-    for (const id of ['poptest', 'marathon', 'trip', 'raid_present']) expect(run(id).rows, id).toBe(3);
+    for (const id of ['poptest', 'marathon', 'festival', 'raid_present']) expect(run(id).rows, id).toBe(3);
   });
 });
 

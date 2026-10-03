@@ -218,34 +218,34 @@ const C = (id: string, name: string, icon: string, attr: Attr | 'all', effect: E
 /** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代の優遇アイコン（ERAS の favor）で競う。その時代出身の生徒はアイコン2倍 */
 export const ERA_CARDS: ContestCard[] = [
   // 現代：優遇なし（全アイコンで競う）
-  C('trip', '修学旅行', '🚌', 'all', { type: 'variety', per: 2 }, '班行動。いろんな得意を持つ子がそろっているほど楽しい。', 'present'),
-  C('festival', '文化祭', '🎪', 'all', { type: 'rank', mult: 2 }, 'クラス総出の出し物で人気投票。', 'present'),
+  C('bukatsu', '部活動紹介', '📣', 'all', { type: 'variety', per: 2 }, '新入生の前でいろんな部が出し物。得意の種類が多いクラスほど盛り上がる。', 'present'),
+  C('festival', '文化祭', '🎪', 'all', { type: 'rank', mult: 2 }, 'クラス総出の出し物。全員の力を合わせた総合点で人気投票。', 'present'),
   // 白亜紀：👊のみ
-  C('roar', '雄叫びコンテスト', '📢', 'fight', { type: 'top', mult: 2 }, '一番でかい声を出したクラスの総取り。', 'cretaceous'),
+  C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'top', mult: 2 }, '一番強い群れが縄張りを総取り。2番手以下は何も得られない。', 'cretaceous'),
   C('dino_sumo', '恐竜と力くらべ', '🦕', 'fight', { type: 'ace', mult: 2 }, 'クラスの代表1人が恐竜と押しあう。', 'cretaceous'),
   // 古代エジプト：🏃👑
   C('pyramid', 'ピラミッド建設', '🔺', 'sports', { type: 'threshold', need: 8, win: 8, lose: 3 }, '石を運んで積み上げろ。完成しなければ罰。', 'egypt'),
   C('pharaoh', 'ファラオの謁見', '🤴', 'charm', { type: 'duel', mult: 2 }, '代表1人がファラオに謁見。気に入られた順に褒美。', 'egypt'),
   // ギリシャ・ローマ：🏃📚
-  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'rank', mult: 2 }, '優勝はオリーブの冠。', 'greece'),
+  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'rank', mult: 2 }, 'クラス総出で全競技に出場。総合得点で順位を決める。', 'greece'),
   C('dialogue', '哲学問答', '🧔', 'study', { type: 'minus', minus: 'without' }, 'ソクラテス式に問い詰められる。答えられない子は減点。', 'greece'),
   // 古代中国：👊📚
   C('chibi', '赤壁の戦い', '🔥', 'fight', { type: 'battle', win: 8, lose: 4 }, '勝てば大手柄、負ければ火計で焼かれる。', 'china'),
   C('keju', '科挙', '📜', 'study', { type: 'ace', mult: 3 }, '超難関の官僚試験。受かるのは一番の秀才だけ。', 'china'),
   // 平安：👑🎨
-  C('mononoke', '物の怪退治', '👹', 'charm', { type: 'threshold', need: 5, win: 6, lose: 4 }, '都に出た物の怪を鎮めよ。鎮められなければ祟られる。', 'heian'),
-  C('utaawase', '歌合せ', '🌸', 'art', { type: 'ace', mult: 2 }, '代表1人が和歌を詠む。', 'heian'),
+  C('gyoko', '帝の行幸', '🎎', 'charm', { type: 'threshold', need: 5, win: 6, lose: 4 }, '帝がお越しになる。もてなせる人望がそろわなければ無礼として罰。', 'heian'),
+  C('eshi', '宮廷絵師の選抜', '🖌️', 'art', { type: 'ace', mult: 2 }, '一番の腕の絵師が1人だけ宮中に召し抱えられる。', 'heian'),
   // 中世・ルネサンス：🎨👊
-  C('renaissance', 'ルネサンス芸術祭', '🖼️', 'art', { type: 'top', mult: 2 }, '一番のクラスにだけパトロンがつく。', 'europe'),
+  C('medici', 'メディチ家のパトロン選び', '💰', 'art', { type: 'top', mult: 2 }, '大富豪が援助するのは一番のクラスだけ。', 'europe'),
   C('joust', '馬上槍試合', '🏇', 'fight', { type: 'duel', mult: 2 }, '代表1人どうしの一騎打ち。', 'europe'),
   // 戦国：👊👑
   C('kassen', '天下分け目の合戦', '⚔️', 'fight', { type: 'battle', win: 10, lose: 5 }, '関ヶ原で全軍激突！', 'sengoku'),
-  C('chakai', '茶の湯の会', '🍵', 'charm', { type: 'rank', mult: 2 }, '天下人の茶会。気に入られた順に出世する。', 'sengoku'),
+  C('shusse', '家臣の出世争い', '🎌', 'charm', { type: 'rank', mult: 2 }, '人望の厚い家臣団ほど殿に取り立てられる。', 'sengoku'),
   // 江戸・幕末：📚🏃
   C('kurofune', '黒船来航', '⚓', 'study', { type: 'threshold', need: 8, win: 8, lose: 4 }, '蒸気船の仕組みを解き明かせ。わからなければ不平等条約。', 'edo'),
   C('hikyaku', '飛脚の早駆け', '🏃', 'sports', { type: 'ace', mult: 2 }, '江戸から大坂まで、一番の健脚が手紙を運ぶ。', 'edo'),
   // 近代：🎨👑
-  C('concert', '演奏会', '🎻', 'art', { type: 'minus', minus: 'without' }, '名曲を披露。弾けない子は雑音になる。', 'modern'),
+  C('orchestra', '交響楽団の演奏会', '🎻', 'art', { type: 'minus', minus: 'without' }, '全員で1曲を演奏。楽器を弾けない子は雑音になる。', 'modern'),
   C('ball', '舞踏会', '💃', 'charm', { type: 'heads', per: 2 }, '社交界デビュー。踊りに誘われる子が多いほど評判が上がる。', 'modern'),
   // 未来：📚のみ
   C('robocon', 'ロボコン', '🤖', 'study', { type: 'ace', mult: 3 }, '一番の天才が作ったロボットで勝負。', 'future'),
