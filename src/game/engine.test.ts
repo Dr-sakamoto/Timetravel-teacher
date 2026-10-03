@@ -132,8 +132,8 @@ describe('engine', () => {
     }
     const yankees = all.filter((x) => x.tags.includes('ヤンキー'));
     const fightOnly = yankees.filter((x) => x.attrs.every((a) => a === 'fight'));
-    // アイコン構成を被らせないので、👊だけの子は👊1〜5個の5種類が上限
-    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.35);
+    // アイコン構成を被らせないので、👊だけの子は少なめ（恐竜の一部は🏃も持つ）
+    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.3);
     expect(fightOnly.length / yankees.length).toBeLessThanOrEqual(0.6);
   });
 
@@ -200,11 +200,10 @@ describe('engine', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('every figure and transfer student has a different set of icons (dinosaurs are 👊 only)', () => {
+  it('every figure and transfer student has a different set of icons', () => {
     const key = (attrs: Attr[]) => [...attrs].sort().join(',');
-    // 恐竜は👊の個数だけのキャラなので、組み合わせの重複は許す
-    const dinos = CARDS.filter((c) => c.tags.includes('恐竜'));
-    for (const d of dinos) expect(d.attrs.every((x) => x === 'fight'), d.name).toBe(true);
+    // 恐竜は👊（と🏃）の個数だけのキャラなので、ほかの子との重複は許す
+    for (const d of CARDS.filter((c) => c.tags.includes('恐竜'))) expect(d.attrs.every((x) => x === 'fight' || x === 'sports'), d.name).toBe(true);
     const all = [
       ...CARDS.filter((c) => !c.tags.includes('恐竜')).map((c) => ({ name: c.name, k: key(c.attrs) })),
       ...ARCHETYPES.filter((a) => a.rarity !== 'N').map((a) => ({ name: a.title, k: key(toIcons(a.attrs, a.rarity, a.power)) })),
