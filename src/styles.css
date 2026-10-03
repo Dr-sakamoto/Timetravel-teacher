@@ -1851,3 +1851,262 @@ h3 {
 .deck-group th { padding-top: 10px; border-bottom: 1px solid currentColor; }
 .deck-note { margin-left: 8px; font-weight: normal; opacity: 0.7; font-size: 0.85em; }
 .deck-empty { opacity: 0.4; }
+
+/* ---------- 得点演出のデモ（#score-demo） ---------- */
+.score-demo {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0.6rem 16px 2rem;
+}
+.demo-head h2 {
+  color: var(--yellow);
+  font-size: 1.2rem;
+}
+.demo-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.3rem 0;
+}
+.demo-desc {
+  margin: 0.4rem 0;
+  min-height: 2.6em;
+  color: var(--chalk-dim);
+  font-size: 0.9rem;
+}
+.demo-legend {
+  color: var(--chalk-dim);
+  font-size: 0.8rem;
+}
+.demo-board {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 200px;
+  margin-bottom: 1.4rem;
+}
+.demo-ecard {
+  position: relative;
+}
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+.fx-layer > * {
+  position: fixed;
+}
+.fx-bubble,
+.fx-stamp,
+.fx-total,
+.fx-raid-eq {
+  white-space: nowrap;
+  font-weight: 900;
+  text-align: center;
+}
+.fx-bubble {
+  background: var(--yellow);
+  color: #3a2a00;
+  border: 3px solid #fff;
+  border-radius: 14px;
+  padding: 0.1rem 0.55rem 0.2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  line-height: 1.1;
+}
+.fx-bubble b {
+  font-size: 1.6rem;
+}
+.fx-bubble small,
+.fx-stamp small {
+  display: flex;
+  gap: 0.25em;
+  justify-content: center;
+  font-size: 0.7rem;
+}
+.fx-bubble.shield,
+.fx-stamp.shield {
+  background: #9ec7ff;
+  color: #0c2a52;
+}
+.fx-mul {
+  border-radius: 4px;
+  padding: 0 0.2em;
+  color: #fff;
+}
+.fx-mul.role {
+  background: #d9480f;
+}
+.fx-mul.era {
+  background: #7048e8;
+}
+.fx-stamp {
+  background: rgba(255, 255, 255, 0.92);
+  color: #c92a2a;
+  border: 3px solid #c92a2a;
+  border-radius: 10px;
+  padding: 0 0.4rem 0.15rem;
+  line-height: 1.05;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+.fx-stamp b {
+  font-size: 1.7rem;
+}
+.fx-stamp small {
+  color: #333;
+}
+.fx-stamp.shield {
+  border-color: #1c5bb8;
+}
+.fx-total {
+  font-size: 2.6rem;
+  color: var(--up);
+  -webkit-text-stroke: 2px #0d2a1c;
+  text-shadow: 0 0 18px rgba(123, 227, 143, 0.9);
+}
+.fx-total.down {
+  color: var(--down);
+  text-shadow: 0 0 18px rgba(255, 138, 138, 0.9);
+}
+.fx-raid-eq {
+  background: #1b1b1b;
+  border: 2px solid var(--chalk-dim);
+  border-radius: 10px;
+  padding: 0.2rem 0.7rem;
+  font-size: 1.05rem;
+}
+.fx-raid-eq .down {
+  color: var(--down);
+}
+.fx-raid-eq .up {
+  color: var(--up);
+}
+.fx-counter {
+  position: absolute;
+  left: 50%;
+  bottom: -0.9rem;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: #0d2a1c;
+  border: 3px solid var(--yellow);
+  color: var(--yellow);
+  border-radius: 999px;
+  padding: 0.05rem 0.8rem;
+  font-weight: 900;
+  font-size: 1.15rem;
+  z-index: 2;
+}
+.fx-counter.big {
+  font-size: 1.6rem;
+  animation: counter-tick 0.18s ease-out;
+}
+.fx-counter.shield {
+  border-color: #9ec7ff;
+  color: #9ec7ff;
+}
+.fx-counter small {
+  font-size: 0.6em;
+}
+@keyframes counter-tick {
+  from {
+    transform: translateX(-50%) scale(1.25);
+  }
+}
+.fx-icon {
+  font-size: 1.3rem;
+  filter: drop-shadow(0 0 6px rgba(246, 216, 96, 0.95));
+}
+.fx-icon.twin {
+  filter: drop-shadow(0 0 6px rgba(255, 120, 60, 1));
+}
+.fx-link {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: visible;
+}
+.fx-link path {
+  fill: none;
+  stroke: var(--yellow);
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(246, 216, 96, 0.9));
+}
+.fx-receipt {
+  width: 290px;
+  background: #fffdf6;
+  color: var(--ink);
+  border-radius: 4px;
+  padding: 0.5rem 0.7rem 0.7rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  font-size: 0.82rem;
+  background-image: repeating-linear-gradient(180deg, transparent 0 25px, rgba(0, 0, 0, 0.05) 25px 26px);
+}
+.fx-receipt-head {
+  text-align: center;
+  font-weight: 900;
+  letter-spacing: 0.4em;
+  border-bottom: 2px dashed #999;
+  margin-bottom: 0.2rem;
+}
+.fx-row {
+  display: grid;
+  grid-template-columns: 1fr auto 3.2em;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.12rem 0;
+  animation: row-in 0.3s ease-out;
+}
+.fx-row-who {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fx-row-why {
+  display: flex;
+  gap: 0.2em;
+  font-size: 0.75rem;
+}
+.fx-row-pts {
+  text-align: right;
+  font-weight: 900;
+  font-size: 1rem;
+}
+.fx-row.enemy .fx-row-pts {
+  color: #c92a2a;
+}
+.fx-row.total {
+  border-top: 2px solid #333;
+  margin-top: 0.2rem;
+  font-weight: 900;
+}
+.fx-row.total .fx-row-pts {
+  font-size: 1.4rem;
+  color: #2b8a3e;
+}
+.fx-row.total.down .fx-row-pts {
+  color: #c92a2a;
+}
+.fx-row.empty {
+  display: block;
+  color: #888;
+}
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+@media (max-width: 700px) {
+  .demo-board {
+    flex-wrap: wrap;
+  }
+}
+.score-demo .playmat.near .seats {
+  grid-template-columns: repeat(6, minmax(0, 92px));
+}
+.score-demo .ecard {
+  width: 140px;
+}

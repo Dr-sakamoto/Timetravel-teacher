@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
-import { attrScore, bestScore, roleSlots, termNo, testScore } from './calc';
+import { attrScore, bestScore, contributions, roleSlots, termNo, testScore } from './calc';
 import { CARDS, parseAttrs } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
@@ -270,5 +270,22 @@ describe('engine', () => {
     const raid = run('raid_7');
     raid.forEach((d, i) => i !== drawer && expect(d).toBe(0));
     expect(raid[drawer]).toBeLessThanOrEqual(0);
+  });
+});
+
+describe('1枚ごとの得点の内訳', () => {
+  it('合計がイベントカード・通常カードの点と一致する', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const s = playOut(3, 1, seed);
+      for (const p of s.players) {
+        for (const a of ['study', 'sports', 'art', 'charm', 'fight'] as Attr[]) {
+          for (const era of [undefined, ...ERAS.map((e) => e.id)]) {
+            const sum = contributions(p, a, 'sum', era).reduce((x, c) => x + c.pts, 0);
+            expect(sum).toBe(attrScore(p, a, era).total);
+          }
+          expect(contributions(p, a, 'best').reduce((x, c) => x + c.pts, 0)).toBe(bestScore(p, a).total);
+        }
+      }
+    }
   });
 });

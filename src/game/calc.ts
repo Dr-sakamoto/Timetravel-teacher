@@ -96,3 +96,25 @@ export function totalPower(p: Player): number {
 export function ranks(values: number[]): number[] {
   return values.map((v) => values.filter((o) => o > v).length);
 }
+
+/** 1枚ごとの得点の内訳（どのカードから何点入ったかを見せる演出用） */
+export interface Contribution {
+  student: Student;
+  /** カードに描かれたそのアイコンの数 */
+  icons: number;
+  /** 時代イベントでその時代出身（×2） */
+  era: boolean;
+  /** 係ボーナス（×2） */
+  role: boolean;
+  pts: number;
+}
+
+/** sum＝イベントカード（全員の合計、attrScore と同じ）／best＝通常カード（一番の子1人、bestScore と同じ） */
+export function contributions(p: Player, a: Attr, mode: 'sum' | 'best', doubleEra?: EraId): Contribution[] {
+  return (mode === 'best' ? bestScore(p, a).holders : p.students.filter((s) => s.attrs.includes(a))).map((s) => {
+    const era = mode === 'sum' && s.era === doubleEra;
+    const role = hasRoleBonus(p, s, a);
+    const icons = iconsOf(s, a);
+    return { student: s, icons, era, role, pts: icons * (era ? 2 : 1) * (role ? 2 : 1) };
+  });
+}
