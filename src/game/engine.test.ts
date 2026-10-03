@@ -151,4 +151,24 @@ describe('engine', () => {
     expect(next.players[0].students).toHaveLength(5);
     expect(next.players[1].students.map((x) => x.uid)).toContain(uid);
   });
+
+  it('normal cards score for everyone, event cards only for the drawer', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 21);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    const drawer = s.phase.player;
+    const run = (id: string) => {
+      const t = structuredClone(s);
+      t.eventDeck.push(id);
+      const before = t.players.map((p) => p.points);
+      const after = step(t, { type: 'drawEvent' }).players.map((p) => p.points);
+      return after.map((v, i) => v - before[i]);
+    };
+    const normal = run('n_study_0');
+    expect(normal.filter((d) => d > 0).length).toBeGreaterThan(1);
+    const contest = run('sportsday');
+    contest.forEach((d, i) => i !== drawer && expect(d).toBe(0));
+    const raid = run('raid_5');
+    raid.forEach((d, i) => i !== drawer && expect(d).toBe(0));
+    expect(raid[drawer]).not.toBe(0);
+  });
 });

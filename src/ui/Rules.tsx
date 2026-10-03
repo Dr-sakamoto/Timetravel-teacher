@@ -50,18 +50,21 @@ export function Rules({ onClose }: { onClose: () => void }) {
           <li>時代は1年に3つランダム。1学期に1つずつ巡り、その学期の時代の生徒の山札と時代カードを使う。</li>
         </ol>
 
-        <h3>手番：イベントの山札を1枚めくる</h3>
+        <h3>手番：1人1枚ずつイベントの山札をめくる</h3>
+        <p>
+          <b>通常カードは全員</b>に、<b>イベントカードはめくった人だけ</b>に効果がある。
+        </p>
         <ul className="rule-list">
           <li>
-            <b>通常カード</b>（{NORMAL_CARDS.length}枚・{NORMAL_CARDS.map((c) => c.name).slice(0, 4).join('・')}…）：
+            <b>通常カード（全員）</b>（{NORMAL_CARDS.length}枚・{NORMAL_CARDS.map((c) => c.name).slice(0, 4).join('・')}…）：
             そのアイコンを持つ子1人につき<b>+1</b>。全クラスが数える。
           </li>
           <li>
-            <b>勝負カード</b>（{CONTEST_CARDS.map((c) => c.icon + c.name).join('・')}）：
-            そのアイコンを持つ子の<b>数値の合計</b>（＋係ボーナス）で順位をつけ、{(CONTEST_POINTS[4] ?? []).join('／')}点。
+            <b>イベントカード（めくった人だけ）</b>（{CONTEST_CARDS.map((c) => c.icon + c.name).join('・')}）：
+            そのアイコンを持つ子の<b>数値の合計</b>（＋係ボーナス）がそのまま入る。
           </li>
           <li>
-            <b>カチコミ</b>（{RAID_CARDS.length}枚）：👊の数値の合計がカードの敵の強さ（{RAID_CARDS.map((c) => c.threat).join('・')}）以上なら+{RAID_WIN}、足りなければ{RAID_LOSE}。
+            <b>カチコミ（めくった人だけ）</b>（{RAID_CARDS.length}枚）：👊の数値の合計がカードの敵の強さ（{RAID_CARDS.map((c) => c.threat).join('・')}）以上なら+{RAID_WIN}、足りなければ{RAID_LOSE}。
           </li>
           {PERSONAL_CARDS.map((c) => (
             <li key={c.id}>
@@ -73,7 +76,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             </li>
           ))}
           <li>
-            <b>時代カード</b>：勝負カードと同じ。ただしその時代出身の生徒は数値2倍。
+            <b>時代カード（めくった人だけ）</b>：イベントカードと同じ。ただしその時代出身の生徒は数値2倍。
           </li>
         </ul>
 
@@ -93,7 +96,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <ul className="rule-list">
           {FIXED_EVENTS.map((f) => (
             <li key={f.id}>
-              {f.icon} <b>{f.name}</b>：{fixedRule(f)}
+              {f.icon} <b>{f.name}</b>（全員）：{fixedRule(f)}。順位点は{(CONTEST_POINTS[4] ?? []).join('／')}点×倍率。
             </li>
           ))}
           <li>🌻 8月 夏休み合宿：今年の3つの時代から1つ選んで転入（3枚から1人）。</li>

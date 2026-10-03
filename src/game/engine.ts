@@ -400,27 +400,26 @@ function resolveNormal(s: GameState, c: NormalCard): EventResult {
   return { title: c.name, icon: ATTR_ICON[c.attr], attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), rows };
 }
 
-/** 勝負カード：アイコンの合計で順位点。時代カードはその時代の生徒が2倍 */
-function resolveContest(s: GameState, c: ContestCard): EventResult {
-  const scores = s.players.map((p) => attrScore(p, c.attr, c.era));
-  const rows = awardRanks(s, scores.map((x) => x.total), 1);
-  rows.forEach((r) => r.delta > 0 && scores[r.player].holders.forEach((h) => h.mvp++));
-  sortRows(rows);
+/** イベントカード（引いた人だけ）：そのアイコンを持つ子の数値の合計＋係ボーナスが入る。時代カードはその時代の生徒が2倍 */
+function resolveContest(s: GameState, c: ContestCard, pi: number): EventResult {
+  const p = s.players[pi];
+  const sc = attrScore(p, c.attr, c.era);
+  p.points += sc.total;
+  sc.holders.forEach((h) => h.mvp++);
+  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta: sc.total }];
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: c.attr, tone: c.era ? 'era' : 'contest', desc: c.desc, rule: cardRule(c), rows };
 }
 
-/** カチコミ：👊の合計が敵の強さ以上なら撃退 */
-function resolveRaid(s: GameState, c: RaidCard): EventResult {
-  const rows = s.players.map((p, i) => {
-    const sc = attrScore(p, 'fight');
-    const win = sc.total >= c.threat;
-    const delta = win ? RAID_WIN : RAID_LOSE;
-    p.points += delta;
-    if (win) sc.holders.forEach((h) => h.mvp++);
-    return { player: i, count: sc.total, delta, note: win ? '撃退' : sc.total ? '突破' : '無防備' };
-  });
-  sortRows(rows);
+/** カチコミ（引いた人だけ）：👊の数値の合計が敵の強さ以上なら撃退 */
+function resolveRaid(s: GameState, c: RaidCard, pi: number): EventResult {
+  const p = s.players[pi];
+  const sc = attrScore(p, 'fight');
+  const win = sc.total >= c.threat;
+  const delta = win ? RAID_WIN : RAID_LOSE;
+  p.points += delta;
+  if (win) sc.holders.forEach((h) => h.mvp++);
+  const rows: ResultRow[] = [{ player: pi, count: sc.total, delta, note: win ? '撃退' : sc.total ? '突破' : '無防備' }];
   logRows(s, c.name, rows);
   return { title: c.name, icon: c.icon, attr: 'fight', tone: 'contest', desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
 }
@@ -466,10 +465,10 @@ function resolveDraw(s: GameState, pi: number) {
       setResult(s, pi, resolveNormal(s, c), 'turn');
       return;
     case 'contest':
-      setResult(s, pi, resolveContest(s, c), 'turn');
+      setResult(s, pi, resolveContest(s, c, pi), 'turn');
       return;
     case 'raid':
-      setResult(s, pi, resolveRaid(s, c), 'turn');
+      setResult(s, pi, resolveRaid(s, c, pi), 'turn');
       return;
     case 'transfer':
       startTransfer(s, pi, currentEra(s), c.name, 'turn');

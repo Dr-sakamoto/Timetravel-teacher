@@ -9,7 +9,7 @@ export interface NormalCard {
   count: number;
 }
 
-/** 勝負カード：そのアイコンを持つ生徒の数値の合計で順位を決め、順位点が入る。時代カードはその時代の生徒が2倍 */
+/** イベントカード（引いた人だけ）：そのアイコンを持つ生徒の数値の合計が入る。時代カードはその時代の生徒が2倍 */
 export interface ContestCard {
   id: string;
   kind: 'contest';
@@ -22,7 +22,7 @@ export interface ContestCard {
   count: number;
 }
 
-/** カチコミ：👊の合計が敵の強さ以上なら撃退 */
+/** カチコミ（引いた人だけ）：👊の合計が敵の強さ以上なら撃退 */
 export interface RaidCard {
   id: string;
   kind: 'raid';
@@ -43,7 +43,7 @@ export interface PersonalCard {
 
 export type EventCard = NormalCard | ContestCard | RaidCard | PersonalCard;
 
-/** 勝負カードの順位点（人数別） */
+/** 定期テスト・卒業式（全員参加）の順位点（人数別） */
 export const CONTEST_POINTS: Record<number, number[]> = {
   2: [8, 3],
   3: [10, 5, 2],
@@ -137,11 +137,11 @@ export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EV
 export function cardRule(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
-      return `${ATTR_ICON[c.attr]}を持つ子1人につき+1（全クラス）`;
+      return `全員：${ATTR_ICON[c.attr]}を持つ子1人につき+1`;
     case 'contest':
-      return `${ATTR_ICON[c.attr]}の数値の合計で勝負${c.era ? '（この時代の生徒は2倍）' : ''}`;
+      return `引いた人：${ATTR_ICON[c.attr]}の数値の合計を加点${c.era ? '（この時代の生徒は2倍）' : ''}`;
     case 'raid':
-      return `👊の数値の合計が${c.threat}以上なら+${RAID_WIN}、足りなければ${RAID_LOSE}`;
+      return `引いた人：👊の数値の合計が${c.threat}以上なら+${RAID_WIN}、足りなければ${RAID_LOSE}`;
     default:
       return c.desc;
   }
