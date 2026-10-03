@@ -1,4 +1,4 @@
-import { MAX_PER_ROLE, MAX_ROLE_KINDS, MAX_ROLE_SEATS, ROLES } from './data/roles';
+import { MAX_PER_ROLE, MAX_ROLE_SEATS, ROLES } from './data/roles';
 import type { Attr, EraId, Player, RoleId, RoleSeat, Student } from './types';
 
 /** 教室の席の数（クラスの定員） */
@@ -12,25 +12,24 @@ export function termNo(year: number, term: number): number {
   return (year - 1) * 3 + Math.max(term, 1);
 }
 
-/** 係の席の数：1年1学期は3人で、学期が進むごとに1人ずつ増える（最大6人） */
+/** 係の数：1年1学期は1種で、学期が進むごとに1種ずつ解放される（最大4種） */
 export function roleSlots(no: number): number {
-  return Math.max(3, Math.min(MAX_ROLE_SEATS, 2 + no));
+  return Math.max(1, Math.min(MAX_ROLE_SEATS, no));
 }
 
-/** 係の編成が決まりを守っているか（席の数・1人1つ・1つの係に2人まで・係の種類は3つまで） */
+/** 係の編成が決まりを守っているか（解放された種類の数まで・1人1つ・1つの係に1人まで） */
 export function validRoles(p: Player, roles: RoleSeat[], slots: number): boolean {
   if (roles.length > slots) return false;
   const uids = roles.map((r) => r.uid);
   if (new Set(uids).size !== uids.length || uids.some((u) => !p.students.some((s) => s.uid === u))) return false;
   if (roles.some((r) => !ROLES[r.role])) return false;
   const kinds = new Set(roles.map((r) => r.role));
-  if (kinds.size > MAX_ROLE_KINDS) return false;
   return [...kinds].every((k) => roles.filter((r) => r.role === k).length <= MAX_PER_ROLE);
 }
 
-/** i番目（0始まり）の係の席が解放される学期の名前（例：「1年2学期」）。最初の3席は最初から */
+/** i番目（0始まり）の係の席が解放される学期の名前（例：「1年2学期」）。最初の1席は最初から */
 export function slotUnlockLabel(i: number): string {
-  const no = Math.max(1, i - 1);
+  const no = i + 1;
   return `${Math.ceil(no / 3)}年${((no - 1) % 3) + 1}学期`;
 }
 

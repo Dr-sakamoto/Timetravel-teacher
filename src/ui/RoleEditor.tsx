@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { autoRoles } from '../game/ai';
-import { MAX_PER_ROLE, MAX_ROLE_KINDS, ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
+import { MAX_PER_ROLE, ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
 import type { Player, RoleId, RoleSeat } from '../game/types';
 import { Playmat } from './Playmat';
 
@@ -17,7 +17,7 @@ export function RoleEditor({ player, year, slots, onConfirm }: Props) {
   const [roles, setRoles] = useState<RoleSeat[]>(() =>
     player.roles.filter((r) => player.students.some((s) => s.uid === r.uid)).slice(0, k),
   );
-  const [active, setActive] = useState<RoleId>(() => roles[0]?.role ?? 'study');
+  const [active, setActive] = useState<RoleId>(() => roles[0]?.role ?? ROLE_ORDER[0]);
   const [warn, setWarn] = useState('');
   const kinds = new Set(roles.map((r) => r.role));
   const role = ROLES[active];
@@ -30,10 +30,8 @@ export function RoleEditor({ player, year, slots, onConfirm }: Props) {
       return;
     }
     const rest = roles.filter((r) => r.uid !== uid);
-    const restKinds = new Set(rest.map((r) => r.role));
-    if (rest.length >= k) return setWarn(`係の席は今学期${k}つまで`);
+    if (rest.length >= k) return setWarn(`係は今学期${k}種まで`);
     if (rest.filter((r) => r.role === active).length >= MAX_PER_ROLE) return setWarn(`${role.name}は${MAX_PER_ROLE}人まで`);
-    if (!restKinds.has(active) && restKinds.size >= MAX_ROLE_KINDS) return setWarn(`係の種類は${MAX_ROLE_KINDS}つまで`);
     const next = cur ? roles.map((r) => (r.uid === uid ? { role: active, uid } : r)) : [...roles, { role: active, uid }];
     setRoles(next);
     setWarn('');
@@ -43,7 +41,7 @@ export function RoleEditor({ player, year, slots, onConfirm }: Props) {
     <div className="role-editor">
       <div className="role-bar">
         <span>
-          係の席 {roles.length}/{k}（1つの係に{MAX_PER_ROLE}人・種類は{MAX_ROLE_KINDS}つまで）
+          係 {roles.length}/{k}種（1つの係に{MAX_PER_ROLE}人）
         </span>
         <div className="role-kinds">
           {ROLE_ORDER.map((r) => (

@@ -89,9 +89,9 @@ describe('engine', () => {
     expect(testScore(y, 1)).toBeLessThan(0);
   });
 
-  it('unlocks one role seat per term, starting with 3 (1年1学期→3 … 2年1学期→6)', () => {
+  it('unlocks one role kind per term, starting with 1 (1年1学期→1 … 2年1学期→4)', () => {
     const slots = (year: number, term: number) => roleSlots(termNo(year, term));
-    expect([[1, 1], [1, 2], [1, 3], [2, 1], [2, 2], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([3, 4, 5, 6, 6, 6]);
+    expect([[1, 1], [1, 2], [1, 3], [2, 1], [2, 2], [3, 3]].map(([y, t]) => slots(y, t))).toEqual([1, 2, 3, 4, 4, 4]);
   });
 
   it('regular modern students have 1-2 icons, each with a different set', () => {
@@ -101,15 +101,14 @@ describe('engine', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('roles: one per student, at most 2 per role and 3 kinds, within the seat count', () => {
+  it('roles: one per student, one per role, within the unlocked kinds', () => {
     const p = player(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((u) => mk(u, ['study'])));
     const r = (role: RoleSeat['role'], uid: string): RoleSeat => ({ role, uid });
-    expect(validRoles(p, [r('study', 'a'), r('study', 'b')], 6)).toBe(true);
-    expect(validRoles(p, [r('study', 'a'), r('study', 'b'), r('study', 'c')], 6)).toBe(false);
-    expect(validRoles(p, [r('study', 'a'), r('pe', 'a')], 6)).toBe(false);
-    expect(validRoles(p, [r('study', 'a'), r('pe', 'b'), r('culture', 'c'), r('leader', 'd')], 6)).toBe(false);
+    expect(validRoles(p, [r('study', 'a'), r('pe', 'b'), r('culture', 'c'), r('leader', 'd')], 4)).toBe(true);
+    expect(validRoles(p, [r('study', 'a'), r('study', 'b')], 4)).toBe(false);
+    expect(validRoles(p, [r('study', 'a'), r('pe', 'a')], 4)).toBe(false);
     expect(validRoles(p, [r('study', 'a'), r('pe', 'b')], 1)).toBe(false);
-    expect(validRoles(p, [r('study', 'zz')], 6)).toBe(false);
+    expect(validRoles(p, [r('study', 'zz')], 4)).toBe(false);
   });
 
   it('fight icons belong only to yankees, and a good share of them are fight-only', () => {

@@ -1,6 +1,6 @@
 import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, hasRoleBonus, iconsOf } from './calc';
 import { ALL_EVENT_CARDS, EVENT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
-import { MAX_PER_ROLE, MAX_ROLE_KINDS, ROLES, ROLE_ORDER } from './data/roles';
+import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
 import { equippable, exchangeTargets, kachikomiTargets, pushTargets, slotsNow, tradeable } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleSeat, type Student } from './types';
 
@@ -44,8 +44,6 @@ export function autoRoles(p: Player, k: number): RoleSeat[] {
   for (const x of pairs) {
     if (out.length >= k) break;
     if (out.some((r) => r.uid === x.uid)) continue;
-    const kinds = new Set(out.map((r) => r.role));
-    if (!kinds.has(x.role) && kinds.size >= MAX_ROLE_KINDS) continue;
     if (out.filter((r) => r.role === x.role).length >= MAX_PER_ROLE) continue;
     out.push({ role: x.role, uid: x.uid });
   }
