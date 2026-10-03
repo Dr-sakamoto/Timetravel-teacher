@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { MAX_CLASS, roleSlots, slotUnlockAt } from '../game/calc';
 import { ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
+import { ERAS } from '../game/data/eras';
 import { className } from '../game/engine';
 import type { Player } from '../game/types';
 import { TcgCard } from './TcgCard';
@@ -104,7 +105,7 @@ interface SeatProps {
   onClick: () => void;
 }
 
-/** 相手の席：名札だけのコンパクト表示。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
+/** 相手の席：小さく畳んだ教室（名札と12席の埋まり具合）。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
 export function OpponentSeat({ player, year, acting, delta, litIcons, targetable, targeted, onClick }: SeatProps) {
   return (
     <button
@@ -113,24 +114,36 @@ export function OpponentSeat({ player, year, acting, delta, litIcons, targetable
       onClick={onClick}
       title={targetable ? `${player.name}に押しつける` : `${player.name}の教室を見る`}
     >
-      <span className="opp-name">
-        {player.name}
-        {player.isCpu && <small>🤖</small>}
-      </span>
-      <span className="opp-class">
-        {className(player.id, year)} 👥{player.students.length}
-      </span>
-      {litIcons.length > 0 && (
-        <span className="opp-lit">
-          {litIcons.slice(0, 6).map((ic, i) => (
-            <span key={i} style={{ animationDelay: `${i * 60}ms` }}>
-              {ic}
-            </span>
-          ))}
-          {litIcons.length > 6 && <small>+{litIcons.length - 6}</small>}
+      <span className="opp-plate">
+        <span className="opp-name">
+          {player.name}
+          {player.isCpu && <small>🤖</small>}
         </span>
-      )}
-      <span className="opp-pts">{player.points}</span>
+        <span className="opp-class">{className(player.id, year)}</span>
+        <span className="opp-pts">{player.points}</span>
+      </span>
+      <span className="opp-seats">
+        {Array.from({ length: MAX_CLASS }, (_, i) => {
+          const st = player.students[i];
+          return (
+            <span
+              key={i}
+              className={`opp-seat ${st ? 'on' : ''}`}
+              style={st ? ({ '--era': ERAS.find((e) => e.id === st.era)!.color } as CSSProperties) : undefined}
+            />
+          );
+        })}
+        {litIcons.length > 0 && (
+          <span className="opp-lit">
+            {litIcons.slice(0, 6).map((ic, i) => (
+              <span key={i} style={{ animationDelay: `${i * 60}ms` }}>
+                {ic}
+              </span>
+            ))}
+            {litIcons.length > 6 && <small>+{litIcons.length - 6}</small>}
+          </span>
+        )}
+      </span>
       {delta !== undefined && delta !== 0 && (
         <span className={`plate-delta ${delta > 0 ? 'up' : 'down'}`} key={`${delta}-${player.points}`}>
           {delta > 0 ? '+' : ''}

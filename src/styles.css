@@ -298,25 +298,28 @@ h3 {
 .opp {
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
+  flex-direction: column;
+  gap: 0.2rem;
   min-width: 0;
   font: inherit;
   color: var(--chalk);
-  background: #24453a;
   border: 3px solid var(--pc);
-  border-radius: 10px;
-  padding: 0.25rem 0.7rem;
+  border-radius: 9px;
+  padding: 0.25rem;
   cursor: pointer;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0 2px, transparent 2px 20px),
+    linear-gradient(180deg, #c99c69, #b4864f);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  transition: transform 0.1s;
 }
 .opp:hover {
-  background: #2c5446;
+  transform: translateY(-2px);
 }
 .opp.acting {
   box-shadow:
     0 0 0 3px var(--yellow),
-    0 3px 0 rgba(0, 0, 0, 0.35);
+    0 4px 0 rgba(0, 0, 0, 0.35);
 }
 .opp.targetable {
   animation: glow 1.2s ease-in-out infinite;
@@ -324,30 +327,65 @@ h3 {
 .opp.targeted {
   outline: 4px solid var(--yellow);
 }
+.opp-plate {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #24453a;
+  border: 2px solid #8a5a33;
+  border-radius: 6px;
+  padding: 0 0.45rem;
+}
 .opp-name {
   font-weight: 900;
   white-space: nowrap;
 }
 .opp-class {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--chalk-dim);
   white-space: nowrap;
 }
 .opp-pts {
+  margin-left: auto;
   font-weight: 900;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   color: var(--yellow);
 }
 .opp-pts::after {
   content: 'pt';
   font-size: 0.6em;
 }
+/* 12席：埋まった席は生徒の時代の色 */
+.opp-seats {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2px;
+  padding: 0 0.1rem;
+}
+.opp-seat {
+  height: 12px;
+  border-radius: 2px;
+  border: 1px dashed rgba(60, 35, 15, 0.4);
+}
+.opp-seat.on {
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--era) 60%, #fff));
+}
 .opp-lit {
+  position: absolute;
+  inset: -4px 0;
   display: flex;
-  gap: 1px;
-  background: rgba(246, 216, 96, 0.2);
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  background: rgba(246, 216, 96, 0.85);
   border-radius: 999px;
-  padding: 0 0.3rem;
+  font-size: 0.9rem;
+}
+.opp-lit small {
+  color: #2b2410;
+  font-weight: 900;
 }
 .opp-lit > span {
   animation: pop-in 0.35s ease-out both;
@@ -1368,33 +1406,47 @@ h3 {
     flex-wrap: nowrap;
   }
   .opp {
-    gap: 0.3rem;
-    padding: 0 0.4rem;
+    flex: 0 1 auto;
+    gap: 0.1rem;
+    padding: 0.1rem;
     border-width: 2px;
-    border-radius: 7px;
-    font-size: 0.72rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   }
-  .opp-class {
-    font-size: 0.56rem;
-  }
-  .opp {
-    flex: 0 1 auto;
+  .opp-plate {
+    gap: 0.3rem;
+    padding: 0 0.3rem;
+    border-width: 1px;
   }
   .opp-name {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* 相手が4人いるときはクラス名を省いて詰める */
-  .opponents:has(> :nth-child(4)) .opp-class {
-    display: none;
+  .opp-class {
+    font-size: 0.54rem;
   }
   .opp-pts {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+  }
+  .opp-seat {
+    height: 6px;
+    border-radius: 1px;
+  }
+  .opp-seats {
+    gap: 1px;
+  }
+  .opp-lit {
+    inset: -3px 0;
+    font-size: 0.6rem;
   }
   .opp .plate-delta {
     font-size: 0.75rem;
     top: -0.75rem;
+  }
+  /* 相手が4人いるときはクラス名を省いて詰める */
+  .opponents:has(> :nth-child(4)) .opp-class {
+    display: none;
   }
   .stage {
     flex-direction: row;
