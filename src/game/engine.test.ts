@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
-import { MAX_CLASS, STARTING_MEMBERS, attrScore, roleSlots, termNo, testScore, validRoles } from './calc';
+import { MAX_CLASS, STARTING_MEMBERS, attrScore, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
 import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
@@ -30,7 +30,7 @@ const mk = (uid: string, attrs: Attr[], era: Student['era'] = 'present'): Studen
   uid, name: uid, title: '', era, rarity: 'N', icon: '', attrs, flavor: '', joined: '', mvp: 0,
 });
 const player = (students: Student[], roles: RoleSeat[] = []): Player => ({
-  id: 0, name: 'A', isCpu: false, color: '', students, roles, points: 0,
+  id: 0, name: 'A', isCpu: false, color: '', students, unlocked: [...new Set(roles.map((r) => r.role))], roles, points: 0,
 });
 
 describe('engine', () => {
@@ -104,11 +104,21 @@ describe('engine', () => {
   it('roles: one per student, one per role, within the unlocked kinds', () => {
     const p = player(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((u) => mk(u, ['study'])));
     const r = (role: RoleSeat['role'], uid: string): RoleSeat => ({ role, uid });
-    expect(validRoles(p, [r('study', 'a'), r('pe', 'b'), r('culture', 'c'), r('leader', 'd')], 4)).toBe(true);
-    expect(validRoles(p, [r('study', 'a'), r('study', 'b')], 4)).toBe(false);
-    expect(validRoles(p, [r('study', 'a'), r('pe', 'a')], 4)).toBe(false);
-    expect(validRoles(p, [r('study', 'a'), r('pe', 'b')], 1)).toBe(false);
-    expect(validRoles(p, [r('study', 'zz')], 4)).toBe(false);
+    const all: RoleSeat['role'][] = ['study', 'pe', 'culture', 'leader'];
+    expect(validRoles(p, [r('study', 'a'), r('pe', 'b'), r('culture', 'c'), r('leader', 'd')], all)).toBe(true);
+    expect(validRoles(p, [r('study', 'a'), r('study', 'b')], all)).toBe(false);
+    expect(validRoles(p, [r('study', 'a'), r('pe', 'a')], all)).toBe(false);
+    expect(validRoles(p, [r('study', 'a'), r('pe', 'b')], ['study'])).toBe(false);
+    expect(validRoles(p, [r('study', 'zz')], all)).toBe(false);
+  });
+
+  it('unlock: pick exactly the new kinds for this term, never one already unlocked', () => {
+    const p = { ...player([mk('a', ['study'])]), unlocked: ['study' as const] };
+    expect(validUnlock(p, ['pe'], 2)).toBe(true);
+    expect(validUnlock(p, [], 2)).toBe(false);
+    expect(validUnlock(p, ['study'], 2)).toBe(false);
+    expect(validUnlock(p, ['pe', 'culture'], 2)).toBe(false);
+    expect(validUnlock(p, [], 1)).toBe(true);
   });
 
   it('fight icons belong only to yankees, and a good share of them are fight-only', () => {
@@ -284,6 +294,17 @@ describe('engine', () => {
     const again = structuredClone(next);
     again.phase = { kind: 'equip', player: pi, card: 'g_shoes' };
     expect(step(again, { type: 'equip', uid })).toBe(again);
+  });
+
+  it('setRoles requires choosing the newly unlocked kind, and unlocked kinds stay', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
+    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
+    const uid = s.players[0].students[0].uid;
+    expect(step(s, { type: 'setRoles', roles: [] })).toBe(s);
+    expect(step(s, { type: 'setRoles', roles: [{ role: 'pe', uid }], unlock: ['study'] })).toBe(s);
+    const next = step(s, { type: 'setRoles', roles: [{ role: 'study', uid }], unlock: ['study'] });
+    expect(next.players[0].unlocked).toEqual(['study']);
+    expect(next.players[0].roles).toEqual([{ role: 'study', uid }]);
   });
 
   it('exchange swaps students without a role', () => {

@@ -75,7 +75,9 @@ export interface Player {
   isCpu: boolean;
   color: string;
   students: Student[];
-  /** 係の席（学期で使える数まで。1つの係に2人まで、係の種類は3つまで） */
+  /** 解放した係の種類（解放した順。学期の頭に1種ずつ、自分で選んで増やす） */
+  unlocked: RoleId[];
+  /** 係に就いている生徒（解放した係に1人ずつ） */
   roles: RoleSeat[];
   points: number;
 }
@@ -133,7 +135,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 14;
+  version: 15;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -163,7 +165,7 @@ export type Action =
   | { type: 'drawMember' }
   | { type: 'drawAllMembers' }
   | { type: 'continue' }
-  | { type: 'setRoles'; roles: RoleSeat[] }
+  | { type: 'setRoles'; roles: RoleSeat[]; unlock?: RoleId[] }
   | { type: 'drawEvent' }
   | { type: 'push'; uid: string | null; target?: number }
   | { type: 'kachikomi'; target: number | null }

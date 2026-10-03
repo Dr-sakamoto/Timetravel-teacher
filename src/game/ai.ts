@@ -2,7 +2,7 @@ import { MAX_CLASS, MIN_CLASS, attrScore, countAttr, hasRoleBonus, iconsOf } fro
 import { ALL_EVENT_CARDS, EVENT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
 import { equippable, exchangeTargets, kachikomiTargets, pushTargets, slotsNow, tradeable } from './engine';
-import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleSeat, type Student } from './types';
+import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
 const ATTR_WEIGHT = Object.fromEntries(
@@ -34,15 +34,28 @@ export function classSummary(p: Player): CategorySummary[] {
   return ATTRS.map((a) => ({ attr: a, icon: ATTR_ICON[a], value: attrScore(p, a).total }));
 }
 
-/** 係のおまかせ編成：アイコンをたくさん持つ子から順に、決まりの範囲で就ける */
-export function autoRoles(p: Player, k: number): RoleSeat[] {
+/** その係に一番向いている子の値打ち（係の解放先を選ぶ目安） */
+function roleValue(p: Player, role: RoleId): number {
+  const a = ROLES[role].attr;
+  return Math.max(0, ...p.students.map((s) => iconsOf(s, a) * ATTR_WEIGHT[a]));
+}
+
+/** 係のおまかせ解放：まだ解放していない係のうち、向いている子がいるものから選ぶ */
+export function autoUnlock(p: Player, slots: number): RoleId[] {
+  const n = Math.max(0, slots - p.unlocked.length);
+  return ROLE_ORDER.filter((r) => !p.unlocked.includes(r))
+    .sort((x, y) => roleValue(p, y) - roleValue(p, x))
+    .slice(0, n);
+}
+
+/** 係のおまかせ編成：アイコンをたくさん持つ子から順に、解放した係に就ける */
+export function autoRoles(p: Player, kinds: RoleId[]): RoleSeat[] {
   const pairs = p.students
-    .flatMap((s) => ROLE_ORDER.map((role) => ({ uid: s.uid, role, v: iconsOf(s, ROLES[role].attr) * ATTR_WEIGHT[ROLES[role].attr] })))
+    .flatMap((s) => kinds.map((role) => ({ uid: s.uid, role, v: iconsOf(s, ROLES[role].attr) * ATTR_WEIGHT[ROLES[role].attr] })))
     .filter((x) => x.v > 0)
     .sort((x, y) => y.v - x.v);
   const out: RoleSeat[] = [];
   for (const x of pairs) {
-    if (out.length >= k) break;
     if (out.some((r) => r.uid === x.uid)) continue;
     if (out.filter((r) => r.role === x.role).length >= MAX_PER_ROLE) continue;
     out.push({ role: x.role, uid: x.uid });
@@ -69,8 +82,11 @@ export function cpuAction(s: GameState): Action | null {
   switch (ph.kind) {
     case 'memberDraw':
       return { type: 'drawMember' };
-    case 'roles':
-      return { type: 'setRoles', roles: autoRoles(s.players[ph.player], slotsNow(s)) };
+    case 'roles': {
+      const p = s.players[ph.player];
+      const unlock = autoUnlock(p, slotsNow(s));
+      return { type: 'setRoles', unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
+    }
     case 'draw':
       return { type: 'drawEvent' };
     case 'push': {

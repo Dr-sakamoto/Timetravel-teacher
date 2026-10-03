@@ -1,4 +1,4 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles } from './calc';
+import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
 import { CARDS, CARD_MAP, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
@@ -95,7 +95,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 14,
+    version: 15,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -105,6 +105,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
       isCpu: p.isCpu,
       color: PLAYER_COLORS[i],
       students: [],
+      unlocked: [],
       roles: [],
       points: 0,
     })),
@@ -579,9 +580,13 @@ export function step(prev: GameState, a: Action): GameState {
     case 'setRoles': {
       if (ph.kind !== 'roles') return prev;
       const p = s.players[ph.player];
-      const k = slotsNow(s);
-      if (!validRoles(p, a.roles, k)) return prev;
+      const unlock = a.unlock ?? [];
+      if (!validUnlock(p, unlock, slotsNow(s))) return prev;
+      const kinds = [...p.unlocked, ...unlock];
+      if (!validRoles(p, a.roles, kinds)) return prev;
+      p.unlocked = kinds;
       p.roles = a.roles.map((r) => ({ ...r }));
+      if (unlock.length) log(s, `${p.name}が${unlock.map((r) => ROLES[r].icon + ROLES[r].name).join('・')}を解放`, ph.player);
       const desc = p.roles.map((r) => `${ROLES[r.role].name}:${p.students.find((x) => x.uid === r.uid)?.name}`).join(' ') || 'なし';
       log(s, `${p.name}の係 — ${desc}`, ph.player);
       s.queueIdx++;

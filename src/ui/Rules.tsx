@@ -44,7 +44,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             現代の普通の生徒（N）の山から、全員で順番に1枚ずつ引いて{STARTING_MEMBERS}人そろえる。スタート以降に現代から来るのは、現代の学期の転校生（R以上）だけ。
           </li>
           <li>
-            <b>係</b>：1年1学期は1種だけ。学期が進むごとに1種ずつ解放され、最大{MAX_ROLE_SEATS}種。1つの係に{MAX_PER_ROLE}人まで。
+            <b>係</b>：1年1学期は1種だけ。学期の頭に、まだ解放していない係から好きなものを1種ずつ選んで解放し、最大{MAX_ROLE_SEATS}種。解放した係はずっと使える。1つの係に{MAX_PER_ROLE}人まで。
             係に就いた子は、その係のアイコンが<b>2倍</b>に数えられる。学期の頭に決め直せる。
             <div className="rule-roles">
               {ROLE_ORDER.map((r) => (

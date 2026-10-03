@@ -17,14 +17,19 @@ export function roleSlots(no: number): number {
   return Math.max(1, Math.min(MAX_ROLE_SEATS, no));
 }
 
-/** 係の編成が決まりを守っているか（解放された種類の数まで・1人1つ・1つの係に1人まで） */
-export function validRoles(p: Player, roles: RoleSeat[], slots: number): boolean {
-  if (roles.length > slots) return false;
+/** 新しく解放する係の選び方が決まりを守っているか（今学期の数ちょうどまで・まだ解放していない種類） */
+export function validUnlock(p: Player, unlock: RoleId[], slots: number): boolean {
+  if (p.unlocked.length + unlock.length !== Math.max(p.unlocked.length, slots)) return false;
+  if (new Set(unlock).size !== unlock.length) return false;
+  return unlock.every((r) => ROLES[r] && !p.unlocked.includes(r));
+}
+
+/** 係の編成が決まりを守っているか（解放した係だけ・1人1つ・1つの係に1人まで） */
+export function validRoles(p: Player, roles: RoleSeat[], kinds: RoleId[]): boolean {
+  if (roles.some((r) => !kinds.includes(r.role))) return false;
   const uids = roles.map((r) => r.uid);
   if (new Set(uids).size !== uids.length || uids.some((u) => !p.students.some((s) => s.uid === u))) return false;
-  if (roles.some((r) => !ROLES[r.role])) return false;
-  const kinds = new Set(roles.map((r) => r.role));
-  return [...kinds].every((k) => roles.filter((r) => r.role === k).length <= MAX_PER_ROLE);
+  return [...new Set(roles.map((r) => r.role))].every((k) => roles.filter((r) => r.role === k).length <= MAX_PER_ROLE);
 }
 
 /** i番目（0始まり）の係の席が解放される学期の名前（例：「1年2学期」）。最初の1席は最初から */

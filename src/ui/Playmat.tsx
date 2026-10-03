@@ -3,7 +3,7 @@ import { MAX_CLASS, slotUnlockLabel } from '../game/calc';
 import { MAX_ROLE_SEATS, ROLES, roleDesc } from '../game/data/roles';
 import { ERAS } from '../game/data/eras';
 import { className } from '../game/engine';
-import type { Player, RoleSeat } from '../game/types';
+import type { Player, RoleId, RoleSeat } from '../game/types';
 import { TcgCard } from './TcgCard';
 
 interface Props {
@@ -22,6 +22,8 @@ interface Props {
   dimUid?: (uid: string) => boolean;
   /** 係決めの下書き */
   roles?: RoleSeat[];
+  /** 係決めの下書き（解放した係） */
+  unlocked?: RoleId[];
   /** 今のイベントに関わった生徒（光らせる） */
   lit?: Set<string>;
 }
@@ -29,7 +31,7 @@ interface Props {
 /** 教室プレイマット：名札・係ボード・9つの座席 */
 export function Playmat(props: Props) {
   const { player, year, variant, acting, delta } = props;
-  const view: Player = props.roles ? { ...player, roles: props.roles } : player;
+  const view: Player = { ...player, roles: props.roles ?? player.roles, unlocked: props.unlocked ?? player.unlocked };
   const k = props.slots;
   const seats = Array.from({ length: MAX_CLASS }, (_, i) => view.students[i] ?? null);
   return (
@@ -52,8 +54,10 @@ export function Playmat(props: Props) {
       </div>
       <div className="roleboard">
         {Array.from({ length: MAX_ROLE_SEATS }, (_, i) => {
-          const locked = i >= k;
-          const seat = view.roles[i];
+          const kind = view.unlocked[i];
+          const open = !kind && i < k;
+          const locked = !kind && !open;
+          const seat = kind && view.roles.find((r) => r.role === kind);
           const st = seat && view.students.find((s) => s.uid === seat.uid);
           return (
             <button
@@ -64,11 +68,11 @@ export function Playmat(props: Props) {
                 e.stopPropagation();
                 props.onSlotClick?.(i);
               }}
-              title={locked ? `${slotUnlockLabel(i)}で解放` : seat ? `${ROLES[seat.role].name}：${roleDesc(seat.role)}` : '空き'}
+              title={locked ? `${slotUnlockLabel(i)}で解放` : open ? '解放する係を選べる' : `${ROLES[kind].name}：${roleDesc(kind)}`}
             >
-              <span>{locked ? '🔒' : seat ? ROLES[seat.role].icon : '🪑'}</span>
-              <span className="role-name">{locked ? slotUnlockLabel(i).replace('年', '-') : seat ? roleDesc(seat.role) : '空き'}</span>
-              {!locked && <span className="role-who">{st ? st.icon : '·'}</span>}
+              <span>{locked ? '🔒' : open ? '🆕' : ROLES[kind].icon}</span>
+              <span className="role-name">{locked ? slotUnlockLabel(i).replace('年', '-') : open ? '選べる' : roleDesc(kind)}</span>
+              {kind && <span className="role-who">{st ? st.icon : '·'}</span>}
             </button>
           );
         })}
