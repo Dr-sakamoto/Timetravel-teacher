@@ -95,7 +95,16 @@ export function Playmat(props: Props) {
       data-pid={player.id}
       data-drop={arrange ? 'seats' : undefined}
       className={`playmat near pm-${variant} ${acting ? 'acting' : ''} ${arrange ? 'arranging' : ''} ${held ? 'holding' : ''}`}
-      style={{ '--pc': player.color, '--cells': cells, '--half': Math.ceil(cells / 2) } as CSSProperties}
+      style={
+        {
+          '--pc': player.color,
+          '--cells': cells,
+          '--half': Math.ceil(cells / 2),
+          // 空いている机を省いたときのマスの数と、2段に収めたときの列数
+          '--filled': ROLE_ORDER.length + free.length,
+          '--fhalf': Math.ceil((ROLE_ORDER.length + free.length) / 2),
+        } as CSSProperties
+      }
       onClick={arrange ? tap(() => arrange.held && arrange.onPlace(null, { kind: 'seats' })) : undefined}
     >
       <div className="plate">
