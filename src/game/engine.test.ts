@@ -59,6 +59,25 @@ describe('engine', () => {
     }
   }
 
+  it('turns go round in seat order, never twice in a row across months, terms or years', () => {
+    for (const players of [2, 4]) {
+      let s = newGame(Array.from({ length: players }, (_, i) => ({ name: `P${i + 1}`, isCpu: true })), 2, players);
+      const turns: number[] = [];
+      const seen = new Set<string>();
+      while (s.phase.kind !== 'gameOver') {
+        s = step(s, cpuAction(s)!);
+        // 新しく手番が始まったところだけ数える（同じ手番の選び直しは数えない）
+        const key = `${s.year}-${s.monthIdx}-${s.queueIdx}`;
+        if (s.phase.kind === 'draw' && !seen.has(key)) {
+          seen.add(key);
+          turns.push(s.phase.player);
+        }
+      }
+      expect(turns.length).toBeGreaterThan(players * 10);
+      turns.forEach((p, i) => expect(p).toBe(i % players));
+    }
+  });
+
   it('deals 6 random modern students one card at a time, alternating', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 1);
     const order: number[] = [];

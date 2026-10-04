@@ -113,7 +113,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
                 {c.icon}
                 {c.name}
               </b>
-              （{c.kind === 'push' ? 'ゲリラ' : '無料'}・×{c.count}）：{c.desc}
+              （{c.kind === 'push' ? 'ゲリラ' : '無料'}・{c.odds !== undefined ? `学期の3回に2回、×${c.count}` : `×${c.count}`}）：{c.desc}
             </li>
           ))}
           <li>
