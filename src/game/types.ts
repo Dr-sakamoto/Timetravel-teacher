@@ -164,7 +164,6 @@ export interface GameState {
   years: number;
   year: number;
   monthIdx: number;
-  rotation: number;
   queue: number[];
   queueIdx: number;
   phase: Phase;

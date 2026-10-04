@@ -122,7 +122,6 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     years,
     year: 1,
     monthIdx: 0,
-    rotation: 0,
     queue: setup.map((_, i) => i),
     queueIdx: 0,
     phase: { kind: 'memberDraw', player: 0, last: null },
@@ -281,9 +280,9 @@ function buildDeck(s: GameState): string[] {
 
 // ---------- 進行 ----------
 
+/** 手番の順：いつも席順（月や学年が変わっても、同じ人が2回続けて手番をしないように） */
 function order(s: GameState): number[] {
-  const n = s.players.length;
-  return Array.from({ length: n }, (_, i) => (i + s.rotation) % n);
+  return s.players.map((_, i) => i);
 }
 
 function startTerm(s: GameState) {
@@ -318,7 +317,6 @@ function monthEnd(s: GameState) {
 }
 
 function advanceMonth(s: GameState) {
-  s.rotation++;
   s.monthIdx++;
   if (s.monthIdx >= MONTHS.length) {
     yearEnd(s);
@@ -348,7 +346,6 @@ function newYear(s: GameState) {
   s.year++;
   drawYearEras(s);
   s.monthIdx = 0;
-  s.rotation++;
   startTerm(s);
 }
 
