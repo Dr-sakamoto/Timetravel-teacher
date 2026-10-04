@@ -247,16 +247,6 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         </div>
       );
     }
-    case 'push': {
-      const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
-      return (
-        <div className="say">
-          📦 {who} 👋 1人 転校 — タップ
-          <div className="say-sub">{chosen(st)}</div>
-          {pair(null, '👋 転校', !!pick.uid, () => pick.uid && dispatch({ type: 'push', uid: pick.uid }))}
-        </div>
-      );
-    }
     case 'kachikomi': {
       const power = attrScore(state.players[ph.player], 'fight').total * KACHIKOMI_CARDS[0].mult;
       const target = pick.target !== null ? state.players[pick.target] : null;

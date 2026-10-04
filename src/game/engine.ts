@@ -105,7 +105,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 20,
+    version: 21,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -552,25 +552,34 @@ export function kachikomiTargets(s: GameState, pi: number): number[] {
   return s.players.filter((p) => p.id !== pi).map((p) => p.id);
 }
 
-/** 転校：めくった人から席順に、全クラスが1人ずつ外す */
-function startDrop(s: GameState, drawer: number) {
-  const n = s.players.length;
-  nextDrop(s, drawer, Array.from({ length: n }, (_, i) => (drawer + i) % n), []);
+const RARITY_RANK = { N: 0, R: 1, SR: 2, SSR: 3 } as const;
+
+/** 転校で出ていく子：係に就いていない子のうち、アイコンが一番少ない子（同じならレア度が低い子、それも同じなら最後に来た子） */
+export function dropCandidate(p: Player): Student | undefined {
+  return droppable(p)
+    .map((st, i) => ({ st, i }))
+    .sort((a, b) => a.st.attrs.length - b.st.attrs.length || RARITY_RANK[a.st.rarity] - RARITY_RANK[b.st.rarity] || b.i - a.i)[0]?.st;
 }
 
-/** 転校の次の人へ（left はまだ外していないクラス。外せる子がいないクラスは飛ばす）。全員終わったら結果を出す */
-function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[]) {
-  for (let i = 0; i < left.length; i++) {
-    const pi = left[i];
-    if (droppable(s.players[pi]).length > 0) {
-      s.phase = { kind: 'push', player: pi, drawer, left: left.slice(i + 1), gone };
-      return;
+/** 転校：全クラスから1人ずつ、決まりに従って自動で出ていく（ゲリラの途中で誰にも操作させない） */
+function startDrop(s: GameState, drawer: number) {
+  const n = s.players.length;
+  const gone: Student[] = [];
+  for (let k = 0; k < n; k++) {
+    const pi = (drawer + k) % n;
+    const p = s.players[pi];
+    const st = dropCandidate(p);
+    if (!st) {
+      log(s, `${p.name}のクラスは転校させられる子がいなかった。`, pi);
+      continue;
     }
-    log(s, `${s.players[pi].name}のクラスは転校させられる子がいなかった。`, pi);
+    removeStudent(s, p, st.uid, false);
+    log(s, `${p.name}のクラスの${st.name}が転校していった。`, pi);
+    gone.push(st);
   }
   setResult(
     s,
-    drawer,
+    null,
     {
       title: '転校',
       icon: '📦',
@@ -653,14 +662,15 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
   const c = EVENT_MAP[id];
   log(s, `ゲリラ発生！ ${c.icon}${c.name}`);
   switch (c.kind) {
+    // ゲリラは誰の手番でもない学校全体のできごと（めくった人のものとして見せない）
     case 'swing':
-      setResult(s, pi, resolveSwing(s, c), 'turn');
+      setResult(s, null, resolveSwing(s, c), 'turn');
       return;
     case 'contest':
-      setResult(s, pi, resolveContest(s, c), 'turn');
+      setResult(s, null, resolveContest(s, c), 'turn');
       return;
     case 'raid':
-      setResult(s, pi, resolveRaid(s, c), 'turn');
+      setResult(s, null, resolveRaid(s, c), 'turn');
       return;
     case 'push':
       startDrop(s, pi);
@@ -828,15 +838,6 @@ export function step(prev: GameState, a: Action): GameState {
       const gone = removeStudent(s, p, a.uid, false)!;
       log(s, `${p.name}のクラスの${gone.name}が転校していった。`, ph.player);
       buyPerson(s, ph.player, ph.slot, gone);
-      return s;
-    }
-    case 'push': {
-      if (ph.kind !== 'push') return prev;
-      const p = s.players[ph.player];
-      if (!droppable(p).some((x) => x.uid === a.uid)) return prev;
-      const st = removeStudent(s, p, a.uid, false)!;
-      log(s, `${p.name}のクラスの${st.name}が転校していった。`, ph.player);
-      nextDrop(s, ph.drawer, ph.left, [...ph.gone, st]);
       return s;
     }
     case 'kachikomi': {
