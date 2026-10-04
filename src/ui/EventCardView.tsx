@@ -1,10 +1,10 @@
 import { ATTR_ICON, type EventResult } from '../game/types';
 import { EventArt, hasEventArt } from './art/events';
 
-/** 卓の中央でめくられたイベントカード */
+/** 卓の中央に出たイベントカード（取ったカード・ゲリラ・学校行事） */
 export function EventCardView({ result }: { result: EventResult }) {
   const attr = result.attr && result.attr !== 'all' ? ATTR_ICON[result.attr] : result.attr === 'all' ? '🌈' : null;
-  const kind = { normal: '通常（めくった人）', contest: '共通イベント（全員）', era: '時代イベント（全員）', fixed: '学校行事（全員）', personal: 'イベント' }[result.tone];
+  const kind = { normal: '授業（取った人）', contest: 'ゲリラ・共通イベント（全員）', era: 'ゲリラ・時代イベント（全員）', fixed: '学校行事（全員）', personal: 'イベント' }[result.tone];
   return (
     <div className={`ecard tone-${result.tone} deal-in`}>
       <div className="ecard-inner">

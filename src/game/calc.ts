@@ -105,6 +105,11 @@ export function testScore(p: Player, penalty: number): number {
 }
 
 /** 卒業式の点：クラス全員のアイコンの総数 */
+/** カードに印刷されたアイコンの数（グッズの＋1は数えない）。クラス替えはこの数が同じ子どうしでしかできない */
+export function baseIcons(s: Student): number {
+  return s.attrs.length - (s.goods ? 1 : 0);
+}
+
 export function totalPower(p: Player): number {
   return p.students.reduce((a, s) => a + s.attrs.length, 0);
 }

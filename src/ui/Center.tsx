@@ -1,10 +1,10 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { currentEra } from '../game/engine';
+import { canTake, currentEra, marketCost, previewStudent } from '../game/engine';
 import { EVENT_MAP, KACHIKOMI_CARDS, cardRule } from '../game/data/events';
-import { STARTING_MEMBERS, attrScore } from '../game/calc';
+import { MAX_CLASS, STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
-import type { Action, GameState } from '../game/types';
+import { ATTR_ICON, type Action, type GameState } from '../game/types';
 import { EventCardView } from './EventCardView';
 import { TcgCard } from './TcgCard';
 
@@ -25,25 +25,61 @@ export interface Pick {
   theirUid: string | null;
 }
 
-/** 卓の中央：山札・捨て札・めくったカードと手番の操作 */
+/** 場のカード1枚の見た目 */
+function MarketCard({ id, selected, dim, onClick }: { id: string; selected: boolean; dim: boolean; onClick?: () => void }) {
+  const cost = marketCost(id);
+  const costLabel = cost > 0 ? `${cost}点` : '無料';
+  if (id.startsWith('person:')) {
+    return (
+      <button className={`mcard person ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
+        <TcgCard student={previewStudent(id)} size="mini" />
+        <span className={`mcard-cost ${cost > 0 ? '' : 'free'}`}>{costLabel}</span>
+      </button>
+    );
+  }
+  const c = EVENT_MAP[id];
+  const attr = 'attr' in c && c.attr ? (c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr]) : null;
+  const tone = c.kind === 'normal' ? 'normal' : 'personal';
+  return (
+    <button className={`mcard tone-${tone} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
+      <span className="mcard-icon">{c.icon}</span>
+      <span className="mcard-name">{c.name}</span>
+      {attr && <span className="mcard-attr">{attr}</span>}
+      <span className={`mcard-cost ${cost > 0 ? '' : 'free'}`}>{costLabel}</span>
+    </button>
+  );
+}
+
+/** 卓の中央：山札・場のカード・捨て札・めくったカードと手番の操作 */
 export function Center({ state, dispatch, cpuBusy, pick, side }: Props) {
   const ph = state.phase;
   const era = ERAS[currentEra(state)];
   const actor = ph.kind !== 'gameOver' && ph.player !== null ? state.players[ph.player] : null;
   const human = actor && !actor.isCpu && !cpuBusy;
-  const canDraw = human && ph.kind === 'draw';
+  const canPick = human && ph.kind === 'draw';
   const canMember = human && ph.kind === 'memberDraw';
   const [showDeck, setShowDeck] = useState(false);
+  /** 手番の人が選んでいる場のカード */
+  const [sel, setSel] = useState<number | null>(null);
+  const selected = canPick && sel !== null && sel < state.market.length ? sel : null;
 
   return (
     <div className="center">
+      {ph.kind !== 'memberDraw' && state.market.length > 0 && (
+        <div className={`market ${canPick ? 'glow' : ''}`}>
+          {state.market.map((id, i) => (
+            <MarketCard
+              key={`${i}-${id}`}
+              id={id}
+              selected={selected === i}
+              dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
+              onClick={canPick ? () => setSel(i) : undefined}
+            />
+          ))}
+        </div>
+      )}
       <div className="piles">
-        <button
-          className={`pile event-pile ${canDraw ? 'glow' : ''}`}
-          disabled={!canDraw}
-          onClick={() => dispatch({ type: 'drawEvent' })}
-          title="イベントの山札"
-        >
+        <button className="pile event-pile" disabled title="イベントの山札">
           <span className="pile-back">🃏</span>
           <span className="pile-label">イベント</span>
           <span className="pile-count">{state.eventDeck.length}</span>
@@ -72,17 +108,21 @@ export function Center({ state, dispatch, cpuBusy, pick, side }: Props) {
         <Action
           key={ph.kind}
           state={state}
-          dispatch={dispatch}
+          dispatch={(a) => {
+            setSel(null);
+            dispatch(a);
+          }}
           cpuBusy={cpuBusy}
           pick={pick}
           side={side}
+          sel={selected}
         />
       </div>
     </div>
   );
 }
 
-function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
+function Action({ state, dispatch, cpuBusy, pick, side, sel }: Props & { sel: number | null }) {
   const ph = state.phase;
   if (ph.kind === 'gameOver') return null;
   const actor = ph.player !== null ? state.players[ph.player] : null;
@@ -104,15 +144,82 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
         </div>
       );
     }
-    case 'roles':
-      return <div className="say">{who} の係決め — 生徒のカードを係の場に置こう（ドラッグ／タップ）</div>;
-    case 'draw':
-      return <div className="say">{who} の番 — イベントの山札をめくろう</div>;
+    case 'roles': {
+      const era = ERAS[currentEra(state)];
+      return (
+        <div className="say">
+          {who} の係決め — 生徒のカードを係の場に置こう（ドラッグ／タップ）
+          <div className="say-sub era-motto">
+            {era.icon}
+            {era.name}「{era.motto}」
+          </div>
+        </div>
+      );
+    }
+    case 'draw': {
+      if (sel === null)
+        return (
+          <div className="say">
+            {who} の番 — 場のカードを1枚選ぼう（持ち点 {state.players[ph.player].points}）
+          </div>
+        );
+      const id = state.market[sel];
+      const cost = marketCost(id);
+      const p = state.players[ph.player];
+      const person = id.startsWith('person:') ? previewStudent(id) : null;
+      const ok = canTake(state, ph.player, sel);
+      const card = person ? null : EVENT_MAP[id];
+      /** 授業カードなら、取ったら今すぐ入る点 */
+      const gainNow = card?.kind === 'normal' ? attrScore(p, card.attr).total : null;
+      const why = ok
+        ? null
+        : cost > 0 && p.points < cost
+          ? `ポイントが足りない（持ち点 ${p.points}）`
+          : person
+            ? '満席で、代わりに転校させられる子がいない'
+            : '使える生徒・相手がいない';
+      const text = person
+        ? `${person.icon}${person.name}（${person.rarity}・${person.attrs.map((a) => ATTR_ICON[a]).join('')}）が転入${p.students.length >= MAX_CLASS ? '。満席なので代わりに1人転校させる' : ''}`
+        : cardRule(EVENT_MAP[id]);
+      return (
+        <div className="say">
+          {who}：{text}
+          {why && <div className="say-sub warn">{why}</div>}
+          <div className="say-sub">
+            <button className="btn ghost" onClick={() => dispatch({ type: 'pass', slot: sel })} title="このカードを捨て札にして、何もせずに手番を終える">
+              捨てて見送る
+            </button>
+            <button className="btn primary" disabled={!ok} onClick={() => dispatch({ type: 'take', slot: sel })}>
+              取る{cost > 0 ? `（−${cost}点）` : gainNow !== null ? `（+${gainNow}点）` : ''}
+            </button>
+          </div>
+        </div>
+      );
+    }
+    case 'makeRoom': {
+      const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+      const newcomer = previewStudent(state.market[ph.slot]);
+      return (
+        <div className="say">
+          🚪 {who} のクラスは満席 — {newcomer.icon}
+          {newcomer.name}を迎える代わりに、係に就いていない生徒を1人転校させる
+          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
+          <div className="say-sub">
+            <button className="btn ghost" onClick={() => dispatch({ type: 'makeRoom', uid: null })}>
+              やめる
+            </button>
+            <button className="btn primary" disabled={!pick.uid} onClick={() => pick.uid && dispatch({ type: 'makeRoom', uid: pick.uid })}>
+              転校させて迎える（−{marketCost(state.market[ph.slot])}点）
+            </button>
+          </div>
+        </div>
+      );
+    }
     case 'push': {
       const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
       return (
         <div className="say">
-          📦 転校（{state.players[ph.drawer].name}がめくった）— {who} は係に就いていない生徒を1人選んで転校させる（必ず1人）
+          📦 転校（ゲリラ）— {who} は係に就いていない生徒を1人選んで転校させる（必ず1人）
           <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
           <div className="say-sub">
             <button className="btn primary" disabled={!pick.uid} onClick={() => pick.uid && dispatch({ type: 'push', uid: pick.uid })}>
@@ -127,7 +234,7 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
       const target = pick.target !== null ? state.players[pick.target] : null;
       return (
         <div className="say">
-          👊 {who} のカチコミ — 殴りこむ相手の名札をタップ（相手は−{power}）
+          👊 ゲリラ発生！ {who} のクラスのヤンキーがカチコミに行く — 殴りこむ相手の名札をタップ（相手は−{power}）
           <div className="say-sub">→ {target ? target.name : '相手：未選択'}</div>
           <div className="say-sub">
             <button className="btn ghost" onClick={() => dispatch({ type: 'kachikomi', target: null })}>
@@ -146,7 +253,7 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
       const theirs = target?.students.find((x) => x.uid === pick.theirUid);
       return (
         <div className="say">
-          🔁 {who} のクラス替え — 手前の教室から出す生徒を選び、相手の名札をタップして連れてくる生徒を選ぶ（相手の係の子は選べない）
+          🔁 {who} のクラス替え — 手前の教室から出す生徒を選び、相手の名札をタップして連れてくる生徒を選ぶ（アイコンの数が同じ子どうしだけ。グッズの＋1は数えない。相手の係の子は選べない）
           <div className="say-sub">
             {mine ? `${mine.icon}${mine.name}` : '自分の生徒：未選択'} ⇄ {theirs ? `${theirs.icon}${theirs.name}（${target!.name}）` : target ? `${target.name}の生徒：未選択` : '相手：未選択'}
           </div>
@@ -175,10 +282,10 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
           <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
           <div className="say-sub">
             <button className="btn ghost" onClick={() => dispatch({ type: 'cyborg', uid: null })}>
-              使わない
+              やめる
             </button>
             <button className="btn primary" disabled={!pick.uid} onClick={() => dispatch({ type: 'cyborg', uid: pick.uid })}>
-              サイボーグにする
+              サイボーグにする（−{marketCost('cyborg')}点）
             </button>
           </div>
         </div>
@@ -189,14 +296,14 @@ function Action({ state, dispatch, cpuBusy, pick, side }: Props) {
       const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
       return (
         <div className="say">
-          {c.icon} {who} がグッズ「{c.name}」をゲット — {cardRule(c)}。手前の教室から装備する生徒をタップ
+          {c.icon} {who} がグッズ「{c.name}」を買う — {cardRule(c)}。手前の教室から装備する生徒をタップ
           <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
           <div className="say-sub">
             <button className="btn ghost" onClick={() => dispatch({ type: 'equip', uid: null })}>
-              装備しない
+              やめる
             </button>
             <button className="btn primary" disabled={!pick.uid} onClick={() => dispatch({ type: 'equip', uid: pick.uid })}>
-              装備する
+              装備する（−{marketCost(ph.card)}点）
             </button>
           </div>
         </div>

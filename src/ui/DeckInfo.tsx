@@ -1,15 +1,15 @@
-import { ERAS, favorLabel } from '../game/data/eras';
+import { ERAS } from '../game/data/eras';
 import { DECK_GROUPS, currentEra, deckBreakdown, type DeckGroup, type DeckRow } from '../game/engine';
 import type { GameState } from '../game/types';
 
 const GROUP_NOTE: Record<DeckGroup, string> = {
-  通常: 'めくった人：クラス全員のそのアイコンの数',
-  カチコミ: 'めくった人：他のクラスを自分の👊の数×3だけ減点',
-  共通イベント: '全クラス：状況でプラスにもマイナスにも',
-  '転校・クラス替え': '転校は全クラスが1人ずつ外す／クラス替えはめくった人が入れ替える',
-  グッズ: '生徒1人に装備してアイコン＋1',
-  時代イベント: '全クラス：カードごとに効果が違う。この時代の子は2倍',
-  人物: 'めくった人のクラスに転入',
+  通常: '場から取る（無料）：クラス全員のそのアイコンの数',
+  カチコミ: 'ゲリラ：手番の人が他のクラスを自分の👊の数×3だけ減点',
+  共通イベント: 'ゲリラ・全クラス：状況でプラスにもマイナスにも',
+  '転校・クラス替え': '転校はゲリラ（全クラスが1人ずつ外す）／クラス替えは場から取る（無料）',
+  グッズ: '場から取る（ポイントを払う）：生徒1人に装備してアイコン＋1',
+  時代イベント: 'ゲリラ・全クラス：カードごとに効果が違う。この時代の子は2倍',
+  人物: '場から取る（レア度に応じてポイントを払う）：自分のクラスに転入',
 };
 
 /** 今学期の山札の内訳（残り枚数と捨て札の枚数） */
@@ -17,7 +17,7 @@ export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => 
   const era = ERAS[currentEra(state)];
   const rows = deckBreakdown(state);
   const groups = DECK_GROUPS.filter((g) => rows.some((r) => r.group === g));
-  const sum = (rs: DeckRow[]) => rs.reduce((a, r) => a + r.left + r.used, 0);
+  const sum = (rs: DeckRow[]) => rs.reduce((a, r) => a + r.left + r.open + r.used, 0);
   const total = sum(rows);
   return (
     <div className="modal-back" onClick={onClose}>
@@ -27,16 +27,18 @@ export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => 
         </button>
         <h2>
           {era.icon}
-          {era.name}の山札（{favorLabel(era)}）
+          {era.name}の山札
         </h2>
+        <p className="deck-motto">「{era.motto}」</p>
         <p>
-          山札の残り {state.eventDeck.length}枚／捨て札 {state.discard.length}枚（合わせて {total}枚。装備されたグッズと転入した人物は含まない）
+          山札の残り {state.eventDeck.length}枚／場 {state.market.length}枚／捨て札 {state.discard.length}枚（合わせて {total}枚。装備されたグッズと転入した人物は含まない）
         </p>
         <table className="deck-table">
           <thead>
             <tr>
               <th>カード</th>
               <th>残り</th>
+              <th>場</th>
               <th>捨て札</th>
             </tr>
           </thead>
@@ -46,7 +48,7 @@ export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => 
             return (
               <tbody key={g}>
                 <tr className="deck-group">
-                  <th colSpan={3}>
+                  <th colSpan={4}>
                     {g} {n}枚（{Math.round((n / total) * 100)}%）<span className="deck-note">{GROUP_NOTE[g]}</span>
                   </th>
                 </tr>
@@ -57,6 +59,7 @@ export function DeckInfo({ state, onClose }: { state: GameState; onClose: () => 
                       {r.name}
                     </td>
                     <td>{r.left}</td>
+                    <td>{r.open}</td>
                     <td>{r.used}</td>
                   </tr>
                 ))}

@@ -1,7 +1,7 @@
-import { attrScore, countAttr, hasRoleBonus, iconsOf } from './calc';
+import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { cyborgable, droppable, equippable, exchangeTargets, kachikomiTargets, slotsNow, tradeable } from './engine';
+import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -21,7 +21,7 @@ export function classScore(p: Player): number {
   for (const c of SWING_CARDS) {
     const plus = attrScore(p, c.plus).total;
     const minus = !c.minus ? 0 : c.minus === 'heads' ? p.students.length : attrScore(p, c.minus).total;
-    v += c.offsetOnly ? Math.min(0, plus - minus) : plus - minus;
+    v += plus - minus;
   }
   v += (attrScore(p, 'study').total - countAttr(p, 'fight') * TEST_YANKEE_PENALTY) * 2;
   return v;
@@ -76,6 +76,58 @@ function worth(p: Player, uid: string): number {
   return classScore(p) - classScore(withStudents(p, p.students.filter((x) => x.uid !== uid)));
 }
 
+/** 残りの手番のある月の数 */
+function monthsLeft(s: GameState): number {
+  return (s.years - s.year) * MONTHS.length + (MONTHS.length - s.monthIdx);
+}
+
+/** クラスが強くなった分を点に換算するときの係数（rate：残り1か月あたり、grad：卒業式のアイコン1個あたり） */
+export const AI_TUNING = { rate: 0.05, grad: 1 };
+
+/** クラスを before から after に変えると、この先どれだけ点になりそうか */
+function gain(s: GameState, before: Player, after: Player): number {
+  return (classScore(after) - classScore(before)) * AI_TUNING.rate * monthsLeft(s) + (totalPower(after) - totalPower(before)) * AI_TUNING.grad;
+}
+
+/** いなくなっても一番困らない子（満席の転入・転校で手放す） */
+function leastWorth(p: Player): Student | undefined {
+  return droppable(p).sort((x, y) => worth(p, x.uid) - worth(p, y.uid))[0];
+}
+
+function equipped(st: Student, attr: Attr): Student {
+  return { ...st, attrs: [...st.attrs, attr], goods: { id: 'x', name: '', icon: '', attr } };
+}
+
+function cyborged(st: Student): Student {
+  return { ...st, attrs: [...CYBORG_ATTRS], goods: undefined };
+}
+
+/** その場のカードを取る値打ち（払うポイントを差し引いた、この先の得点の目安） */
+export function marketValue(s: GameState, pi: number, slot: number): number {
+  const p = s.players[pi];
+  const id = s.market[slot];
+  const cost = marketCost(id);
+  if (id.startsWith('person:')) {
+    const out = p.students.length >= 9 ? leastWorth(p) : undefined;
+    const kept = p.students.filter((x) => x.uid !== out?.uid);
+    return gain(s, p, withStudents(p, [...kept, previewStudent(id)])) - cost;
+  }
+  const c = EVENT_MAP[id];
+  const swap = (uid: string, st: Student) => withStudents(p, p.students.map((x) => (x.uid === uid ? st : x)));
+  switch (c.kind) {
+    case 'normal':
+      return attrScore(p, c.attr).total;
+    case 'goods':
+      return Math.max(...equippable(p).map((st) => gain(s, p, swap(st.uid, equipped(st, c.attr))))) - cost;
+    case 'cyborg':
+      return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;
+    case 'exchange':
+      return Math.max(...exchangePairs(s, pi).map((x) => gain(s, p, swap(x.uid, s.players[x.target].students.find((y) => y.uid === x.theirUid)!))));
+    default:
+      return -Infinity;
+  }
+}
+
 /** 一番点の高い相手 */
 function leader(s: GameState, candidates: number[]): number {
   return [...candidates].sort((x, y) => s.players[y].points - s.players[x].points)[0];
@@ -91,8 +143,15 @@ export function cpuAction(s: GameState): Action | null {
       const unlock = autoUnlock(p, slotsNow(s));
       return { type: 'setRoles', unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
     }
-    case 'draw':
-      return { type: 'drawEvent' };
+    case 'draw': {
+      const slots = s.market.map((_, i) => i);
+      const best = slots.filter((i) => canTake(s, ph.player, i)).sort((x, y) => marketValue(s, ph.player, y) - marketValue(s, ph.player, x))[0];
+      if (best !== undefined && marketValue(s, ph.player, best) > 0) return { type: 'take', slot: best };
+      // 取りたいものがなければ、一番高いカードを捨てて見送る
+      return { type: 'pass', slot: slots.sort((x, y) => marketCost(s.market[y]) - marketCost(s.market[x]))[0] };
+    }
+    case 'makeRoom':
+      return { type: 'makeRoom', uid: leastWorth(s.players[ph.player])?.uid ?? null };
     case 'push': {
       // 一番いなくても困らない子を転校させる
       const p = s.players[ph.player];
@@ -103,28 +162,21 @@ export function cpuAction(s: GameState): Action | null {
       return { type: 'kachikomi', target: leader(s, kachikomiTargets(s, ph.player)) };
     case 'exchange': {
       const p = s.players[ph.player];
-      const mine = [...p.students].sort((x, y) => worth(p, x.uid) - worth(p, y.uid))[0];
-      let best: { target: number; uid: string; gain: number } | null = null;
-      for (const t of exchangeTargets(s, ph.player)) {
-        for (const st of tradeable(s.players[t])) {
-          const after = withStudents(p, [...p.students.filter((x) => x.uid !== mine.uid), st]);
-          const gain = classScore(after) - classScore(p);
-          if (!best || gain > best.gain) best = { target: t, uid: st.uid, gain };
-        }
+      let best: { uid: string; target: number; theirUid: string; gain: number } | null = null;
+      for (const x of exchangePairs(s, ph.player)) {
+        const theirs = s.players[x.target].students.find((y) => y.uid === x.theirUid)!;
+        const g = gain(s, p, withStudents(p, p.students.map((y) => (y.uid === x.uid ? theirs : y))));
+        if (!best || g > best.gain) best = { ...x, gain: g };
       }
-      if (!best || best.gain <= 0) return { type: 'exchange', uid: null };
-      return { type: 'exchange', uid: mine.uid, target: best.target, theirUid: best.uid };
+      if (!best) return { type: 'exchange', uid: null };
+      return { type: 'exchange', uid: best.uid, target: best.target, theirUid: best.theirUid };
     }
     case 'cyborg': {
-      // サイボーグにしたほうが強くなる子（いなければ使わない）
+      // サイボーグにして一番強くなる子（取ると決めた時点で得になる子がいる）
       const me = s.players[ph.player];
-      const after = (uid: string) => withStudents(me, me.students.map((x) => (x.uid === uid ? { ...x, attrs: [...CYBORG_ATTRS], goods: undefined } : x)));
-      let best: { uid: string; gain: number } | null = null;
-      for (const st of cyborgable(me)) {
-        const gain = classScore(after(st.uid)) - classScore(me);
-        if (!best || gain > best.gain) best = { uid: st.uid, gain };
-      }
-      return { type: 'cyborg', uid: best && best.gain > 0 ? best.uid : null };
+      const after = (uid: string) => withStudents(me, me.students.map((x) => (x.uid === uid ? cyborged(x) : x)));
+      const st = cyborgable(me).sort((x, y) => gain(s, me, after(y.uid)) - gain(s, me, after(x.uid)))[0];
+      return { type: 'cyborg', uid: st?.uid ?? null };
     }
     case 'equip': {
       const p = s.players[ph.player];
