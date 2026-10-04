@@ -280,17 +280,6 @@ button.chip {
 .era-chip .era-left {
   display: none;
 }
-/* この時代が優遇するアイコン：次の学期を見て作戦を立てられるように目立たせる */
-.era-chip .era-favor {
-  grid-column: 3;
-  grid-row: 1 / 3;
-  font-size: 0.7rem;
-  font-weight: 900;
-  white-space: nowrap;
-  padding: 0.1rem 0.35rem;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--era) 35%, #18261f);
-}
 .era-chip.now {
   opacity: 1;
   border-color: var(--yellow);
@@ -558,6 +547,118 @@ button.chip {
   border-radius: 999px;
   padding: 0 0.45em;
   border: 2px solid #2b2410;
+}
+
+/* ---------- 場のカード（手番の人はここから1枚取る） ---------- */
+.market {
+  display: flex;
+  gap: 0.55rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 0.35rem;
+  border-radius: 12px;
+}
+/* めくったカードを見せている間は場を隠して、卓の高さを変えない */
+.center:has(.reveal) .market {
+  display: none;
+}
+.market.glow {
+  background: rgba(246, 216, 96, 0.1);
+  box-shadow: 0 0 0 2px rgba(246, 216, 96, 0.45);
+}
+.mcard {
+  position: relative;
+  width: 76px;
+  height: 104px;
+  border-radius: 9px;
+  border: none;
+  padding: 4px;
+  font: inherit;
+  color: var(--ink);
+  background: linear-gradient(145deg, #8fd4a8, #2f7a4a);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.45);
+  transition: transform 0.12s;
+}
+.mcard.tone-normal {
+  background: linear-gradient(145deg, #7fb6e8, #2e6aa8);
+}
+.mcard:not(.person)::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 6px;
+  background: var(--paper);
+}
+.mcard > * {
+  position: relative;
+}
+.mcard.person {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.mcard.person .tcg {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+.mcard:enabled {
+  cursor: pointer;
+}
+.mcard:enabled:hover {
+  transform: translateY(-3px);
+}
+.mcard.selected {
+  outline: 4px solid var(--yellow);
+  transform: translateY(-4px);
+}
+.mcard.dim {
+  filter: grayscale(0.7) brightness(0.7);
+}
+.mcard-icon {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+.mcard-name {
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-align: center;
+  line-height: 1.15;
+}
+.mcard-attr {
+  font-size: 0.9rem;
+}
+.mcard-cost {
+  position: absolute;
+  bottom: -8px;
+  right: -8px;
+  z-index: 3;
+  background: var(--down);
+  color: #2b1010;
+  font-weight: 900;
+  font-size: 0.72rem;
+  border-radius: 999px;
+  padding: 0 0.45em;
+  border: 2px solid #2b1010;
+}
+.mcard-cost.free {
+  background: var(--up);
+  color: #10301a;
+  border-color: #10301a;
+}
+.say-sub.warn {
+  color: var(--down);
+  font-weight: 900;
+}
+.say-sub.era-motto,
+.deck-motto {
+  color: var(--yellow);
+  font-weight: 900;
 }
 
 /* ---------- 中央の操作 ---------- */
@@ -1393,10 +1494,6 @@ button.chip {
   .era-chip .era-name {
     font-size: 0.66rem;
   }
-  .era-chip .era-favor {
-    font-size: 0.6rem;
-    padding: 0.05rem 0.2rem;
-  }
 }
 /* アイコン数＝強さ：アイコン欄を主役に */
 .tcg-head {
@@ -1785,9 +1882,40 @@ button.chip {
     min-height: 0;
     container-type: size;
   }
-  /* めくったカードを見せている間は山札を隠して場所を空ける */
-  .center:has(.reveal) .piles {
+  /* めくったカードを見せている間は山札と場を隠して場所を空ける */
+  .center:has(.reveal) :is(.piles, .market) {
     display: none;
+  }
+  .market {
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    padding: 0.2rem;
+    flex: none;
+  }
+  .mcard {
+    width: 54px;
+    height: 74px;
+    padding: 3px;
+    border-radius: 6px;
+  }
+  .mcard:not(.person)::before {
+    inset: 3px;
+    border-radius: 4px;
+  }
+  .mcard-icon {
+    font-size: 1.2rem;
+  }
+  .mcard-name {
+    font-size: 0.5rem;
+  }
+  .mcard-attr {
+    font-size: 0.7rem;
+  }
+  .mcard-cost {
+    font-size: 0.55rem;
+    bottom: -5px;
+    right: -6px;
+    border-width: 1px;
   }
   .piles {
     display: grid;

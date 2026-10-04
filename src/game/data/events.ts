@@ -1,6 +1,6 @@
-import { ATTR_ICON, type Attr, type EraId } from '../types';
+import { ATTR_ICON, type Attr, type EraId, type Rarity } from '../types';
 
-/** 通常カード（○○の時間）：めくった人だけ、クラス全員のそのアイコンの合計数（＋係ボーナス）が入る。全時代共通 */
+/** 通常カード（○○の時間）：場から取った人だけ、クラス全員のそのアイコンの合計数（＋係ボーナス）が入る。全時代共通 */
 export interface NormalCard {
   id: string;
   kind: 'normal';
@@ -30,8 +30,6 @@ export interface SwingCard {
   plus: Attr;
   /** 引かれるアイコン（または人数）。なければプラスだけ */
   minus?: Attr | 'heads';
-  /** プラスはマイナスを打ち消すだけで、点はプラスにならない（0が上限） */
-  offsetOnly?: boolean;
   desc: string;
   count: number;
 }
@@ -131,6 +129,23 @@ export const CONTEST_POINTS: Record<number, number[]> = {
 /** 学期ごとの山札に入る人物カードの最大枚数（その時代のカードプールに残っている分だけ） */
 export const PERSON_CARDS_PER_TERM = 7;
 
+/** 場に表向きで並ぶカードの枚数 */
+export const MARKET_SIZE = 4;
+/** 人物カードを取るのに払うクラスポイント（レア度ごと） */
+export const PERSON_COST: Record<Rarity, number> = { N: 4, R: 7, SR: 14, SSR: 22 };
+/** グッズ・サイボーグ化を取るのに払うクラスポイント */
+export const GOODS_COST = 2;
+
+/** 場から取れるカードのコスト（授業とクラス替えは無料） */
+export function eventCost(c: EventCard): number {
+  return c.kind === 'goods' || c.kind === 'cyborg' ? GOODS_COST : 0;
+}
+
+/** ゲリラ：場に並べようとめくった瞬間に、その場で起こるカード（だれも避けられない） */
+export function isGuerrilla(c: EventCard): boolean {
+  return c.kind === 'kachikomi' || c.kind === 'swing' || c.kind === 'contest' || c.kind === 'raid' || c.kind === 'push';
+}
+
 const N = (attr: Attr, name: string, icon: string, count: number): NormalCard => ({ id: `n_${attr}`, kind: 'normal', name, icon, attr, count });
 export const NORMAL_CARDS: NormalCard[] = [
   N('study', '数学の時間', '🔢', 5),
@@ -141,20 +156,19 @@ export const NORMAL_CARDS: NormalCard[] = [
 
 export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, count: 3 }];
 
-const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | 'heads' | undefined, desc: string, offsetOnly?: boolean): SwingCard => ({
-  id, kind: 'swing', name, icon, plus, minus, offsetOnly, desc, count: 1,
+const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | 'heads' | undefined, desc: string): SwingCard => ({
+  id, kind: 'swing', name, icon, plus, minus, desc, count: 1,
 });
 export const SWING_CARDS: SwingCard[] = [
   W('poptest', '抜き打ちテスト', '📝', 'study', undefined, '日ごろの勉強がものを言う。'),
   W('visit', '授業参観', '👀', 'charm', 'fight', '親の前でいいところを見せたい。'),
   W('marathon', '持久走大会', '🥵', 'sports', 'heads', '全員が走る。走れない子は足を引っぱる。'),
   W('chorus', '合唱練習', '🎶', 'art', 'heads', '全員で歌う。音痴が混ざると台なし。'),
-  W('brawl', 'ケンカ騒ぎ', '😤', 'charm', 'fight', 'ヤンキーが暴れる。人望のある子が止めに入れば被害は減る。', true),
 ];
 
 export const MOVE_CARDS: MoveCard[] = [
   { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: '全クラス：係に就いていない生徒を1人、必ず転校させる（クラスから外す）', count: 2 },
-  { id: 'exchange', kind: 'exchange', name: 'クラス替え', icon: '🔁', desc: 'めくった人：自分の生徒1人と、他のクラスの係に就いていない好きな生徒1人を強制的に入れ替えられる', count: 1 },
+  { id: 'exchange', kind: 'exchange', name: 'クラス替え', icon: '🔁', desc: '取った人：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える（印刷されたアイコンの数が同じ子どうしだけ）', count: 1 },
 ];
 
 const G = (id: string, name: string, icon: string, attr: Attr, era?: EraId): GoodsCard => ({ id, kind: 'goods', name, icon, attr, era, count: 1 });
@@ -293,12 +307,11 @@ export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EV
 export function cardRule(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
-      return `めくった人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
+      return `取った人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return `他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
+      return `手番の人が他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
     case 'swing':
       if (!c.minus) return `全クラス：クラス全員の${ATTR_ICON[c.plus]}の数を加点`;
-      if (c.offsetOnly) return `全クラス：${ATTR_ICON[c.minus === 'heads' ? c.plus : c.minus]}の数だけ減点。${ATTR_ICON[c.plus]}の数だけ打ち消す（プラスにはならない）`;
       return `全クラス：${ATTR_ICON[c.plus]}の数 − ${c.minus === 'heads' ? 'クラスの人数' : `${ATTR_ICON[c.minus]}の数`}（マイナスもある）`;
     case 'contest':
       return c.effect.type === 'alien' || c.effect.type === 'variety' ? `全クラス：${eraEffectRule(c)}` : `全クラス：${eraEffectRule(c)}（この時代の生徒は2倍）`;

@@ -1,6 +1,6 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, contributions, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
+import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
 import { CARDS, CARD_MAP, toIcons } from './data/cards';
-import { ERAS, PRESENT_INDEX, favorLabel } from './data/eras';
+import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
   ALL_EVENT_CARDS,
   KACHIKOMI_CARDS,
@@ -9,11 +9,15 @@ import {
   EVENT_MAP,
   FIXED_BY_MONTH,
   FIXED_MAP,
+  MARKET_SIZE,
+  PERSON_COST,
   PERSON_CARDS_PER_TERM,
   TEST_YANKEE_PENALTY,
   cardEra,
   cardRule,
+  eventCost,
   fixedRule,
+  isGuerrilla,
   type ContestCard,
   type FixedEvent,
   type GoodsCard,
@@ -97,7 +101,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 19,
+    version: 20,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -119,6 +123,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     queueIdx: 0,
     phase: { kind: 'memberDraw', player: 0, last: null },
     eventDeck: [],
+    market: [],
     discard: [],
     starters: [...STARTER_POOL],
     pools,
@@ -281,9 +286,11 @@ function startTerm(s: GameState) {
   s.queueIdx = 0;
   const t = termOfMonth(MONTHS[s.monthIdx]);
   const era = ERAS[currentEra(s)];
-  log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name}（${favorLabel(era)}）。`);
+  log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name} —「${era.motto}」`);
   s.eventDeck = buildDeck(s);
   s.discard = [];
+  s.market = [];
+  fillMarket(s);
   s.phase = { kind: 'roles', player: s.queue[0] };
 }
 
@@ -377,10 +384,9 @@ function resolveSwing(s: GameState, c: SwingCard): EventResult {
   const rows = s.players.map((p, i): ResultRow => {
     const plus = attrScore(p, c.plus);
     const minus = !c.minus ? { total: 0, holders: [] as Student[] } : c.minus === 'heads' ? { total: p.students.length, holders: [] as Student[] } : attrScore(p, c.minus);
-    // 打ち消すだけのカード（ケンカ騒ぎ）は0が上限
-    const delta = c.offsetOnly ? Math.min(0, plus.total - minus.total) : plus.total - minus.total;
+    const delta = plus.total - minus.total;
     p.points += delta;
-    if (delta > 0 || c.offsetOnly) plus.holders.forEach((h) => h.mvp++);
+    if (delta > 0) plus.holders.forEach((h) => h.mvp++);
     const note = c.minus ? `${ATTR_ICON[c.plus]}${plus.total}−${c.minus === 'heads' ? '👥' : ATTR_ICON[c.minus]}${minus.total}` : undefined;
     return { player: i, count: c.minus ? undefined : plus.total, delta, note, uids: [...plus.holders, ...minus.holders].map((h) => h.uid) };
   });
@@ -526,14 +532,6 @@ function setResult(s: GameState, pi: number | null, result: EventResult, ctx: Re
   s.phase = { kind: 'result', player: pi, result, ctx };
 }
 
-/** 人物カードを引いた：そのまま転入 */
-function welcome(s: GameState, pi: number, st: Student, ctx: ResultCtx) {
-  const p = s.players[pi];
-  addStudent(s, p, st);
-  log(s, `${p.name}のクラスに${st.name}が転入！`, pi);
-  setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc: `${st.icon}${st.name}がやってきた！`, rows: [], students: [st] }, ctx);
-}
-
 /** 転校で外せる生徒（係に就いていない子。定員の下限まで減っていたら外せない） */
 export function droppable(p: Player): Student[] {
   return p.students.length <= MIN_CLASS ? [] : p.students.filter((x) => roleOf(p, x.uid) === null);
@@ -544,9 +542,17 @@ export function tradeable(p: Player): Student[] {
   return p.students.filter((x) => roleOf(p, x.uid) === null);
 }
 
-/** クラス替えの相手（係に就いていない生徒がいるクラス） */
+/** クラス替えできる組み合わせ：自分の生徒と、他のクラスの係に就いていない生徒で、印刷されたアイコンの数が同じ子どうし */
+export function exchangePairs(s: GameState, pi: number): { uid: string; target: number; theirUid: string }[] {
+  const me = s.players[pi];
+  return s.players
+    .filter((p) => p.id !== pi)
+    .flatMap((p) => tradeable(p).flatMap((x) => me.students.filter((m) => baseIcons(m) === baseIcons(x)).map((m) => ({ uid: m.uid, target: p.id, theirUid: x.uid }))));
+}
+
+/** クラス替えの相手（交換できる組み合わせがあるクラス） */
 export function exchangeTargets(s: GameState, pi: number): number[] {
-  return s.players.filter((p) => p.id !== pi && tradeable(p).length > 0).map((p) => p.id);
+  return [...new Set(exchangePairs(s, pi).map((x) => x.target))];
 }
 
 /** グッズを装備できる生徒（まだ何も装備していない子） */
@@ -591,46 +597,75 @@ function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[])
   );
 }
 
-function popCard(s: GameState): string {
+function popCard(s: GameState): string | undefined {
   if (s.eventDeck.length === 0) {
+    if (s.discard.length === 0) return undefined;
     s.eventDeck = shuffle(s, s.discard);
     s.discard = [];
     log(s, '捨て札をシャッフルして山札に戻した。');
   }
-  return s.eventDeck.pop()!;
+  return s.eventDeck.pop();
 }
 
 const isPerson = (id: string) => id.startsWith('person:');
 const personId = (id: string) => id.slice('person:'.length);
 /** 人物カードの子がまだ誰のクラスにもいないか */
 const available = (s: GameState, id: string) => s.pools[eraOfId(personId(id))].includes(personId(id));
+/** 場に並べるとその場で起こるカードか */
+const guerrilla = (id: string) => !isPerson(id) && isGuerrilla(EVENT_MAP[id]);
 
-function resolveDraw(s: GameState, pi: number) {
-  const p = s.players[pi];
-  let id = popCard(s);
-  // 満席なら人物カードは捨てて、もう1枚めくる（もう転入済みの子のカードも同様）
-  for (let guard = 0; isPerson(id) && (p.students.length >= MAX_CLASS || !available(s, id)); guard++) {
-    s.discard.push(id);
-    if (guard >= 50) {
-      setResult(s, pi, { title: '満席', icon: '🪑', tone: 'personal', desc: '人物カードしか残っていなかった。', rows: [] }, 'turn');
+/** 人物カードの子を見せる用に作る（クラスには入れない。現代の生徒は名前の代わりに肩書きを出す） */
+export function previewStudent(id: string): Student {
+  const pid = personId(id);
+  if (isModernCard(pid)) {
+    const a = ARCHETYPE_MAP[archetypeOf(pid)];
+    return { uid: `preview:${pid}`, cardId: pid, name: a.title, title: a.title, era: 'present', rarity: a.rarity, icon: a.icon, art: a.id, attrs: toIcons(a.attrs, a.rarity, a.power), flavor: a.flavor, joined: '', mvp: 0 };
+  }
+  const c = CARD_MAP[pid];
+  return { uid: `preview:${pid}`, cardId: pid, name: c.name, title: c.title, era: c.era, rarity: c.rarity, icon: c.icon, art: pid, attrs: [...c.attrs], flavor: c.flavor, joined: '', mvp: 0 };
+}
+
+/** 場のカードを取るのに払うクラスポイント */
+export function marketCost(id: string): number {
+  return isPerson(id) ? PERSON_COST[previewStudent(id).rarity] : eventCost(EVENT_MAP[id]);
+}
+
+/** 学期の頭に場を並べる（この時はゲリラは起こさず、山札の一番下に戻す） */
+function fillMarket(s: GameState) {
+  for (let guard = s.eventDeck.length; s.market.length < MARKET_SIZE && guard > 0; guard--) {
+    const id = s.eventDeck.pop();
+    if (!id) break;
+    if (guerrilla(id)) s.eventDeck.unshift(id);
+    else s.market.push(id);
+  }
+}
+
+/** 手番の終わりに場を補充する。ゲリラをめくったらその場で起こし、結果を見せてから続きを補充する */
+function refill(s: GameState) {
+  const pi = s.queue[s.queueIdx];
+  while (s.market.length < MARKET_SIZE) {
+    const id = popCard(s);
+    if (!id) break;
+    if (isPerson(id) && !available(s, id)) {
+      s.discard.push(id);
+      continue;
+    }
+    if (guerrilla(id)) {
+      s.discard.push(id);
+      fireGuerrilla(s, pi, id);
       return;
     }
-    log(s, `${p.name}のクラスは満席。人物カードを捨ててもう1枚めくる。`, pi);
-    id = popCard(s);
+    s.market.push(id);
   }
-  // 人物カード：引いたらそのまま転入
-  if (isPerson(id)) {
-    welcome(s, pi, fromPoolId(s, personId(id), joinedLabel(s)), 'turn');
-    return;
-  }
+  endTurn(s);
+}
+
+/** ゲリラ（カチコミ・共通イベント・時代イベント・襲来・転校）。カチコミは手番の人が殴りこむ */
+function fireGuerrilla(s: GameState, pi: number, id: string) {
+  const p = s.players[pi];
   const c = EVENT_MAP[id];
-  // グッズは装備したら場に残るので、捨て札に行くのは装備しなかった時だけ
-  if (c.kind !== 'goods') s.discard.push(id);
-  const personal = (desc: string) => setResult(s, pi, { title: c.name, icon: c.icon, tone: 'personal', desc, rule: cardRule(c), rows: [] }, 'turn');
+  log(s, `ゲリラ発生！ ${c.icon}${c.name}`);
   switch (c.kind) {
-    case 'normal':
-      setResult(s, pi, resolveNormal(s, c, pi), 'turn');
-      return;
     case 'swing':
       setResult(s, pi, resolveSwing(s, c), 'turn');
       return;
@@ -641,25 +676,81 @@ function resolveDraw(s: GameState, pi: number) {
       setResult(s, pi, resolveRaid(s, c), 'turn');
       return;
     case 'kachikomi':
-      if (attrScore(p, 'fight').total === 0) personal('👊を持つ子がいないので、カチコミに行けなかった。');
+      if (attrScore(p, 'fight').total === 0)
+        setResult(s, pi, { title: c.name, icon: c.icon, tone: 'personal', desc: `${p.name}のクラスには👊を持つ子がいないので、カチコミは起きなかった。`, rule: cardRule(c), rows: [] }, 'turn');
       else s.phase = { kind: 'kachikomi', player: pi };
-      return;
-    case 'goods':
-      if (equippable(p).length === 0) {
-        s.discard.push(id);
-        personal('装備できる生徒がいなかった。');
-      } else s.phase = { kind: 'equip', player: pi, card: id };
-      return;
-    case 'cyborg':
-      if (cyborgable(p).length === 0) personal('サイボーグにできる生徒がいなかった。');
-      else s.phase = { kind: 'cyborg', player: pi };
       return;
     case 'push':
       startDrop(s, pi);
       return;
+  }
+}
+
+/** その場のカードを今取れるか（ポイントが足りる・装備できる子や交換できる相手がいる） */
+export function canTake(s: GameState, pi: number, slot: number): boolean {
+  const id = s.market[slot];
+  if (!id) return false;
+  const p = s.players[pi];
+  const cost = marketCost(id);
+  if (cost > 0 && p.points < cost) return false;
+  if (isPerson(id)) return p.students.length < MAX_CLASS || droppable(p).length > 0;
+  const c = EVENT_MAP[id];
+  switch (c.kind) {
+    case 'normal':
+      return true;
+    case 'goods':
+      return equippable(p).length > 0;
+    case 'cyborg':
+      return cyborgable(p).length > 0;
     case 'exchange':
-      if (p.students.length === 0 || exchangeTargets(s, pi).length === 0) personal('交換できる生徒がいなかった。');
-      else s.phase = { kind: 'exchange', player: pi };
+      return exchangePairs(s, pi).length > 0;
+    default:
+      return false;
+  }
+}
+
+/** 場からカードを抜く（取ったカードは捨て札へ。グッズは装備するので捨て札には行かない） */
+function takeFromMarket(s: GameState, slot: number, discard = true): string {
+  const [id] = s.market.splice(slot, 1);
+  if (discard && !isPerson(id)) s.discard.push(id);
+  return id;
+}
+
+/** 人物カードを買う：ポイントを払って転入 */
+function buyPerson(s: GameState, pi: number, slot: number, gone?: Student) {
+  const p = s.players[pi];
+  const id = takeFromMarket(s, slot);
+  const cost = marketCost(id);
+  p.points -= cost;
+  const st = fromPoolId(s, personId(id), joinedLabel(s));
+  addStudent(s, p, st);
+  log(s, `${p.name}のクラスに${st.name}が転入！（−${cost}点）`, pi);
+  const desc = `${st.icon}${st.name}がやってきた！（−${cost}点）${gone ? ` 入れ替わりに${gone.icon}${gone.name}が転校していった。` : ''}`;
+  setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc, rows: [{ player: pi, delta: -cost, note: 'スカウト' }], students: gone ? [st, gone] : [st] }, 'turn');
+}
+
+/** 手番：場のカードを1枚取る */
+function takeCard(s: GameState, pi: number, slot: number) {
+  const id = s.market[slot];
+  if (isPerson(id)) {
+    if (s.players[pi].students.length >= MAX_CLASS) s.phase = { kind: 'makeRoom', player: pi, slot };
+    else buyPerson(s, pi, slot);
+    return;
+  }
+  const c = EVENT_MAP[id];
+  switch (c.kind) {
+    case 'normal':
+      takeFromMarket(s, slot);
+      setResult(s, pi, resolveNormal(s, c, pi), 'turn');
+      return;
+    case 'goods':
+      s.phase = { kind: 'equip', player: pi, card: id, slot };
+      return;
+    case 'cyborg':
+      s.phase = { kind: 'cyborg', player: pi, slot };
+      return;
+    case 'exchange':
+      s.phase = { kind: 'exchange', player: pi, slot };
       return;
   }
 }
@@ -694,7 +785,7 @@ export function step(prev: GameState, a: Action): GameState {
       if (ph.kind !== 'result') return prev;
       switch (ph.ctx) {
         case 'turn':
-          endTurn(s);
+          refill(s);
           break;
         case 'monthEnd':
           advanceMonth(s);
@@ -726,9 +817,30 @@ export function step(prev: GameState, a: Action): GameState {
       else startTurns(s);
       return s;
     }
-    case 'drawEvent': {
-      if (ph.kind !== 'draw') return prev;
-      resolveDraw(s, ph.player);
+    case 'take': {
+      if (ph.kind !== 'draw' || !canTake(s, ph.player, a.slot)) return prev;
+      takeCard(s, ph.player, a.slot);
+      return s;
+    }
+    case 'pass': {
+      if (ph.kind !== 'draw' || !s.market[a.slot]) return prev;
+      const id = s.market.splice(a.slot, 1)[0];
+      s.discard.push(id);
+      log(s, `${s.players[ph.player].name}は${isPerson(id) ? previewStudent(id).name : EVENT_MAP[id].name}のカードを捨てて見送った。`, ph.player);
+      refill(s);
+      return s;
+    }
+    case 'makeRoom': {
+      if (ph.kind !== 'makeRoom') return prev;
+      if (a.uid === null) {
+        s.phase = { kind: 'draw', player: ph.player };
+        return s;
+      }
+      const p = s.players[ph.player];
+      if (!droppable(p).some((x) => x.uid === a.uid)) return prev;
+      const gone = removeStudent(s, p, a.uid, false)!;
+      log(s, `${p.name}のクラスの${gone.name}が転校していった。`, ph.player);
+      buyPerson(s, ph.player, ph.slot, gone);
       return s;
     }
     case 'push': {
@@ -770,12 +882,12 @@ export function step(prev: GameState, a: Action): GameState {
       if (ph.kind !== 'exchange') return prev;
       const p = s.players[ph.player];
       if (a.uid === null) {
-        setResult(s, ph.player, { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: 'やっぱりやめた。', rows: [] }, 'turn');
+        s.phase = { kind: 'draw', player: ph.player };
         return s;
       }
-      if (a.target === undefined || !exchangeTargets(s, ph.player).includes(a.target)) return prev;
-      const to = s.players[a.target];
-      if (!p.students.some((x) => x.uid === a.uid) || !tradeable(to).some((x) => x.uid === a.theirUid)) return prev;
+      if (!exchangePairs(s, ph.player).some((x) => x.uid === a.uid && x.target === a.target && x.theirUid === a.theirUid)) return prev;
+      const to = s.players[a.target!];
+      takeFromMarket(s, ph.slot);
       const mine = removeStudent(s, p, a.uid, false)!;
       const theirs = removeStudent(s, to, a.theirUid!, false)!;
       p.students.push(theirs);
@@ -792,12 +904,13 @@ export function step(prev: GameState, a: Action): GameState {
     case 'cyborg': {
       if (ph.kind !== 'cyborg') return prev;
       if (a.uid === null) {
-        setResult(s, ph.player, { title: 'サイボーグ化', icon: '🦾', tone: 'personal', desc: '使わなかった。', rows: [] }, 'turn');
+        s.phase = { kind: 'draw', player: ph.player };
         return s;
       }
       const owner = s.players[ph.player];
       const st = cyborgable(owner).find((x) => x.uid === a.uid);
       if (!st) return prev;
+      owner.points -= marketCost(takeFromMarket(s, ph.slot));
       const was = `${st.icon}${st.name}`;
       // 元のカードに覆いかぶさる：同じ席（uid・係）のまま中身だけ入れ替わり、元のカードは消える
       Object.assign(st, {
@@ -826,12 +939,12 @@ export function step(prev: GameState, a: Action): GameState {
       const p = s.players[ph.player];
       const c = EVENT_MAP[ph.card] as GoodsCard;
       if (a.uid === null) {
-        s.discard.push(ph.card);
-        setResult(s, ph.player, { title: c.name, icon: c.icon, tone: 'personal', desc: '装備しなかった。', rows: [] }, 'turn');
+        s.phase = { kind: 'draw', player: ph.player };
         return s;
       }
       const st = equippable(p).find((x) => x.uid === a.uid);
       if (!st) return prev;
+      p.points -= marketCost(takeFromMarket(s, ph.slot, false));
       st.goods = { id: c.id, name: c.name, icon: c.icon, attr: c.attr };
       st.attrs = [...st.attrs, c.attr];
       log(s, `${p.name}のクラスの${st.name}が${c.icon}${c.name}を装備した。`, ph.player);
@@ -864,22 +977,24 @@ export interface DeckRow {
   name: string;
   /** 山札に残っている枚数 */
   left: number;
+  /** 場に表向きで並んでいる枚数 */
+  open: number;
   /** 捨て札にある枚数 */
   used: number;
 }
 
-/** 今学期の山札の内訳（山札の残りと捨て札）。人物カードは1行にまとめる */
+/** 今学期の山札の内訳（山札の残り・場・捨て札）。人物カードは1行にまとめる */
 export function deckBreakdown(s: GameState): DeckRow[] {
   const era = ERAS[currentEra(s)];
   const rows = new Map<string, DeckRow>();
-  const row = (key: string, init: () => Omit<DeckRow, 'left' | 'used'>) => {
-    if (!rows.has(key)) rows.set(key, { ...init(), left: 0, used: 0 });
+  const row = (key: string, init: () => Omit<DeckRow, 'left' | 'open' | 'used'>) => {
+    if (!rows.has(key)) rows.set(key, { ...init(), left: 0, open: 0, used: 0 });
     return rows.get(key)!;
   };
   const define = (id: string) => {
     if (isPerson(id)) return row('person', () => ({ group: '人物', icon: era.icon, name: `${era.name}の生徒（転入）` }));
     const c = EVENT_MAP[id];
-    return row(id, (): Omit<DeckRow, 'left' | 'used'> => {
+    return row(id, (): Omit<DeckRow, 'left' | 'open' | 'used'> => {
       const base = { icon: c.icon, name: c.name };
       switch (c.kind) {
         case 'normal':
@@ -905,6 +1020,7 @@ export function deckBreakdown(s: GameState): DeckRow[] {
   // 並び順を固定するため、まず今学期に入りうるカードを全部登録しておく
   for (const e of ALL_EVENT_CARDS) if (!cardEra(e) || cardEra(e) === era.id) define(e.id);
   for (const id of s.eventDeck) define(id).left++;
+  for (const id of s.market) define(id).open++;
   for (const id of s.discard) define(id).used++;
-  return [...rows.values()].filter((r) => r.group !== '人物' || r.left + r.used > 0);
+  return [...rows.values()].filter((r) => r.group !== '人物' || r.left + r.open + r.used > 0);
 }

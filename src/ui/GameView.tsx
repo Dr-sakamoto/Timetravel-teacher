@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cpuAction } from '../game/ai';
-import { MONTHS, actingPlayer, cyborgable, droppable, equippable, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth, tradeable } from '../game/engine';
+import { MONTHS, actingPlayer, cyborgable, droppable, equippable, exchangePairs, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 import type { Pick } from './Center';
 import { Center } from './Center';
@@ -84,15 +84,20 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const slots = slotsNow(state);
 
   // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ（転校は自分の生徒だけ）
-  const choosing = (ph.kind === 'push' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg') && !cpuTurn && ph.player === focus ? ph.kind : null;
+  const choosing =
+    (ph.kind === 'push' || ph.kind === 'makeRoom' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg') && !cpuTurn && ph.player === focus
+      ? ph.kind
+      : null;
+  // クラス替え：アイコンの数が同じ子どうしの組み合わせ（自分の子を選んでいたらその子の相手だけ）
+  const pairs = choosing === 'exchange' ? exchangePairs(state, focus) : [];
   const targets =
     choosing === 'kachikomi' ? kachikomiTargets(state, focus)
     : choosing === 'exchange' ? exchangeTargets(state, focus)
     : [];
   const meNow = state.players[focus];
   const selectable =
-    choosing === 'push' ? droppable(meNow)
-    : choosing === 'exchange' ? meNow.students
+    choosing === 'push' || choosing === 'makeRoom' ? droppable(meNow)
+    : choosing === 'exchange' ? meNow.students.filter((x) => pairs.some((y) => y.uid === x.uid))
     : choosing === 'equip' ? equippable(meNow)
     : choosing === 'cyborg' ? cyborgable(meNow)
     : [];
@@ -104,7 +109,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   };
   const peekPicking = choosing === 'exchange' && peek !== null && peek === pick.target;
   /** 相手の教室で選べる生徒 */
-  const peekable = (pi: number) => tradeable(state.players[pi]);
+  const peekable = (pi: number) =>
+    state.players[pi].students.filter((x) => pairs.some((y) => y.target === pi && y.theirUid === x.uid && (!pick.uid || y.uid === pick.uid)));
   // 手番の人が相手なら、その人の教室を卓の中央に出す
   const stage = actor !== null && actor !== focus ? actor : null;
   // 演出中は、まだ届いていない点を名札から引いて見せる
@@ -199,7 +205,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
                 selectable.length
                   ? (uid) =>
                       selectable.some((x) => x.uid === uid) &&
-                      setPick((x) => ({ ...x, uid }))
+                      setPick((x) => ({ ...x, uid, theirUid: x.uid === uid ? x.theirUid : null }))
                   : undefined
               }
               selectedUid={choosing ? pick.uid : null}
@@ -215,7 +221,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
             <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
               ✕
             </button>
-            {peekPicking && <div className="peek-hint">🔁 こちらのクラスに来てもらう生徒をタップ（係の子は選べない）</div>}
+            {peekPicking && <div className="peek-hint">🔁 こちらのクラスに来てもらう生徒をタップ（アイコンの数が同じ子だけ。係の子は選べない）</div>}
             <Playmat
               player={state.players[peek]}
               year={state.year}

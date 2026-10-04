@@ -123,17 +123,20 @@ export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
   | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
   | { kind: 'roles'; player: number }
+  /** 手番：場のカードを1枚取る（または1枚捨てて見送る） */
   | { kind: 'draw'; player: number }
+  /** 満席で人物カードを取る：代わりに転校させる生徒を選ぶ（slot は場のカードの位置） */
+  | { kind: 'makeRoom'; player: number; slot: number }
   /** 転校：全クラスが順番に、係に就いていない生徒を1人ずつクラスから外す（player は今選んでいる人、left はこの後に選ぶ人） */
   | { kind: 'push'; player: number; drawer: number; left: number[]; gone: Student[] }
   /** カチコミ：他のクラスを1つ選んで、自分の👊の数×3だけ減点させる */
   | { kind: 'kachikomi'; player: number }
-  /** クラス替え：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える */
-  | { kind: 'exchange'; player: number }
+  /** クラス替え：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える（アイコンの数が同じ子どうしだけ） */
+  | { kind: 'exchange'; player: number; slot: number }
   /** サイボーグ化：自分のクラスの生徒1人をサイボーグに作り替える */
-  | { kind: 'cyborg'; player: number }
+  | { kind: 'cyborg'; player: number; slot: number }
   /** グッズ：生徒1人に装備する */
-  | { kind: 'equip'; player: number; card: string }
+  | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
   | { kind: 'gameOver' };
 
@@ -145,7 +148,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 19;
+  version: 20;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -161,6 +164,8 @@ export interface GameState {
   phase: Phase;
   /** イベントの山札（末尾が一番上）。人物カードは 'person:<カードプールのID>' */
   eventDeck: string[];
+  /** 場に表向きで並んでいるカード（手番の人はここから1枚取る） */
+  market: string[];
   /** 捨て札（末尾が一番上） */
   discard: string[];
   /** 初期メンバー用の山（現代の普通の生徒） */
@@ -176,7 +181,12 @@ export type Action =
   | { type: 'drawAllMembers' }
   | { type: 'continue' }
   | { type: 'setRoles'; roles: RoleSeat[]; unlock?: RoleId[] }
-  | { type: 'drawEvent' }
+  /** 場のカードを取る（人物・グッズはクラスポイントを払う） */
+  | { type: 'take'; slot: number }
+  /** 場のカードを1枚捨てて見送る */
+  | { type: 'pass'; slot: number }
+  /** 満席で人物を迎える時に、代わりに転校させる生徒（null でやめる） */
+  | { type: 'makeRoom'; uid: string | null }
   | { type: 'push'; uid: string }
   | { type: 'kachikomi'; target: number | null }
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }

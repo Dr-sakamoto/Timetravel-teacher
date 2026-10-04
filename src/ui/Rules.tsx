@@ -1,15 +1,18 @@
 import { MAX_CLASS, STARTING_MEMBERS } from '../game/calc';
 import { CARDS } from '../game/data/cards';
-import { ERAS, favorLabel } from '../game/data/eras';
+import { ERAS } from '../game/data/eras';
 import {
   CYBORG_CARDS,
   ERA_CARDS,
   FIXED_EVENTS,
+  GOODS_COST,
   GOODS_CARDS,
   KACHIKOMI_CARDS,
+  MARKET_SIZE,
   MOVE_CARDS,
   NORMAL_CARDS,
   PERSON_CARDS_PER_TERM,
+  PERSON_COST,
   RAID_CARDS,
   SWING_CARDS,
   cardRule,
@@ -60,28 +63,41 @@ export function Rules({ onClose }: { onClose: () => void }) {
           <li>時代は1年に3つ。1年目の1学期は現代、あとはランダム。1学期に1つずつ巡る。</li>
         </ol>
 
-        <h3>手番：1人1枚ずつ山札をめくる</h3>
+        <h3>手番：場のカードを1枚取る</h3>
         <p>
-          <b>通常カード・カチコミ・クラス替え・グッズ・人物カードはめくった人だけ</b>。<b>共通イベント・時代イベント・転校は全クラスに</b>効果がある。
-        </p>
-        <p>
-          山札は学期ごとに作り直す。<b>通常カード・カチコミ・共通イベント・転校・グッズは全時代共通</b>で、そこに
-          <b>その時代の固有イベント・襲来・グッズ</b>と、<b>その時代のカードプールから人物カード最大{PERSON_CARDS_PER_TERM}枚</b>が混ざる。
-          中央の「捨て札・内訳」をタップすると今の山札の内訳が見られる。
+          卓の中央に<b>カードが{MARKET_SIZE}枚、表向きで並んでいる</b>（場）。手番の人はこの中から<b>1枚選んで取る</b>。取りたいものがなければ、1枚を<b>捨てて見送って</b>もいい（他の人に取らせたくないカードを流すのにも使える）。
         </p>
         <ul className="rule-list">
           <li>
-            <b>通常カード</b>（めくった人だけ。{NORMAL_CARDS.map((c) => `${c.icon}${c.name}×${c.count}`).join('・')}）：クラス全員の<b>そのアイコンの合計数</b>（＋係ボーナス）が入る。
+            <b>無料</b>：授業（その場で点が入る）・クラス替え
+          </li>
+          <li>
+            <b>クラスポイントを払う</b>：人物（N {PERSON_COST.N}点／R {PERSON_COST.R}点／SR {PERSON_COST.SR}点／SSR {PERSON_COST.SSR}点）・グッズとサイボーグ化（{GOODS_COST}点）。
+            持ち点が足りないと取れない。<b>今すぐ点を取るか、点を払って将来の戦力を買うか</b>が悩みどころ。
+          </li>
+        </ul>
+        <p>
+          取ったら山札から場を補充する。このとき<b>ゲリラ</b>（カチコミ・共通イベント・時代イベント・襲来・転校）をめくったら、<b>その場で起こる</b>（誰も避けられない。補充はそのあと続ける）。
+          カチコミは手番の人のクラスが殴りこむ。共通イベント・時代イベント・襲来・転校は全クラスに効く。
+        </p>
+        <p>
+          山札は学期ごとに作り直す。<b>授業・カチコミ・共通イベント・転校・クラス替え・グッズは全時代共通</b>で、そこに
+          <b>その時代の固有イベント・襲来・グッズ</b>と、<b>その時代のカードプールから人物カード最大{PERSON_CARDS_PER_TERM}枚</b>が混ざる。
+          中央の「捨て札・内訳」をタップすると今の山札と場の内訳が見られる。
+        </p>
+        <ul className="rule-list">
+          <li>
+            <b>授業</b>（無料・取った人だけ。{NORMAL_CARDS.map((c) => `${c.icon}${c.name}×${c.count}`).join('・')}）：クラス全員の<b>そのアイコンの合計数</b>（＋係ボーナス）が入る。
           </li>
           <li>
             <b>
               {kachikomi.icon}
               {kachikomi.name}
             </b>
-            （×{kachikomi.count}）：{cardRule(kachikomi)}。
+            （ゲリラ・×{kachikomi.count}）：{cardRule(kachikomi)}。👊の子はテストや授業参観でいつも足を引っぱるが、カチコミと襲来では頼りになる。
           </li>
           <li>
-            <b>共通イベント</b>（全クラス・各1枚）：クラスの状況で<b>プラスにもマイナスにもなる</b>。
+            <b>共通イベント</b>（ゲリラ・全クラス・各1枚）：クラスの状況で<b>プラスにもマイナスにもなる</b>。
             <ul>
               {SWING_CARDS.map((c) => (
                 <li key={c.id}>
@@ -97,20 +113,20 @@ export function Rules({ onClose }: { onClose: () => void }) {
                 {c.icon}
                 {c.name}
               </b>
-              （×{c.count}）：{c.desc}
+              （{c.kind === 'push' ? 'ゲリラ' : '無料'}・×{c.count}）：{c.desc}
             </li>
           ))}
           <li>
-            <b>グッズ</b>（共通：{GOODS_CARDS.filter((g) => !g.era).map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`).join('・')}＋時代ごとに2種）：生徒1人に装備して、そのアイコンを＋1。
+            <b>グッズ</b>（{GOODS_COST}点。共通：{GOODS_CARDS.filter((g) => !g.era).map((g) => `${g.icon}${g.name}${ATTR_ICON[g.attr]}`).join('・')}＋時代ごとに2種）：生徒1人に装備して、そのアイコンを＋1。
           </li>
           <li>
-            <b>時代イベント</b>（全クラス・2種×2枚）：<b>時代ごとに有利なアイコン（0〜2個）が決まっていて</b>、そのアイコンで競う（効果はカードごとに違う。現代は優遇なしで全アイコン勝負）。<b>その時代出身の子のアイコンは2倍</b>。1年の3つの時代は年の初めに決まって上に出ているので、次の学期に向けてクラスを作っておこう。
+            <b>時代イベント</b>（ゲリラ・全クラス・2種×2枚）：<b>時代ごとにものを言う力が違う</b>。何が有利かは、学期の頭に読み上げられる<b>時代の空気</b>（「ただ強い者だけが生き残る時代」など）から読み取ろう。<b>その時代出身の子のアイコンは2倍</b>。1年の3つの時代は年の初めに決まって上に出ているので、次の学期に向けてクラスを作っておこう。
           </li>
           <li>
-            <b>襲来</b>（全クラス・時代ごとに1枚）：クラスの👊の数 − 敵の強さ（その時代出身の子は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス。
+            <b>襲来</b>（ゲリラ・全クラス・時代ごとに1枚）：クラスの👊の数 − 敵の強さ（その時代出身の子は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス。
           </li>
           <li>
-            <b>人物カード</b>：めくったらその子が<b>そのまま転入</b>。満席なら捨て札にしてもう1枚めくる。
+            <b>人物カード</b>（レア度に応じてポイントを払う）：取るとその子が転入。満席なら、係に就いていない子を1人転校させて入れ替わりに迎える。
           </li>
         </ul>
 
@@ -120,7 +136,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
             const raid = RAID_CARDS.find((c) => c.era === era.id)!;
             return (
               <li key={era.id}>
-                {era.icon} <b>{era.name}</b>（<b>{favorLabel(era)}</b>）：
+                {era.icon} <b>{era.name}</b>「{era.motto}」：
                 {era.id === 'present' ? (
                   <>
                     転校生{' '}

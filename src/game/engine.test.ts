@@ -5,8 +5,8 @@ import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
-import { currentEra, deckBreakdown, droppable, newGame, step } from './engine';
-import type { Attr, GameState, Player, RoleSeat, Student } from './types';
+import { canTake, currentEra, deckBreakdown, droppable, exchangePairs, marketCost, newGame, step } from './engine';
+import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
   let s = newGame(
@@ -24,6 +24,14 @@ function playOut(players: number, years: number, seed: number): GameState {
     if (++steps > 20000) throw new Error('did not finish');
   }
   return s;
+}
+
+/** 山札の一番上に積んだカードを、場の補充でめくらせる（場の1枚を見送ると補充が起こる。ゲリラはその場で起こる） */
+const pass: Action = { type: 'pass', slot: 0 };
+/** 場の先頭にカードを置いて、それを取る */
+function take(s: GameState, id: string): GameState {
+  s.market[0] = id;
+  return step(s, { type: 'take', slot: 0 });
 }
 
 const mk = (uid: string, attrs: Attr[], era: Student['era'] = 'present'): Student => ({
@@ -170,22 +178,50 @@ describe('engine', () => {
     }
   });
 
-  it('drawing a person card makes them join directly; a full class discards it and draws again', () => {
+  it('taking a person card costs class points; a full class must send someone away first', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 5);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
+    const m = `person:${s.pools.present[0]}`;
+    const cost = marketCost(m);
+    expect(cost).toBeGreaterThan(0);
+    // ポイントが足りなければ取れない
+    const poor = structuredClone(s);
+    poor.players[pi].points = cost - 1;
+    poor.market[0] = m;
+    expect(canTake(poor, pi, 0)).toBe(false);
     const t = structuredClone(s);
-    const m = `person:${t.pools.present[0]}`;
-    t.eventDeck.push(m);
+    t.players[pi].points = cost;
     const n = t.players[pi].students.length;
-    expect(step(t, { type: 'drawEvent' }).players[pi].students).toHaveLength(n + 1);
+    const joined = take(t, m);
+    expect(joined.players[pi].students).toHaveLength(n + 1);
+    expect(joined.players[pi].points).toBe(0);
+    expect(joined.pools.present).not.toContain(m.slice(7));
+    // 満席なら、代わりに転校させる子を選んでから迎える
     const f = structuredClone(s);
+    f.players[pi].points = cost;
     while (f.players[pi].students.length < MAX_CLASS) f.players[pi].students.push({ ...f.players[pi].students[0], uid: `f${f.players[pi].students.length}` });
-    f.eventDeck.push('n_study', m);
-    const full = step(f, { type: 'drawEvent' });
+    const room = take(f, m);
+    expect(room.phase.kind).toBe('makeRoom');
+    expect(step(room, { type: 'makeRoom', uid: null }).phase.kind).toBe('draw');
+    const gone = droppable(room.players[pi])[0].uid;
+    const full = step(room, { type: 'makeRoom', uid: gone });
     expect(full.players[pi].students).toHaveLength(MAX_CLASS);
-    expect(full.discard.slice(-2)).toEqual([m, 'n_study']);
-    expect(full.phase.kind).toBe('result');
+    expect(full.players[pi].students.map((x) => x.uid)).not.toContain(gone);
+    expect(full.players[pi].points).toBe(0);
+  });
+
+  it('refilling the market sets off guerrilla events on the spot, and only buyable cards stay face up', () => {
+    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 5);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    expect(s.market).toHaveLength(4);
+    s.eventDeck.push('n_art', 'poptest');
+    const next = step(s, pass);
+    expect(next.phase.kind).toBe('result');
+    expect(next.phase.kind === 'result' && next.phase.result.title).toBe('抜き打ちテスト');
+    const after = step(next, { type: 'continue' });
+    expect(after.market).toHaveLength(4);
+    expect(after.market.at(-1)).toBe('n_art');
   });
 
   it('starting members come from the regular modern students; later only the rare transfer students come from the present', () => {
@@ -216,10 +252,11 @@ describe('engine', () => {
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     for (let i = 0; i < 6; i++) s = step(step(s, cpuAction(s)!), { type: 'continue' });
     const rows = deckBreakdown(s);
-    const sum = (k: 'left' | 'used') => rows.reduce((a, r) => a + r[k], 0);
+    const sum = (k: 'left' | 'open' | 'used') => rows.reduce((a, r) => a + r[k], 0);
     expect(sum('left')).toBe(s.eventDeck.length);
     expect(sum('used')).toBe(s.discard.length);
-    expect(rows.filter((r) => r.group === '通常').reduce((a, r) => a + r.left + r.used, 0)).toBe(19);
+    expect(sum('open')).toBe(s.market.length);
+    expect(rows.filter((r) => r.group === '通常').reduce((a, r) => a + r.left + r.open + r.used, 0)).toBe(19);
   });
 
   it('cards carry 1-5 icons, more for rarer students', () => {
@@ -239,10 +276,10 @@ describe('engine', () => {
     t.players[pi].students = [mk('y', ['fight', 'fight'])];
     t.players[pi].roles = [];
     t.eventDeck.push('raid_present');
-    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(2 * 2 - 4);
+    expect(step(t, pass).players[pi].points - t.players[pi].points).toBe(2 * 2 - 4);
     const u = structuredClone(t);
     u.players[pi].students = [mk('y', ['fight', 'fight', 'fight'], 'sengoku')];
-    expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(3 - 4);
+    expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(3 - 4);
   });
 
   it('kachikomi takes 3× the drawer\'s 👊 count from the chosen school', () => {
@@ -254,7 +291,7 @@ describe('engine', () => {
     t.players[pi].students = [mk('y', ['fight', 'fight']), mk('z', ['fight', 'study'])];
     t.players[pi].roles = [];
     t.eventDeck.push('kachikomi');
-    const k = step(t, { type: 'drawEvent' });
+    const k = step(t, pass);
     expect(k.phase.kind).toBe('kachikomi');
     const done = step(k, { type: 'kachikomi', target });
     expect(done.players[target].points - t.players[target].points).toBe(-9);
@@ -262,7 +299,7 @@ describe('engine', () => {
     // 👊がいなければカチコミに行けない
     const u = structuredClone(t);
     u.players[pi].students = [mk('a', ['study'])];
-    expect(step(u, { type: 'drawEvent' }).phase.kind).toBe('result');
+    expect(step(u, pass).phase.kind).toBe('result');
   });
 
   it('swing events can go negative', () => {
@@ -274,25 +311,10 @@ describe('engine', () => {
     t.players[pi].roles = [];
     // 抜き打ちテストは📚の数だけ（👊では引かれない）
     t.eventDeck.push('poptest');
-    expect(step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points).toBe(1);
+    expect(step(t, pass).players[pi].points - t.players[pi].points).toBe(1);
     const u = structuredClone(t);
     u.eventDeck.push('marathon');
-    expect(step(u, { type: 'drawEvent' }).players[pi].points - u.players[pi].points).toBe(0 - 2);
-  });
-
-  it('brawl takes 👊 away, offset by 👑 but never above zero', () => {
-    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
-    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
-    const pi = s.phase.player;
-    const run = (students: Student[]) => {
-      const t = structuredClone(s);
-      t.players[pi].students = students;
-      t.players[pi].roles = [];
-      t.eventDeck.push('brawl');
-      return step(t, { type: 'drawEvent' }).players[pi].points - t.players[pi].points;
-    };
-    expect(run([mk('y', ['fight', 'fight', 'fight']), mk('c', ['charm'])])).toBe(-2);
-    expect(run([mk('y', ['fight']), mk('c', ['charm', 'charm', 'charm'])])).toBe(0);
+    expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(0 - 2);
   });
 
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
@@ -313,7 +335,7 @@ describe('engine', () => {
     const sizes = s.players.map((p) => p.students.length);
     const points = s.players.map((p) => p.points);
     s.eventDeck.push('martian');
-    const next = step(s, { type: 'drawEvent' });
+    const next = step(s, pass);
     next.players.forEach((p, i) => {
       expect(p.points).toBe(points[i]);
       expect(p.students.length).toBe(i === full ? MAX_CLASS : sizes[i] + 1);
@@ -326,8 +348,8 @@ describe('engine', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
-    s.eventDeck.push('cyborg');
-    s = step(s, { type: 'drawEvent' });
+    s.players[pi].points = 10;
+    s = take(s, 'cyborg');
     expect(s.phase.kind).toBe('cyborg');
     // 相手のクラスの子は選べない
     expect(step(s, { type: 'cyborg', uid: s.players[1 - pi].students[0].uid })).toBe(s);
@@ -339,9 +361,11 @@ describe('engine', () => {
     expect(st.attrs).toEqual(['study', 'sports']);
     expect(st.name).toBe('サイボーグ');
     expect(st.cardId).toBeUndefined();
+    expect(next.players[pi].points).toBe(10 - marketCost('cyborg'));
     // もうサイボーグの子はもう一度サイボーグにできない
     const again = structuredClone(next);
-    again.phase = { kind: 'cyborg', player: pi };
+    again.market[0] = 'cyborg';
+    again.phase = { kind: 'cyborg', player: pi, slot: 0 };
     expect(step(again, { type: 'cyborg', uid: mine.uid })).toBe(again);
   });
 
@@ -355,7 +379,7 @@ describe('engine', () => {
         t.players[i].roles = [];
       });
       t.eventDeck.push(id);
-      const after = step(t, { type: 'drawEvent' });
+      const after = step(t, pass);
       return after.players.map((p, i) => p.points - t.players[i].points);
     };
     const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
@@ -387,18 +411,24 @@ describe('engine', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
-    s.eventDeck.push('g_book');
-    s = step(s, { type: 'drawEvent' });
+    s.players[pi].points = 10;
+    s = take(s, 'g_book');
     expect(s.phase.kind).toBe('equip');
+    // やめたら手番の選び直し（ポイントも払わない）
+    const back = step(s, { type: 'equip', uid: null });
+    expect(back.phase.kind).toBe('draw');
+    expect(back.players[pi].points).toBe(10);
     const uid = s.players[pi].students[0].uid;
     const before = s.players[pi].students[0].attrs.length;
     const next = step(s, { type: 'equip', uid });
     const st = next.players[pi].students.find((x) => x.uid === uid)!;
     expect(st.attrs).toHaveLength(before + 1);
     expect(st.goods?.attr).toBe('study');
+    expect(next.players[pi].points).toBe(10 - marketCost('g_book'));
     // もう装備している子にはつけられない
     const again = structuredClone(next);
-    again.phase = { kind: 'equip', player: pi, card: 'g_shoes' };
+    again.market[0] = 'g_shoes';
+    again.phase = { kind: 'equip', player: pi, card: 'g_shoes', slot: 0 };
     expect(step(again, { type: 'equip', uid })).toBe(again);
   });
 
@@ -413,29 +443,40 @@ describe('engine', () => {
     expect(next.players[0].roles).toEqual([{ role: 'study', uid }]);
   });
 
-  it('exchange takes a student without a role from another class', () => {
+  it('exchange swaps students with the same number of printed icons; the other side must have no role', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
     while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
-    const [a0, a1] = s.players[0].students;
-    const b0 = s.players[1].students[0];
+    const a0 = mk('a0', ['art', 'art', 'art']);
+    const a1 = mk('a1', ['study', 'study']);
+    const b0 = mk('b0', ['fight', 'fight', 'fight']);
+    const b1 = mk('b1', ['sports', 'sports', 'sports']);
+    const b2 = mk('b2', ['charm', 'charm']);
+    s.players[0].students = [a0, a1];
+    s.players[1].students = [b0, b1, b2];
+    s.players[0].roles = [{ role: 'study', uid: a0.uid }];
     s.players[1].roles = [{ role: 'study', uid: b0.uid }];
-    s.phase = { kind: 'exchange', player: 0 };
+    s.market = ['exchange'];
+    s.phase = { kind: 'exchange', player: 0, slot: 0 };
     // 相手の係の子はもらえない
     expect(step(s, { type: 'exchange', uid: a0.uid, target: 1, theirUid: b0.uid })).toBe(s);
-    const b1 = s.players[1].students[1];
+    // アイコンの数が違う子どうしは入れ替えられない
+    expect(step(s, { type: 'exchange', uid: a1.uid, target: 1, theirUid: b1.uid })).toBe(s);
+    // グッズの＋1は数えない
+    const g = structuredClone(s);
+    g.players[0].students[1] = { ...a1, attrs: ['study', 'study', 'study'], goods: { id: 'g_book', name: '参考書', icon: '📕', attr: 'study' } };
+    expect(exchangePairs(g, 0).some((x) => x.uid === a1.uid && x.theirUid === b1.uid)).toBe(false);
     // 自分の側は係の子でも出せる
-    s.players[0].roles = [{ role: 'study', uid: a1.uid }];
-    const next = step(s, { type: 'exchange', uid: a1.uid, target: 1, theirUid: b1.uid });
+    const next = step(s, { type: 'exchange', uid: a0.uid, target: 1, theirUid: b1.uid });
     expect(next.players[0].students.map((x) => x.uid)).toContain(b1.uid);
-    expect(next.players[1].students.map((x) => x.uid)).toContain(a1.uid);
+    expect(next.players[1].students.map((x) => x.uid)).toContain(a0.uid);
     expect(next.players[0].roles).toEqual([]);
+    expect(next.market).toEqual([]);
   });
 
   it('drawn event cards go to the discard pile', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 3);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
-    s.eventDeck.push('n_study');
-    s = step(s, { type: 'drawEvent' });
+    s = take(s, 'n_study');
     expect(s.discard[s.discard.length - 1]).toBe('n_study');
   });
 
@@ -447,7 +488,7 @@ describe('engine', () => {
     const sitter = s.players[drawer].students[0];
     s.players[drawer].roles = [{ role: 'study', uid: sitter.uid }];
     s.eventDeck.push('push');
-    s = step(s, { type: 'drawEvent' });
+    s = step(s, pass);
     expect(s.phase).toMatchObject({ kind: 'push', player: drawer });
     // 係の子は外せない
     expect(step(s, { type: 'push', uid: sitter.uid })).toBe(s);
@@ -468,9 +509,9 @@ describe('engine', () => {
     const drawer = s.phase.player;
     const run = (id: string) => {
       const t = structuredClone(s);
-      t.eventDeck.push(id);
       const before = t.players.map((p) => p.points);
-      const after = step(t, { type: 'drawEvent' });
+      t.eventDeck.push(id);
+      const after = id.startsWith('n_') ? take(t, id) : step(t, pass);
       return { rows: after.phase.kind === 'result' ? after.phase.result.rows.length : 0, d: after.players.map((p, i) => p.points - before[i]) };
     };
     for (const id of ['n_study', 'n_sports']) {
