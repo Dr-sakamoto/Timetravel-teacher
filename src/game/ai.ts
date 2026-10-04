@@ -155,6 +155,12 @@ export function cpuAction(s: GameState): Action | null {
     }
     case 'makeRoom':
       return { type: 'makeRoom', uid: leastWorth(s.players[ph.player])?.uid ?? null };
+    case 'push': {
+      // 一番いなくても困らない子を転校させる
+      const p = s.players[ph.player];
+      const st = droppable(p).sort((x, y) => worth(p, x.uid) - worth(p, y.uid))[0];
+      return { type: 'push', uid: st.uid };
+    }
     case 'kachikomi':
       return { type: 'kachikomi', target: leader(s, kachikomiTargets(s, ph.player)) };
     case 'exchange': {

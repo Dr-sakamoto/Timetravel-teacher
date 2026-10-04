@@ -1,6 +1,6 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { canTake, currentEra, marketCost, previewStudent } from '../game/engine';
+import { canTake, currentEra, marketCost, nextTurnPlayer, previewStudent } from '../game/engine';
 import { EVENT_MAP, KACHIKOMI_CARDS, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
@@ -139,6 +139,23 @@ function Who({ state }: { state: GameState }) {
   return <b style={{ color: p.color }}>{p.name}</b>;
 }
 
+/** ゲリラの途中で、このあと誰の手番かを出す（ゲリラが誰かの手番に見えないように） */
+function NextTurn({ state }: { state: GameState }) {
+  const next = nextTurnPlayer(state);
+  const p = next !== null ? state.players[next] : null;
+  return (
+    <div className="say-sub next-turn">
+      {p ? (
+        <>
+          ▶ このあと <b style={{ color: p.color }}>{p.name}</b> の番
+        </>
+      ) : (
+        '▶ このあと月末'
+      )}
+    </div>
+  );
+}
+
 /** 場のカードを取るとどうなるかを、絵文字の式で（文章にしない） */
 function effectOf(state: GameState, pi: number, id: string): ReactNode {
   const p = state.players[pi];
@@ -247,6 +264,19 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         </div>
       );
     }
+    case 'push': {
+      const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+      return (
+        <div className="say">
+          📦 全クラス転校（手番ではありません）
+          <div className="say-sub">
+            {who}：出ていく子をタップ {chosen(st)}
+          </div>
+          {pair(null, '👋 転校', !!pick.uid, () => pick.uid && dispatch({ type: 'push', uid: pick.uid }))}
+          <NextTurn state={state} />
+        </div>
+      );
+    }
     case 'kachikomi': {
       const power = attrScore(state.players[ph.player], 'fight').total * KACHIKOMI_CARDS[0].mult;
       const target = pick.target !== null ? state.players[pick.target] : null;
@@ -331,6 +361,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
                 ))}
               </div>
             )}
+            {ph.ctx === 'turn' && ph.player === null && <NextTurn state={state} />}
             {canContinue ? (
               <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
                 次へ ▶

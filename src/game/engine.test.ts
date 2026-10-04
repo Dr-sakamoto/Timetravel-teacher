@@ -5,7 +5,7 @@ import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
-import { canTake, currentEra, deckBreakdown, dropCandidate, droppable, exchangePairs, marketCost, newGame, step } from './engine';
+import { canTake, currentEra, deckBreakdown, droppable, exchangePairs, marketCost, newGame, step } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
@@ -638,41 +638,41 @@ describe('engine', () => {
     expect(s.discard[s.discard.length - 1]).toBe('n_study');
   });
 
-  it('push automatically drops, from every class, the student without a role who has the fewest icons', () => {
+  it('push makes every class drop one student without a role', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const drawer = s.phase.player;
     const other = 1 - drawer;
     const sitter = s.players[drawer].students[0];
-    // 係の子はアイコンが一番少なくても外れない
-    sitter.attrs = [];
     s.players[drawer].roles = [{ role: 'study', uid: sitter.uid }];
-    const weak = s.players[drawer].students[1];
-    weak.attrs = ['study'];
-    s.players[drawer].students.slice(2).forEach((x) => (x.attrs = ['study', 'art', 'sports']));
-    const expectOther = dropCandidate(s.players[other])!.uid;
     s.eventDeck.push('push');
     s = step(s, pass);
-    // 誰にも操作を求めず、すぐに結果になる（めくった人の手番のものとしては見せない）
-    expect(s.phase).toMatchObject({ kind: 'result', player: null });
-    expect(s.players[drawer].students.map((x) => x.uid)).toContain(sitter.uid);
-    expect(s.players[drawer].students.map((x) => x.uid)).not.toContain(weak.uid);
-    expect(s.players[other].students.map((x) => x.uid)).not.toContain(expectOther);
+    expect(s.phase).toMatchObject({ kind: 'push', player: drawer });
+    // 係の子は外せない
+    expect(step(s, { type: 'push', uid: sitter.uid })).toBe(s);
+    const mine = s.players[drawer].students[1].uid;
+    s = step(s, { type: 'push', uid: mine });
+    expect(s.phase).toMatchObject({ kind: 'push', player: other });
+    const theirs = droppable(s.players[other])[0].uid;
+    s = step(s, { type: 'push', uid: theirs });
+    expect(s.phase.kind).toBe('result');
+    expect(s.players[drawer].students.map((x) => x.uid)).not.toContain(mine);
+    expect(s.players[other].students.map((x) => x.uid)).not.toContain(theirs);
     expect(s.players.map((p) => p.students.length)).toEqual([STARTING_MEMBERS - 1, STARTING_MEMBERS - 1]);
   });
 
-  it('guerrillas never ask anyone to act and never look like someone\'s turn', () => {
+  it('guerrilla results never belong to the player who flipped them', () => {
     for (const seed of [1, 2, 3, 4, 5]) {
       let s = newGame(Array.from({ length: 4 }, (_, i) => ({ name: `P${i + 1}`, isCpu: true })), 2, seed);
       let fired = 0;
       while (s.phase.kind !== 'gameOver') {
         const before = s.logCounter;
         s = step(s, cpuAction(s)!);
-        const guerrilla = s.log.some((l) => l.id >= before && l.text.startsWith('ゲリラ発生'));
-        if (!guerrilla) continue;
+        if (!s.log.some((l) => l.id >= before && l.text.startsWith('ゲリラ発生'))) continue;
         fired++;
-        // ゲリラが起きた直後は、全員向けの結果を見せているだけ
-        expect(s.phase).toMatchObject({ kind: 'result', player: null });
+        // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところ
+        if (s.phase.kind === 'result') expect(s.phase.player).toBeNull();
+        else expect(s.phase.kind).toBe('push');
       }
       expect(fired).toBeGreaterThan(0);
     }
