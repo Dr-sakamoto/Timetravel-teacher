@@ -3,6 +3,8 @@ import { CARDS } from './game/data/cards';
 import { newGame, PLAYER_COLORS, step, calendarLabel } from './game/engine';
 import type { Action, GameState } from './game/types';
 import { GameView } from './ui/GameView';
+import { Online } from './ui/Online';
+import { normalizeCode } from './net/protocol';
 import { Rules } from './ui/Rules';
 import { ScoreDemo } from './ui/ScoreDemo';
 
@@ -39,7 +41,9 @@ export default function App() {
 function Game() {
   const [state, setState] = useState<GameState | null>(null);
   const [saved, setSaved] = useState<GameState | null>(() => loadSave());
-  const [screen, setScreen] = useState<'title' | 'setup' | 'game'>('title');
+  // 招待リンク（?room=12345）で開いたら、通信対戦の画面から始める
+  const [roomCode] = useState(() => normalizeCode(new URLSearchParams(location.search).get('room') ?? ''));
+  const [screen, setScreen] = useState<'title' | 'setup' | 'game' | 'online'>(() => (roomCode ? 'online' : 'title'));
   const [rules, setRules] = useState(false);
 
   const dispatch = useCallback((a: Action) => setState((s) => (s ? step(s, a) : s)), []);
@@ -60,6 +64,7 @@ function Game() {
         <Title
           saved={saved}
           onNew={() => setScreen('setup')}
+          onOnline={() => setScreen('online')}
           onContinue={() => {
             if (saved) {
               setState(saved);
@@ -78,6 +83,7 @@ function Game() {
           }}
         />
       )}
+      {screen === 'online' && <Online initialCode={roomCode} onExit={() => setScreen('title')} onRules={() => setRules(true)} />}
       {screen === 'game' && state && (
         <GameView state={state} dispatch={dispatch} onQuit={quit} onRules={() => setRules(true)} />
       )}
@@ -89,11 +95,13 @@ function Game() {
 function Title({
   saved,
   onNew,
+  onOnline,
   onContinue,
   onRules,
 }: {
   saved: GameState | null;
   onNew: () => void;
+  onOnline: () => void;
   onContinue: () => void;
   onRules: () => void;
 }) {
@@ -122,6 +130,9 @@ function Title({
         <button className="btn primary big" onClick={onNew}>
           新しく始める
         </button>
+        <button className="btn big" onClick={onOnline}>
+          📱 通信対戦（みんなのスマホで）
+        </button>
         {saved && (
           <button className="btn big" onClick={onContinue}>
             続きから（{calendarLabel(saved)}）
@@ -131,7 +142,7 @@ function Title({
           遊び方
         </button>
       </div>
-      <p className="title-foot">2〜5人 ・ 1台を回して遊ぶホットシート式 ・ CPUとも対戦可 ・ 偉人/恐竜カード{CARDS.length}種</p>
+      <p className="title-foot">2〜5人 ・ 1台を回すホットシート式／スマホどうしの通信対戦 ・ CPUとも対戦可 ・ 偉人/恐竜カード{CARDS.length}種</p>
     </div>
   );
 }

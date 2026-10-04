@@ -177,6 +177,8 @@ interface SeatProps {
   player: Player;
   year: number;
   acting: boolean;
+  /** 通信対戦で、この人の通信が切れている */
+  offline?: boolean;
   delta?: number;
   /** 今のイベントに関わったこの人の生徒 */
   litIcons: string[];
@@ -186,7 +188,7 @@ interface SeatProps {
 }
 
 /** 相手の席：小さく畳んだ教室（名札と12席の埋まり具合）。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
-export function OpponentSeat({ player, year, acting, delta, litIcons, targetable, targeted, onClick }: SeatProps) {
+export function OpponentSeat({ player, year, acting, offline, delta, litIcons, targetable, targeted, onClick }: SeatProps) {
   return (
     <button
       data-pid={player.id}
@@ -199,6 +201,7 @@ export function OpponentSeat({ player, year, acting, delta, litIcons, targetable
         <span className="opp-name">
           {player.name}
           {player.isCpu && <small>🤖</small>}
+          {offline && <small title="通信が切れています">📵</small>}
         </span>
         <span className="opp-class">{className(player.id, year)}</span>
         <span className="opp-pts">{player.points}</span>

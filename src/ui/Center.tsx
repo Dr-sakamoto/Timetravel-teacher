@@ -11,7 +11,10 @@ import { TcgCard } from './TcgCard';
 interface Props {
   state: GameState;
   dispatch: (a: Action) => void;
+  /** ほかの人（CPU・通信対戦の相手）の番で、この端末からは操作しない */
   cpuBusy: boolean;
+  /** 結果の「次へ」を押せるか（通信対戦では手番の人だけ） */
+  canContinue?: boolean;
   /** 転校・カチコミ・クラス替え・グッズで選んだもの */
   pick: Pick;
   /** 得点演出の明細（襲来）。点数表の上に出す */
@@ -51,7 +54,7 @@ function MarketCard({ id, selected, dim, onClick }: { id: string; selected: bool
 }
 
 /** 卓の中央：山札・場のカード・捨て札・めくったカードと手番の操作 */
-export function Center({ state, dispatch, cpuBusy, pick, side }: Props) {
+export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, side }: Props) {
   const ph = state.phase;
   const era = ERAS[currentEra(state)];
   const actor = ph.kind !== 'gameOver' && ph.player !== null ? state.players[ph.player] : null;
@@ -113,6 +116,7 @@ export function Center({ state, dispatch, cpuBusy, pick, side }: Props) {
             dispatch(a);
           }}
           cpuBusy={cpuBusy}
+          canContinue={canContinue}
           pick={pick}
           side={side}
           sel={selected}
@@ -122,13 +126,18 @@ export function Center({ state, dispatch, cpuBusy, pick, side }: Props) {
   );
 }
 
-function Action({ state, dispatch, cpuBusy, pick, side, sel }: Props & { sel: number | null }) {
+function Action({ state, dispatch, cpuBusy, canContinue = true, pick, side, sel }: Props & { sel: number | null }) {
   const ph = state.phase;
   if (ph.kind === 'gameOver') return null;
   const actor = ph.player !== null ? state.players[ph.player] : null;
   const who = actor ? <b style={{ color: actor.color }}>{actor.name}</b> : null;
 
-  if (cpuBusy && ph.kind !== 'result') return <div className="say cpu">🤖 {who} の番…</div>;
+  if (cpuBusy && ph.kind !== 'result')
+    return (
+      <div className="say cpu">
+        {actor?.isCpu ? '🤖' : '⏳'} {who} の番…
+      </div>
+    );
 
   switch (ph.kind) {
     case 'memberDraw': {
@@ -341,9 +350,13 @@ function Action({ state, dispatch, cpuBusy, pick, side, sel }: Props & { sel: nu
                 ))}
               </div>
             )}
-            <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
-              次へ
-            </button>
+            {canContinue ? (
+              <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
+                次へ
+              </button>
+            ) : (
+              <div className="say-sub">⏳ {who ?? '誰か'} が「次へ」を押すのを待っています</div>
+            )}
           </div>
         </div>
       );
