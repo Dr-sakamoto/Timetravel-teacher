@@ -360,3 +360,62 @@ export function fixedRule(f: FixedEvent): string {
     ? `📚の数−👊を持つ子1人につき${TEST_YANKEE_PENALTY}で勝負（順位点×${f.mult}）`
     : `クラス全員のアイコンの総数で勝負（順位点×${f.mult}）`;
 }
+
+/**
+ * カードの効果を絵文字の式で（文章を読まなくても分かるように）。
+ * 例：授業「👑 → +」、共通イベント「🏃 − 👥」、時代イベント「🥇👊×2」、襲来「👊 − 8」
+ */
+export function cardGlyph(c: EventCard): string {
+  switch (c.kind) {
+    case 'normal':
+      return `${ATTR_ICON[c.attr]} → +`;
+    case 'kachikomi':
+      return `👊×${c.mult} → 😵`;
+    case 'swing':
+      return c.minus ? `${ATTR_ICON[c.plus]} − ${c.minus === 'heads' ? '👥' : ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
+    case 'contest':
+      return contestGlyph(c);
+    case 'raid':
+      return `👊 − ${c.threat}`;
+    case 'goods':
+      return `🧑 ＋${ATTR_ICON[c.attr]}`;
+    case 'cyborg':
+      return '🧑 → 🦾';
+    case 'push':
+      return '👥 → 👋🧑';
+    case 'exchange':
+      return '🧑 ⇄ 🧑';
+  }
+}
+
+function contestGlyph(c: ContestCard): string {
+  const a = c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr];
+  const e = c.effect;
+  const x = (m: number) => (m !== 1 ? `×${m}` : '');
+  switch (e.type) {
+    case 'sum':
+      return `${a}${x(e.mult)} → +`;
+    case 'top':
+      return `🥇 ${a}${x(e.mult)}`;
+    case 'ace':
+      return `🧑${a}${x(e.mult)}`;
+    case 'champion':
+      return `🏆🧑 ${a}${x(e.mult)}`;
+    case 'heads':
+      return `🧑${a} → +${e.per}`;
+    case 'threshold':
+      return `${a} ${e.need}↑ ⭕+${e.win} ❌−${e.lose}`;
+    case 'battle':
+      return `🥇+${e.win}　最下位−${e.lose}`;
+    case 'minus':
+      return e.minus === 'without' ? `${a} − 🚫${a}🧑` : `${a} − ${ATTR_ICON[e.minus]}`;
+    case 'variety':
+      return `🌈種類 ×${e.per}`;
+    case 'alien':
+      return '🪑 → 👽';
+  }
+}
+
+export function fixedGlyph(f: FixedEvent): string {
+  return f.rule === 'test' ? `📚 − 👊🧑×${TEST_YANKEE_PENALTY}　🥇🥈🥉` : '🌈 全部　🥇🥈🥉';
+}

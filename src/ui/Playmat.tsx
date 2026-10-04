@@ -34,6 +34,8 @@ interface Props {
   acting?: boolean;
   /** 直前のイベントでの得点 */
   delta?: number;
+  /** 直前のイベントでの順位（0が1位） */
+  rank?: number;
   onSeatClick?: (uid: string) => void;
   selectedUid?: string | null;
   dimUid?: (uid: string) => boolean;
@@ -116,12 +118,7 @@ export function Playmat(props: Props) {
           {className(player.id, year)} 👥{view.students.length}/{MAX_CLASS}
         </span>
         <span className="plate-pts">{player.points}</span>
-        {delta !== undefined && delta !== 0 && (
-          <span className={`plate-delta ${delta > 0 ? 'up' : 'down'}`} key={`${delta}-${player.points}`}>
-            {delta > 0 ? '+' : ''}
-            {delta}
-          </span>
-        )}
+        <DeltaBadge delta={delta} rank={props.rank} points={player.points} />
       </div>
       <div className="floor">
         {ROLE_ORDER.map((r, i) => {
@@ -155,8 +152,7 @@ export function Playmat(props: Props) {
                   <span className="zone-badge">{def.name}</span>
                   <span className="zone-icon">{open ? def.icon : unlockable ? '🆕' : '🔒'}</span>
                   <span className="zone-desc">{roleDesc(r)}</span>
-                  {!open && <span className="zone-note">{unlockable ? 'タップで解放' : lockNote}</span>}
-                  {open && arrange && <span className="zone-note">ここに置く</span>}
+                  {!open && <span className="zone-note">{unlockable ? '👆' : lockNote}</span>}
                 </span>
               )}
             </div>
@@ -189,6 +185,7 @@ interface SeatProps {
   /** 通信対戦で、この人の通信が切れている */
   offline?: boolean;
   delta?: number;
+  rank?: number;
   /** 今のイベントに関わったこの人の生徒 */
   litIcons: string[];
   targetable: boolean;
@@ -197,7 +194,7 @@ interface SeatProps {
 }
 
 /** 相手の席：小さく畳んだ教室（名札と12席の埋まり具合）。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
-export function OpponentSeat({ player, year, acting, offline, delta, litIcons, targetable, targeted, onClick }: SeatProps) {
+export function OpponentSeat({ player, year, acting, offline, delta, rank, litIcons, targetable, targeted, onClick }: SeatProps) {
   return (
     <button
       data-pid={player.id}
@@ -237,12 +234,21 @@ export function OpponentSeat({ player, year, acting, offline, delta, litIcons, t
           </span>
         )}
       </span>
-      {delta !== undefined && delta !== 0 && (
-        <span className={`plate-delta ${delta > 0 ? 'up' : 'down'}`} key={`${delta}-${player.points}`}>
-          {delta > 0 ? '+' : ''}
-          {delta}
-        </span>
-      )}
+      <DeltaBadge delta={delta} rank={rank} points={player.points} />
     </button>
+  );
+}
+
+const MEDAL = ['🥇', '🥈', '🥉'];
+
+/** 名札に浮かぶ「+5」「🥇+6」 */
+function DeltaBadge({ delta, rank, points }: { delta?: number; rank?: number; points: number }) {
+  if (delta === undefined || (delta === 0 && rank === undefined)) return null;
+  return (
+    <span className={`plate-delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`} key={`${delta}-${points}`}>
+      {rank !== undefined && MEDAL[rank]}
+      {delta > 0 ? '+' : ''}
+      {delta !== 0 && delta}
+    </span>
   );
 }

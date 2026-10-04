@@ -670,6 +670,71 @@ button.chip {
 }
 
 /* ---------- 中央の操作 ---------- */
+/* めくったカードの効果（絵文字の式） */
+.ecard-glyph {
+  margin: 2px;
+  padding: 0.2rem 0.3rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  color: var(--ink);
+}
+/* 取るとどうなるか（絵文字の式） */
+.effect {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+}
+/* 選んだ生徒・相手 */
+.pick-chip {
+  display: inline-block;
+  min-width: 2.5em;
+  padding: 0 0.6em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px dashed var(--chalk-dim);
+  font-weight: 900;
+}
+/* 結果：入ってきた子は光らせ、出ていった子は灰色に */
+.deal-card {
+  position: relative;
+  width: 64px;
+  animation: deal 0.45s ease-out both;
+}
+.deal-card .tcg {
+  width: 100%;
+}
+.deal-card.in .tcg {
+  box-shadow:
+    0 0 0 2px var(--yellow),
+    0 0 14px rgba(246, 216, 96, 0.8);
+}
+.deal-card.out .tcg {
+  filter: grayscale(1) brightness(0.75);
+  transform: rotate(-6deg);
+}
+.deal-mark {
+  position: absolute;
+  top: -0.6rem;
+  right: -0.5rem;
+  font-size: 1.2rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+/* 手番の人の名札は脈打つ */
+.opp.acting {
+  animation: acting 1.1s ease-in-out infinite;
+}
+@keyframes acting {
+  50% {
+    box-shadow:
+      0 0 0 4px var(--yellow),
+      0 0 18px rgba(246, 216, 96, 0.8);
+  }
+}
 .lastlog {
   max-width: 100%;
   font-size: 0.8rem;
@@ -944,6 +1009,8 @@ button.chip {
   position: absolute;
   right: 0.5rem;
   top: -1.2rem;
+  z-index: 4;
+  white-space: nowrap;
   font-weight: 900;
   font-size: 1.3rem;
   padding: 0 0.4em;
@@ -1599,9 +1666,14 @@ button.chip {
     display: block;
     padding: 0;
   }
+  /* 光った生徒のアイコンは名札の下にぶら下げる（名前と点を隠さない） */
   .opp-lit {
-    inset: 0;
-    border-radius: 6px;
+    inset: auto 0.3rem auto auto;
+    top: 100%;
+    margin-top: 2px;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    z-index: 3;
   }
   /* 空いている机は省く（人数は名札の 👥 で分かる） */
   :is(.pm-near, .pm-stage) .seat.empty {
@@ -1630,14 +1702,6 @@ button.chip {
     flex: 1;
     min-height: 0;
     gap: 0.4rem;
-  }
-  /* 相手の手番は、自分の教室の代わりにその人の教室を下に出す */
-  .stage > .playmat {
-    order: 2;
-    width: 100%;
-  }
-  .felt:has(.stage.with-mat) .near-seat {
-    display: none;
   }
   .stage > .center {
     flex: 1;
@@ -1727,8 +1791,30 @@ button.chip {
   .action {
     flex: none;
   }
+  /* 結果：カードは場のカードと同じくらいの大きさで */
+  .center:has(.reveal) .action {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+  }
+  .reveal {
+    flex-wrap: nowrap;
+    gap: 0.8rem;
+    max-height: 100%;
+  }
+  .reveal .ecard {
+    width: min(150px, 40vw);
+    min-height: 0;
+  }
+  .reveal .deal {
+    margin-top: 0;
+  }
+  .deal-card {
+    width: min(76px, 20vw);
+  }
   /* 係決めの間は場を使わないので、教室に場所をゆずる */
-  .center.ph-roles .board {
+  .felt:has(.role-editor) .center.ph-roles .board {
     display: none;
   }
   .market {
@@ -2022,12 +2108,11 @@ button.chip {
     gap: 1px;
   }
   .opp-lit {
-    inset: -3px 0;
-    font-size: 0.6rem;
+    font-size: 0.75rem;
   }
   .opp .plate-delta {
-    font-size: 0.75rem;
-    top: -0.75rem;
+    font-size: 1rem;
+    top: -0.8rem;
   }
   .stage {
     flex-direction: row;

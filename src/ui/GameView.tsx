@@ -39,7 +39,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const logRef = useRef<HTMLDivElement>(null);
   const feltRef = useRef<HTMLDivElement>(null);
   // どのカードから何点入ったかの演出（CPUの「速い」設定では早送り）
-  const fx = useGameFx(state, feltRef, speed === 'fast' ? 0.35 : 1);
+  const fx = useGameFx(state, feltRef, speed === 'fast' ? 0.35 : 1, focus);
   const fxLength = fx?.length ?? 0;
   const cpuTurn = actor !== null && state.players[actor].isCpu && ph.kind !== 'result';
   /** 通信対戦で、ほかの人の番（自分は見ているだけ） */
@@ -84,11 +84,14 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const n = state.players.length;
   const others = Array.from({ length: n - 1 }, (_, i) => (focus + 1 + i) % n);
   const deltas = new Map<number, number>();
+  /** 順位のあるイベントの順位（名札にメダルを出す） */
+  const ranks = new Map<number, number>();
   // 今のイベントに関わったカード（光らせる。相手の席には絵柄を出す）
   const lit = new Set<string>();
   if (ph.kind === 'result') {
     for (const r of ph.result.rows) {
       if (!fx || fx.settled(r.player)) deltas.set(r.player, r.delta);
+      if (r.rank !== undefined) ranks.set(r.player, r.rank);
       r.uids?.forEach((u) => lit.add(u));
     }
     ph.result.students?.forEach((st) => lit.add(st.uid));
@@ -125,8 +128,6 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   /** 相手の教室で選べる生徒 */
   const peekable = (pi: number) =>
     state.players[pi].students.filter((x) => pairs.some((y) => y.target === pi && y.theirUid === x.uid && (!pick.uid || y.uid === pick.uid)));
-  // 手番の人が相手なら、その人の教室を卓の中央に出す
-  const stage = actor !== null && actor !== focus ? actor : null;
   // 演出中は、まだ届いていない点を名札から引いて見せる
   const shown = (i: number) => (fx ? { ...state.players[i], points: fx.points(i) } : state.players[i]);
   const matLit = (i: number) => fx?.lit(i) ?? lit;
@@ -177,6 +178,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               acting={actor === pi}
               offline={offline?.(pi)}
               delta={deltas.get(pi)}
+              rank={ranks.get(pi)}
               litIcons={state.players[pi].students.filter((st) => lit.has(st.uid)).map((st) => st.icon)}
               targetable={targets.includes(pi)}
               targeted={pick.target === pi}
@@ -184,20 +186,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
             />
           ))}
         </div>
-        <div className={`stage ${stage !== null ? 'with-mat' : ''}`}>
-          {stage !== null && (
-            <Playmat
-              key={stage}
-              player={shown(stage)}
-              year={state.year}
-              slots={slots}
-              variant="stage"
-              acting
-              delta={deltas.get(stage)}
-              lit={matLit(stage)}
-              dimUid={fxDim(stage)}
-            />
-          )}
+        {/* 相手の教室は卓に出さない（名札をタップしたときだけ開く） */}
+        <div className="stage">
           <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} />
         </div>
         <div className="near-seat">
@@ -217,6 +207,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               variant="near"
               acting={actor === focus}
               delta={deltas.get(focus)}
+              rank={ranks.get(focus)}
               lit={matLit(focus)}
               onSeatClick={
                 selectable.length
