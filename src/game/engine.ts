@@ -158,7 +158,7 @@ function fromArchetype(s: GameState, cardId: string, a: Archetype, joined: strin
   return {
     uid: `u${s.uidCounter++}`,
     cardId,
-    name: `${pick(s, SURNAMES)} ${pick(s, a.female ? GIRL_NAMES : BOY_NAMES)}`,
+    name: a.fixedName ?? `${pick(s, SURNAMES)} ${pick(s, a.female ? GIRL_NAMES : BOY_NAMES)}`,
     title: a.title,
     era: 'present',
     rarity: a.rarity,

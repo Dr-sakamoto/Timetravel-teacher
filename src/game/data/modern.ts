@@ -14,10 +14,12 @@ export interface Archetype {
   flavor: string;
   /** 女子生徒（名前を女子の名前から選ぶ） */
   female: boolean;
+  /** 名前が決まっている生徒（ランダムな名前を付けない） */
+  fixedName?: string;
 }
 
 /** 絵柄が女子のアーキタイプ */
-const FEMALE_IDS = new Set(['lit', 'rep', 'brass', 'dance', 'gyaru', 'sukeban', 'returnee', 'childstar', 'influencer']);
+const FEMALE_IDS = new Set(['rep', 'brass', 'dance', 'gyaru', 'sukeban', 'returnee', 'childstar', 'influencer']);
 
 const Y: Tag[] = ['現代', 'ヤンキー'];
 const M: Tag[] = ['現代'];
@@ -29,7 +31,7 @@ function a(id: string, title: string, icon: string, rarity: Rarity, power: numbe
 // 部活は優劣をつけないので、部活系の通常生徒は肩書きなし（個人名＋絵柄だけ）。
 // 通常生徒（N）はアイコン1〜2個で、構成が1人ずつ違う。個数は「=」でそのまま指定する。👊はヤンキー専用
 export const ARCHETYPES: Archetype[] = [
-  a('lit', '', '📖', 'N', 3, '=s', 'ポエムを書いている。'),
+  { ...a('lit', '', '📖', 'N', 3, '=s', 'ポエムを書いている。'), fixedName: 'カツ' },
   a('soccer', '', '⚽', 'N', 3, '=p', '昼休みは必ずグラウンド。'),
   a('artclub', '', '🖌️', 'N', 4, '=a', 'ノートの端が全部イラスト。'),
   a('rep', '委員長タイプ', '🙋', 'N', 4, '=c', '「ちょっと男子ー！」'),

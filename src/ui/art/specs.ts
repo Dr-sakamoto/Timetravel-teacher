@@ -24,7 +24,7 @@ export interface HumanSpec {
   liner?: boolean;
 }
 
-export type ArtSpec = HumanSpec | { creature: Creature };
+export type ArtSpec = HumanSpec | { creature: Creature } | { photo: string };
 
 const { black, brown, dark, blond, red, grey, white, pink, navy } = HAIR;
 
@@ -115,7 +115,7 @@ export const ART: Record<string, ArtSpec> = {
   swim: { skin: SKIN.tan, outfit: 'bare', c1: SKIN.tan, hat: 'swimcap', hatColor: '#2f7fd8', expr: 'grin' },
   brass: { back: 'shoulder', hair: 'mid', hairColor: brown, outfit: 'sailor', c1: navy, c2: '#e5534b', expr: 'smile', prop: 'trumpet' },
   artclub: { hair: 'short', hairColor: dark, outfit: 'smock', c1: '#f6f1e4', hat: 'beret', hatColor: '#c0392b', expr: 'smile', prop: 'brush' },
-  lit: { back: 'bob', hair: 'short', hairColor: black, outfit: 'sailor', c1: navy, c2: '#3f7fd0', acc: ['glasses'], expr: 'calm', prop: 'book' },
+  lit: { photo: 'katsu.jpg' },
   band: { back: 'shoulder', hair: 'messy', hairColor: '#5a3a6a', outfit: 'tshirt', c1: '#2b2b2b', c2: '#e5534b', expr: 'cool', acc: ['earring'], prop: 'guitar' },
   drama: { back: 'ponytail', hair: 'short', hairColor: brown, outfit: 'sailor', c1: navy, c2: '#e5534b', expr: 'surprised', prop: 'theater' },
   dance: { back: 'ponytail', hair: 'short', hairColor: blond, outfit: 'tshirt', c1: '#f59ac2', c2: '#fff', hat: 'cap', hatColor: '#2b2b2b', expr: 'wink', prop: 'mic' },
