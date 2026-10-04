@@ -481,13 +481,6 @@ function bestOf(p: Player, cands: Student[], a: Attr | 'all', era?: EraId): { st
   return out;
 }
 
-/** 生徒をほかのクラスへ移す（係は外れる。カードプールには戻さない） */
-function moveStudent(s: GameState, from: Player, to: Player, uid: string): Student {
-  const st = removeStudent(s, from, uid, false)!;
-  to.students.push(st);
-  return st;
-}
-
 /** その時代だけの仕組みのイベント（点の数え方ではなく、起こることそのものが違う） */
 function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, { type: 'heads' | 'threshold' | 'battle' | 'alien' }>): EventResult {
   const ps = s.players;
@@ -501,9 +494,8 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
   const values = scores.map((x) => x.total);
   const best = Math.max(...values);
   const worst = Math.min(...values);
-  /** 移ったり出ていったりした子（結果に並べる） */
+  /** 結果に並べる子 */
   const moved: Student[] = [];
-  const out: string[] = [];
   const name = (x: Student) => `${x.icon}${x.name}`;
   /** 起きたこと（ログに残し、めくったカードの横に一言で出す） */
   const said: string[] = [];
@@ -513,9 +505,12 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
   };
 
   switch (e.type) {
-    // 白亜紀：一番強いクラス（1クラスだけ）が、一番弱いクラスから一番アイコンの多い子を奪う
-    case 'steal': {
-      rows.forEach((r, i) => (r.count = values[i]));
+    // 白亜紀：一番強いクラス（1クラスだけ）が、一番弱いクラスから点を奪う
+    case 'plunder': {
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+      });
       const tops = values.flatMap((v, i) => (v === best ? [i] : []));
       if (best === worst || tops.length > 1) {
         rows.forEach((r) => (r.note = '互角'));
@@ -524,18 +519,12 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       const win = tops[0];
       // 一番弱いクラスが複数なら、ポイントの多いほうが狙われる
       const lose = values.flatMap((v, i) => (v === worst ? [i] : [])).sort((x, y) => ps[y].points - ps[x].points)[0];
-      const prey = [...droppable(ps[lose])].sort((x, y) => y.attrs.length - x.attrs.length)[0];
-      if (ps[win].students.length >= MAX_CLASS || !prey) {
-        rows[win].note = ps[win].students.length >= MAX_CLASS ? '満席' : '奪えず';
-        break;
-      }
-      const st = moveStudent(s, ps[lose], ps[win], prey.uid);
+      add(win, e.amount);
+      add(lose, -e.amount);
       scores[win].holders.forEach((h) => h.mvp++);
-      moved.push(st);
       rows[win].note = '奪った';
       rows[lose].note = '奪われた';
-      rows[win].uids = [st.uid];
-      tell(`${ps[win].name}のクラスが${ps[lose].name}のクラスから${name(st)}を奪った！`, win);
+      tell(`${ps[win].name}のクラスが${ps[lose].name}のクラスから${e.amount}点奪った！`, win);
       break;
     }
     // エジプト：全クラスの合計で1つのピラミッド。完成なら全員にほうび、一番少ないクラスはサボりで0
@@ -560,11 +549,10 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // ギリシャ：全校でアイコンが一番多い子が1人だけ追放される（定員の下限のクラスの子は除く）
+    // ギリシャ：全校でアイコンが一番多い子のクラスが減点（同点ならポイントの多いクラスの子）
     case 'ostracism': {
       let pick: { pi: number; st: Student } | null = null;
       ps.forEach((p, pi) => {
-        if (p.students.length <= MIN_CLASS) return;
         for (const st of p.students) {
           const better = !pick || st.attrs.length > pick.st.attrs.length || (st.attrs.length === pick.st.attrs.length && p.points > ps[pick.pi].points);
           if (better) pick = { pi, st };
@@ -572,12 +560,12 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       if (!pick) break;
       const { pi, st } = pick as { pi: number; st: Student };
-      removeStudent(s, ps[pi], st.uid, false);
+      add(pi, -e.lose);
       moved.push(st);
-      out.push(st.uid);
-      rows[pi].note = '追放';
+      rows[pi].count = st.attrs.length;
+      rows[pi].note = '追放の票';
       rows[pi].uids = [st.uid];
-      tell(`${ps[pi].name}のクラスの${name(st)}が陶片追放された。`, pi);
+      tell(`${ps[pi].name}のクラスの${name(st)}に陶片の票が集まった。（−${e.lose}）`, pi);
       break;
     }
     // 中国：各クラスの一番の子が受験。合格した子はアイコンが1つ増える（カードに印刷できるのは5個まで）
@@ -630,7 +618,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // 中世：各クラスの代表1人どうしの一騎打ち。1位は+win、最下位の代表は落馬して転校（その子がいないクラスは出ない）
+    // 中世：各クラスの代表1人どうしの一騎打ち。1位は+win、最下位は−lose（その子がいないクラスは出ない）
     case 'duel': {
       const champs = ps.map((p) => bestOf(p, p.students, c.attr, c.era));
       const vs = champs.flatMap((x) => (x ? [x.pts] : []));
@@ -654,42 +642,36 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
           moved.push(x.student);
           tell(`${ps[i].name}のクラスの${name(x.student)}が勝った！`, i);
         } else if (x.pts === lo) {
+          add(i, -e.lose);
           rows[i].note = '落馬';
-          if (ps[i].students.length <= MIN_CLASS) return;
-          removeStudent(s, ps[i], x.student.uid, false);
-          moved.push(x.student);
-          out.push(x.student.uid);
-          tell(`${ps[i].name}のクラスの${name(x.student)}が落馬して去っていった。`, i);
         }
       });
       break;
     }
-    // 戦国：全クラスいっせいに、係に就いていない一番の子をとなり（次の席）のクラスへ出す
-    case 'hostage': {
-      const sent = ps.map((p) => bestOf(p, tradeable(p), c.attr, c.era)?.student ?? null);
-      // 受け取ると定員を超えるクラス（満席で、自分は誰も出さない）には送れない。送れなくなると満席が増えることがあるので、落ち着くまで繰り返す
-      for (let changed = true; changed; ) {
-        changed = false;
-        sent.forEach((st, i) => {
-          const to = (i + 1) % n;
-          if (st && to !== i && ps[to].students.length - (sent[to] ? 1 : 0) + 1 > MAX_CLASS) {
-            sent[i] = null;
-            changed = true;
-          }
-        });
-      }
-      sent.forEach((st, i) => {
-        if (!st) {
-          rows[i].note = '出せる子なし';
-          return;
-        }
-        const to = ps[(i + 1) % n];
-        moveStudent(s, ps[i], to, st.uid);
-        moved.push(st);
-        rows[i].note = `→ ${to.name}`;
-        rows[(i + 1) % n].uids = [st.uid];
+    // 戦国：一番人望のあるクラス（1クラスだけ）が、ポイントが一番多いクラスから点を奪う（自分が一番なら何も起こらない）
+    case 'gekokujo': {
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
       });
-      if (moved.length) tell(`${moved.map(name).join('・')}がとなりのクラスへ移った。`);
+      const tops = values.flatMap((v, i) => (v === best ? [i] : []));
+      if (best === worst || tops.length > 1) {
+        rows.forEach((r) => (r.note = '互角'));
+        break;
+      }
+      const win = tops[0];
+      const lord = ps.map((_, i) => i).sort((x, y) => ps[y].points - ps[x].points)[0];
+      if (lord === win || ps[lord].points === ps[win].points) {
+        rows[win].note = '天下安泰';
+        tell(`${ps[win].name}のクラスの天下はゆるがない。`, win);
+        break;
+      }
+      add(win, e.amount);
+      add(lord, -e.amount);
+      scores[win].holders.forEach((h) => h.mvp++);
+      rows[win].note = '下剋上';
+      rows[lord].note = '引きずり下ろされた';
+      tell(`${ps[win].name}のクラスが${ps[lord].name}のクラスから${e.amount}点奪った！`, win);
       break;
     }
     // 江戸：全クラスが出し合い、くじで1クラスが総取り
@@ -718,7 +700,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       break;
     }
   }
-  const result = eraResult(s, c, rows, { students: moved, outUids: out.length ? out : undefined });
+  const result = eraResult(s, c, rows, { students: moved });
   // 何も起きなかったときはカードの効果を出す
   return said.length ? { ...result, say: said.join(' ') } : result;
 }

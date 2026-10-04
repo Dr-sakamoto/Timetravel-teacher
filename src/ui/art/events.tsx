@@ -350,26 +350,21 @@ const SCENES: Record<string, () => ReactNode> = {
       <Star x={50} y={46} r={5} fill="#fff3b0" />
     </g>
   ),
-  hitojichi: () => (
+  gekokujo: () => (
     <g>
-      <Bg sky="#ffe9c0" ground="#9fbf6a" y={54} />
-      {[[4, '#c0392b'], [70, '#3f5fa3']].map(([x, f]) => (
-        <g key={x as number}>
-          <R x={(x as number) + 4} y={30} w={18} h={24} fill="#fbfbf7" />
-          <P d={`M${x} 30 L${(x as number) + 13} 22 L${(x as number) + 26} 30Z`} fill="#3a3a44" />
-          <R x={(x as number) + 8} y={14} w={10} h={8} fill="#fbfbf7" sw={1.1} />
-          <P d={`M${(x as number) + 5} 14 L${(x as number) + 13} 8 L${(x as number) + 21} 14Z`} fill="#3a3a44" sw={1.1} />
-          <R x={(x as number) + 11} y={42} w={4} h={12} fill="#7a5a3a" sw={1} />
-          <Stick x1={(x as number) + 24} y1={54} x2={(x as number) + 24} y2={30} w={1} color="#7a5a3a" />
-          <R x={(x as number) + 24} y={30} w={6} h={12} fill={f as string} sw={1} />
-        </g>
-      ))}
-      <P d="M28 62 C40 56 60 56 72 62" stroke="#fbf4e2" sw={3} />
-      <P d="M28 62 C40 56 60 56 72 62" sw={0.8} />
-      <Mini x={50} y={50} c="#d97ab0" s={1.1} />
-      <P d="M45 46 C44 41 47 39 50 41 C53 39 56 41 55 46" fill="#2f2a2a" sw={1} />
-      <P d="M60 50 h6 l-2 -2 M66 50 l-2 2" sw={1.2} />
-      <P d="M38 40 C36 36 40 34 41 37 C42 34 46 36 44 40 L41 43Z" fill="#e5534b" sw={0.9} />
+      <Bg sky="#ffd9a8" ground="#9fbf6a" y={54} />
+      <R x={56} y={30} w={30} h={24} fill="#fbfbf7" />
+      <P d="M50 30 L71 20 L92 30Z" fill="#3a3a44" />
+      <R x={64} y={10} w={14} h={10} fill="#fbfbf7" sw={1.1} />
+      <P d="M60 10 L71 3 L82 10Z" fill="#3a3a44" sw={1.1} />
+      <R x={68} y={42} w={6} h={12} fill="#7a5a3a" sw={1} />
+      <P d="M84 18 L92 20 L84 24Z" fill="#f2c94c" sw={0.9} />
+      <P d="M86 50 C90 46 96 48 96 54" fill="#c0392b" />
+      <Mini x={24} y={46} c="#d97ab0" s={1.3} />
+      <Stick x1={32} y1={40} x2={52} y2={24} w={1.4} color="#7a5a3a" />
+      <R x={52} y={18} w={9} h={10} fill="#c0392b" sw={1} />
+      <P d="M14 22 l3 -5 l3 3 l3 -5 l3 5 l3 -3 l3 5Z" fill="#f2c94c" sw={0.9} />
+      <P d="M36 60 h14 l-3 -3 M50 60 l-3 3" sw={1.2} />
     </g>
   ),
 
