@@ -663,9 +663,8 @@ function refill(s: GameState) {
   endTurn(s);
 }
 
-/** ゲリラ（カチコミ・共通イベント・時代イベント・襲来・転校）。カチコミは手番の人が殴りこむ */
+/** ゲリラ（共通イベント・時代イベント・襲来・転校） */
 function fireGuerrilla(s: GameState, pi: number, id: string) {
-  const p = s.players[pi];
   const c = EVENT_MAP[id];
   log(s, `ゲリラ発生！ ${c.icon}${c.name}`);
   switch (c.kind) {
@@ -677,11 +676,6 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
       return;
     case 'raid':
       setResult(s, pi, resolveRaid(s, c), 'turn');
-      return;
-    case 'kachikomi':
-      if (attrScore(p, 'fight').total === 0)
-        setResult(s, pi, { title: c.name, icon: c.icon, tone: 'personal', desc: `${p.name}のクラスには👊を持つ子がいないので、カチコミは起きなかった。`, rule: cardRule(c), glyph: cardGlyph(c), rows: [] }, 'turn');
-      else s.phase = { kind: 'kachikomi', player: pi };
       return;
     case 'push':
       startDrop(s, pi);
@@ -707,6 +701,8 @@ export function canTake(s: GameState, pi: number, slot: number): boolean {
       return cyborgable(p).length > 0;
     case 'exchange':
       return exchangePairs(s, pi).length > 0;
+    case 'kachikomi':
+      return attrScore(p, 'fight').total > 0;
     default:
       return false;
   }
@@ -754,6 +750,9 @@ function takeCard(s: GameState, pi: number, slot: number) {
       return;
     case 'exchange':
       s.phase = { kind: 'exchange', player: pi, slot };
+      return;
+    case 'kachikomi':
+      s.phase = { kind: 'kachikomi', player: pi, slot };
       return;
   }
 }
@@ -859,10 +858,11 @@ export function step(prev: GameState, a: Action): GameState {
       if (ph.kind !== 'kachikomi') return prev;
       const p = s.players[ph.player];
       if (a.target === null) {
-        setResult(s, ph.player, { title: 'カチコミ', icon: '👊', tone: 'personal', desc: 'やっぱりやめた。', rows: [] }, 'turn');
+        s.phase = { kind: 'draw', player: ph.player };
         return s;
       }
       if (!kachikomiTargets(s, ph.player).includes(a.target)) return prev;
+      takeFromMarket(s, ph.slot);
       const sc = attrScore(p, 'fight');
       const damage = sc.total * KACHIKOMI_CARDS[0].mult;
       const to = s.players[a.target];

@@ -133,8 +133,8 @@ export type Phase =
   | { kind: 'makeRoom'; player: number; slot: number }
   /** 転校：全クラスが順番に、係に就いていない生徒を1人ずつクラスから外す（player は今選んでいる人、left はこの後に選ぶ人） */
   | { kind: 'push'; player: number; drawer: number; left: number[]; gone: Student[] }
-  /** カチコミ：他のクラスを1つ選んで、自分の👊の数×3だけ減点させる */
-  | { kind: 'kachikomi'; player: number }
+  /** カチコミ（場から取った）：他のクラスを1つ選んで、自分の👊の数×3だけ減点させる */
+  | { kind: 'kachikomi'; player: number; slot: number }
   /** クラス替え：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える（アイコンの数が同じ子どうしだけ） */
   | { kind: 'exchange'; player: number; slot: number }
   /** サイボーグ化：自分のクラスの生徒1人をサイボーグに作り替える */

@@ -69,7 +69,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
         </p>
         <ul className="rule-list">
           <li>
-            <b>無料</b>：授業（その場で点が入る）・クラス替え
+            <b>無料</b>：授業（その場で点が入る）・カチコミ（👊を持つ子がいるときだけ）・クラス替え
           </li>
           <li>
             <b>クラスポイントを払う</b>：人物（N {PERSON_COST.N}点／R {PERSON_COST.R}点／SR {PERSON_COST.SR}点／SSR {PERSON_COST.SSR}点）・グッズとサイボーグ化（{GOODS_COST}点）。
@@ -77,8 +77,8 @@ export function Rules({ onClose }: { onClose: () => void }) {
           </li>
         </ul>
         <p>
-          取ったら山札から場を補充する。このとき<b>ゲリラ</b>（カチコミ・共通イベント・時代イベント・襲来・転校）をめくったら、<b>その場で起こる</b>（誰も避けられない。補充はそのあと続ける）。
-          カチコミは手番の人のクラスが殴りこむ。共通イベント・時代イベント・襲来・転校は全クラスに効く。
+          取ったら山札から場を補充する。このとき<b>ゲリラ</b>（共通イベント・時代イベント・襲来・転校）をめくったら、<b>その場で起こる</b>（誰も避けられない。補充はそのあと続ける）。
+          ゲリラは全クラスに効く。
         </p>
         <p>
           山札は学期ごとに作り直す。<b>授業・カチコミ・共通イベント・転校・クラス替え・グッズは全時代共通</b>で、そこに
@@ -94,7 +94,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
               {kachikomi.icon}
               {kachikomi.name}
             </b>
-            （ゲリラ・×{kachikomi.count}）：{cardRule(kachikomi)}。👊の子はテストや授業参観でいつも足を引っぱるが、カチコミと襲来では頼りになる。
+            （場から取る・無料・×{kachikomi.count}）：{cardRule(kachikomi)}。👊の子はテストや授業参観でいつも足を引っぱるが、カチコミと襲来では頼りになる。
           </li>
           <li>
             <b>共通イベント</b>（ゲリラ・全クラス・各1枚）：クラスの状況で<b>プラスにもマイナスにもなる</b>。

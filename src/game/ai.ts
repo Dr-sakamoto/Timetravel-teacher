@@ -11,7 +11,7 @@ const ATTR_WEIGHT = Object.fromEntries(
     ALL_EVENT_CARDS.reduce((x, c) => x + (c.kind === 'normal' && c.attr === a ? c.count : c.kind === 'contest' && c.attr === a ? c.count / 11 : 0), 0),
   ]),
 ) as Record<Attr, number>;
-// 👊はカチコミ（3枚・×3）と襲来の分
+// 👊はカチコミ（場から取る・3枚・×3）と襲来の分
 ATTR_WEIGHT.fight += 9;
 
 /** クラスの強さの目安（CPUの判断用） */
@@ -121,6 +121,9 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
       return Math.max(...equippable(p).map((st) => gain(s, p, swap(st.uid, equipped(st, c.attr))))) - cost;
     case 'cyborg':
       return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;
+    case 'kachikomi':
+      // 相手1クラスを減点するだけなので、相手の数で割って自分の加点と比べる
+      return (attrScore(p, 'fight').total * c.mult) / (s.players.length - 1);
     case 'exchange':
       return Math.max(...exchangePairs(s, pi).map((x) => gain(s, p, swap(x.uid, s.players[x.target].students.find((y) => y.uid === x.theirUid)!))));
     default:

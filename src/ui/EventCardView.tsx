@@ -6,7 +6,7 @@ export function EventCardView({ result }: { result: EventResult }) {
   const attr = result.attr && result.attr !== 'all' ? ATTR_ICON[result.attr] : result.attr === 'all' ? '🌈' : null;
   // 誰に効くか：取った人だけ（👤）か、全クラス（👥）か
   const scope = result.tone === 'normal' || result.tone === 'personal' ? '👤' : '👥';
-  // 物語の文は、ほかに何も見せるものがないときだけ（例：カチコミが起きなかった）
+  // 物語の文は、ほかに何も見せるものがないときだけ
   const descOnly = !result.glyph && !result.rows.length && !result.students?.length;
   return (
     <div className={`ecard tone-${result.tone} deal-in`} title={result.rule ?? result.desc}>

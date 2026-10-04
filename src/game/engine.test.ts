@@ -282,7 +282,7 @@ describe('engine', () => {
     expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(3 - 4);
   });
 
-  it('kachikomi takes 3× the drawer\'s 👊 count from the chosen school', () => {
+  it('kachikomi is taken from the market for free and takes 3× the taker\'s 👊 count from the chosen school', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -290,16 +290,29 @@ describe('engine', () => {
     const t = structuredClone(s);
     t.players[pi].students = [mk('y', ['fight', 'fight']), mk('z', ['fight', 'study'])];
     t.players[pi].roles = [];
-    t.eventDeck.push('kachikomi');
-    const k = step(t, pass);
+    t.market = ['kachikomi'];
+    expect(marketCost('kachikomi')).toBe(0);
+    // 山札からめくっても起こらない（ゲリラではない）
+    const g = structuredClone(t);
+    g.market = ['n_study'];
+    g.eventDeck.push('kachikomi');
+    expect(step(step(g, { type: 'take', slot: 0 }), { type: 'continue' }).market).toContain('kachikomi');
+    const k = step(t, { type: 'take', slot: 0 });
     expect(k.phase.kind).toBe('kachikomi');
+    // やめたら場に残ったまま手番に戻る
+    const back = step(k, { type: 'kachikomi', target: null });
+    expect(back.phase.kind).toBe('draw');
+    expect(back.market).toEqual(['kachikomi']);
+    // 自分は殴れない
+    expect(step(k, { type: 'kachikomi', target: pi })).toBe(k);
     const done = step(k, { type: 'kachikomi', target });
     expect(done.players[target].points - t.players[target].points).toBe(-9);
     expect(done.players[pi].points).toBe(t.players[pi].points);
-    // 👊がいなければカチコミに行けない
+    expect(done.market).toEqual([]);
+    // 👊がいなければ取れない
     const u = structuredClone(t);
     u.players[pi].students = [mk('a', ['study'])];
-    expect(step(u, pass).phase.kind).toBe('result');
+    expect(canTake(u, pi, 0)).toBe(false);
   });
 
   it('swing events can go negative', () => {
