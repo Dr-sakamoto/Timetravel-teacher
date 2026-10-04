@@ -3,7 +3,8 @@ import { EventArt, hasEventArt } from './art/events';
 
 /** 卓の中央に出たイベントカード（取ったカード・ゲリラ・学校行事）。文字は名前と効果だけ */
 export function EventCardView({ result }: { result: EventResult }) {
-  const attr = result.attr && result.attr !== 'all' ? ATTR_ICON[result.attr] : result.attr === 'all' ? '🌈' : null;
+  // 角のアイコン：競うアイコンが1種類のときだけ（全アイコンなら式に「アイコン」と書く）
+  const attr = result.attr && result.attr !== 'all' ? ATTR_ICON[result.attr] : null;
   // 誰に効くか：取った人だけ（👤）か、全クラス（👥）か
   const scope = result.tone === 'normal' || result.tone === 'personal' ? '👤' : '👥';
   // 物語の文は、ほかに何も見せるものがないときだけ（例：カチコミが起きなかった）

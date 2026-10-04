@@ -92,7 +92,7 @@ function scenario(id: string, label: string): Scenario {
 
 const SCENARIOS: Scenario[] = [
   scenario('n_sports', '🏃 通常カード'),
-  scenario('marathon', '🥵 共通イベント（−人数）'),
+  scenario('visit', '👀 共通イベント（👑−👊）'),
   scenario('sekigahara', '⚔️ 時代イベント（×2）'),
   scenario('raid_sengoku', '👊 襲来（−敵の強さ）'),
 ];
