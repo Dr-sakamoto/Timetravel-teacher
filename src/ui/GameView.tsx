@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cpuAction } from '../game/ai';
 import { MONTHS, actingPlayer, cyborgable, droppable, equippable, exchangePairs, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth } from '../game/engine';
 import type { Action, GameState } from '../game/types';
@@ -15,9 +15,18 @@ interface Props {
   dispatch: (a: Action) => void;
   onQuit: () => void;
   onRules: () => void;
+  /** 通信対戦：この端末で操作する席（なければ1台を回すホットシート） */
+  me?: number;
+  /** CPUを動かし、CPUの結果を自動で進める端末か（通信対戦では部屋を作った人だけ） */
+  driver?: boolean;
+  /** 通信対戦：席ごとにつながっているか（つながっていない人は名札に出す） */
+  offline?: (pi: number) => boolean;
+  /** 通信対戦：画面の上に出す通信の状態など */
+  banner?: ReactNode;
 }
 
-export function GameView({ state, dispatch, onQuit, onRules }: Props) {
+export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner }: Props) {
+  const online = mySeat !== undefined;
   const ph = state.phase;
   const actor = actingPlayer(state);
   const allCpu = state.players.every((p) => p.isCpu);
@@ -26,7 +35,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const [portraitOk, setPortraitOk] = useState(false);
   /** タップして中身を見ている相手 */
   const [peek, setPeek] = useState<number | null>(null);
-  const [focus, setFocus] = useState(() => state.players.find((p) => !p.isCpu)?.id ?? 0);
+  const [focus, setFocus] = useState(() => mySeat ?? state.players.find((p) => !p.isCpu)?.id ?? 0);
   const [pick, setPick] = useState<Pick>({ uid: null, target: null, theirUid: null });
   const logRef = useRef<HTMLDivElement>(null);
   const feltRef = useRef<HTMLDivElement>(null);
@@ -34,11 +43,17 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const fx = useGameFx(state, feltRef, speed === 'fast' ? 0.35 : 1);
   const fxLength = fx?.length ?? 0;
   const cpuTurn = actor !== null && state.players[actor].isCpu && ph.kind !== 'result';
+  /** 通信対戦で、ほかの人の番（自分は見ているだけ） */
+  const othersTurn = online && actor !== mySeat && ph.kind !== 'result';
+  // 結果の「次へ」：手番の人が人間ならその人、CPUや全員向けの結果なら誰でも
+  const resultOwner = ph.kind === 'result' && ph.player !== null && !state.players[ph.player].isCpu ? ph.player : null;
+  const canContinue = !online || (mySeat !== undefined && !state.players[mySeat].isCpu && (resultOwner === null || resultOwner === mySeat));
 
-  // 人間の手番になったら、その人を手前に座らせる（ホットシート）
+  // 人間の手番になったら、その人を手前に座らせる（ホットシート）。通信対戦では自分の席のまま
   useEffect(() => {
+    if (online) return;
     if (actor !== null && !state.players[actor].isCpu) setFocus(actor);
-  }, [actor, state.players]);
+  }, [actor, state.players, online]);
 
   useEffect(() => {
     setPick({ uid: null, target: null, theirUid: null });
@@ -46,7 +61,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
 
   // CPUの自動進行
   useEffect(() => {
-    if (ph.kind === 'gameOver') return;
+    if (ph.kind === 'gameOver' || !driver) return;
     const mul = speed === 'fast' ? 0.35 : 1;
     if (ph.kind === 'result') {
       const auto = (ph.player !== null && state.players[ph.player].isCpu) || allCpu;
@@ -59,7 +74,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
     if (!a) return;
     const t = setTimeout(() => dispatch(a), 800 * mul);
     return () => clearTimeout(t);
-  }, [state, cpuTurn, allCpu, speed, dispatch, ph, fxLength]);
+  }, [state, cpuTurn, allCpu, speed, dispatch, ph, fxLength, driver]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -85,7 +100,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
 
   // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ（転校は自分の生徒だけ）
   const choosing =
-    (ph.kind === 'push' || ph.kind === 'makeRoom' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg') && !cpuTurn && ph.player === focus
+    (ph.kind === 'push' || ph.kind === 'makeRoom' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg') && !cpuTurn && !othersTurn && ph.player === focus
       ? ph.kind
       : null;
   // クラス替え：アイコンの数が同じ子どうしの組み合わせ（自分の子を選んでいたらその子の相手だけ）
@@ -118,7 +133,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
   const matLit = (i: number) => fx?.lit(i) ?? lit;
   const fxDim = (i: number) => (fx?.dims(i) ? (u: string) => fx.dims(i)!.has(u) : undefined);
   const me = state.players[focus];
-  const editingRoles = ph.kind === 'roles' && ph.player === focus && !me.isCpu;
+  const editingRoles = ph.kind === 'roles' && ph.player === focus && !me.isCpu && !othersTurn;
 
   return (
     <div className="table-wrap">
@@ -134,7 +149,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
         </div>
         <EraBar state={state} />
         <div className="top-actions">
-          {state.players.some((p) => p.isCpu) && (
+          {driver && state.players.some((p) => p.isCpu) && (
             <button className="btn small ghost" title="CPUの速さ" onClick={() => setSpeed((s) => (s === 'fast' ? 'normal' : 'fast'))}>
               {speed === 'fast' ? '⏩' : '▶'}
             </button>
@@ -151,6 +166,8 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
         </div>
       </header>
 
+      {banner}
+
       <div className="felt" ref={feltRef}>
         <div className="opponents">
           {others.map((pi) => (
@@ -159,6 +176,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               player={shown(pi)}
               year={state.year}
               acting={actor === pi}
+              offline={offline?.(pi)}
               delta={deltas.get(pi)}
               litIcons={state.players[pi].students.filter((st) => lit.has(st.uid)).map((st) => st.icon)}
               targetable={targets.includes(pi)}
@@ -181,7 +199,7 @@ export function GameView({ state, dispatch, onQuit, onRules }: Props) {
               dimUid={fxDim(stage)}
             />
           )}
-          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn} pick={pick} side={fx?.side} />
+          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} />
         </div>
         <div className="near-seat">
           {editingRoles ? (

@@ -2431,3 +2431,111 @@ button.chip {
 .fx-counter-neg {
   color: var(--down);
 }
+
+/* ---------- 通信対戦 ---------- */
+.online-lead {
+  font-size: 0.85rem;
+  color: var(--chalk-dim);
+  line-height: 1.6;
+}
+.online-warn {
+  color: #ffa8a8;
+  font-weight: bold;
+}
+.code-input {
+  font-size: 1.3rem !important;
+  letter-spacing: 0.2em;
+  max-width: 10em;
+}
+.room-code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  background: var(--felt-dark);
+  border: 6px solid var(--rim);
+  border-radius: 14px;
+  padding: 0.8rem 1rem;
+}
+.room-code-label {
+  font-size: 0.85rem;
+  color: var(--chalk-dim);
+}
+.room-code-num {
+  font-size: 2.4rem;
+  letter-spacing: 0.25em;
+  font-variant-numeric: tabular-nums;
+}
+.seat-list .player-row {
+  min-height: 2.2rem;
+}
+.seat-list .empty {
+  opacity: 0.4;
+}
+.seat-name {
+  flex: 1;
+}
+.seat-name small {
+  margin-left: 0.3em;
+  color: var(--chalk-dim);
+}
+.seat-kind {
+  font-size: 0.85rem;
+  color: var(--chalk-dim);
+}
+.net-banner {
+  position: fixed;
+  left: 6px;
+  bottom: 6px;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: calc(100vw - 12px);
+  pointer-events: none;
+  font-size: 0.75rem;
+}
+.net-banner > * {
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.net-code {
+  opacity: 0.7;
+}
+.net-warn {
+  color: #ffd8a8;
+}
+.room-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+.room-choice section {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+.room-choice .code-input {
+  font: inherit;
+  max-width: none;
+  padding: 0.5em 0.8em;
+  border-radius: 8px;
+  border: 2px solid var(--chalk-dim);
+  background: #0f2a20;
+  color: var(--chalk);
+  text-align: center;
+}
+@media (max-width: 520px) {
+  .room-choice {
+    grid-template-columns: 1fr;
+  }
+}
