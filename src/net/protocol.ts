@@ -74,6 +74,13 @@ export function canAct(s: GameState, seat: number, a: Action): boolean {
   return actingPlayer(s) === seat && a.type !== 'continue';
 }
 
+/** 今だれの操作を待っているか（CPUの番や、CPU・全員向けの結果なら null） */
+export function waitingOn(s: GameState): number | null {
+  const ph = s.phase;
+  if (ph.kind === 'gameOver' || ph.player === null) return null;
+  return s.players[ph.player].isCpu ? null : ph.player;
+}
+
 /** 端末ID（この端末でずっと同じ。つなぎ直した時に同じ席へ戻るため） */
 export function clientId(): string {
   const KEY = 'jikuu-saikyou-cid';

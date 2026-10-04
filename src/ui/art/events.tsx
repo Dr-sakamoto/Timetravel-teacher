@@ -186,24 +186,33 @@ const SCENES: Record<string, () => ReactNode> = {
       <Mini x={50} y={58} c="#e5534b" head="#f0c08f" />
     </g>
   ),
-  socrates_q: () => (
+  ostracism: () => (
     <g>
-      <Bg sky="#e9e2f5" ground="#cdbf9e" y={56} />
-      {[8, 88].map((x) => (
-        <R key={x} x={x} y={6} w={8} h={50} fill="#f6f1e4" />
+      <Bg sky="#e9e2f5" ground="#cdbf9e" y={54} />
+      {[6, 86].map((x) => (
+        <g key={x}>
+          <R x={x} y={8} w={8} h={46} fill="#f6f1e4" />
+          <P d={`M${x + 2.6} 12 V50 M${x + 5.4} 12 V50`} sw={0.6} />
+          <R x={x - 2} y={4} w={12} h={4} fill="#f6f1e4" sw={1} />
+        </g>
       ))}
-      <P d="M22 72 C22 56 30 50 40 50 C50 50 58 56 58 72Z" fill="#3f7fd0" />
-      <C x={40} y={36} r={11} fill="#ffd9b8" />
-      <P d="M29 34 C28 26 34 22 40 24 C46 22 52 26 51 34" fill="#b9b4ad" sw={1.1} />
-      <P d="M31 40 C31 52 49 52 49 40 C46 46 34 46 31 40Z" fill="#b9b4ad" />
-      <C x={36} y={35} r={1.1} fill={O} sw={0} />
-      <C x={44} y={35} r={1.1} fill={O} sw={0} />
-      <P d="M60 12 C60 6 92 6 92 12 L92 30 C92 36 72 36 68 36 L62 42 L64 35 C60 34 60 32 60 30Z" fill="#fff" />
-      <text x={76} y={30} textAnchor="middle" fontSize={20} fontWeight={900} fill="#e5534b">
-        ?
-      </text>
-      <Mini x={72} y={58} c="#f2c94c" s={0.9} />
-      <P d="M78 50 l3 -3 M80 54 l4 -1" stroke="#3f7fd0" sw={1.1} />
+      <P d="M38 54 C30 54 28 40 34 32 C36 28 36 24 38 22 H62 C64 24 64 28 66 32 C72 40 70 54 62 54Z" fill="#d9773b" />
+      <P d="M38 22 C36 18 40 16 42 18 M62 22 C64 18 60 16 58 18" sw={1.2} />
+      <P d="M36 36 H64 M35 44 H65" stroke="#2f2a2a" sw={1.6} />
+      <R x={40} y={18} w={20} h={4} fill="#c0662e" sw={1} />
+      {[
+        [26, 14, -18],
+        [70, 12, 16],
+        [22, 34, 10],
+        [76, 32, -12],
+      ].map(([x, y, r]) => (
+        <g key={x} transform={`rotate(${r} ${x} ${y})`}>
+          <P d={`M${x - 8} ${y - 3} L${x + 6} ${y - 5} L${x + 8} ${y + 3} L${x - 6} ${y + 5}Z`} fill="#e8a46a" sw={1.1} />
+          <P d={`M${x - 4} ${y} l2 -2 l1 3 l2 -2 l1 2`} sw={0.8} />
+        </g>
+      ))}
+      <Mini x={50} y={62} c="#3f7fd0" s={0.9} />
+      <P d="M57 62 l6 -2 M57 66 l6 1" stroke="#e5534b" sw={1.2} />
     </g>
   ),
 
@@ -341,51 +350,57 @@ const SCENES: Record<string, () => ReactNode> = {
       <Star x={50} y={46} r={5} fill="#fff3b0" />
     </g>
   ),
-  rakuichi: () => (
+  hitojichi: () => (
     <g>
-      <Bg sky="#ffe9c0" ground="#d8c08a" y={52} />
-      <P d="M30 4 L50 0 L70 4 L66 10 H34Z" fill="#3a3a44" />
-      <R x={38} y={10} w={24} h={12} fill="#fbfbf7" />
-      <P d="M36 22 L50 18 L64 22Z" fill="#3a3a44" />
-      {[[8, '#e5534b'], [38, '#3f7fd0'], [68, '#2f8a4c']].map(([x, f]) => (
+      <Bg sky="#ffe9c0" ground="#9fbf6a" y={54} />
+      {[[4, '#c0392b'], [70, '#3f5fa3']].map(([x, f]) => (
         <g key={x as number}>
-          <P d={`M${x} 34 L${(x as number) + 12} 28 L${(x as number) + 24} 34Z`} fill={f as string} />
-          <R x={(x as number) + 2} y={34} w={20} h={18} fill="#e8d6a8" />
-          <R x={(x as number) + 4} y={42} w={16} h={4} fill="#f2c94c" sw={1} />
+          <R x={(x as number) + 4} y={30} w={18} h={24} fill="#fbfbf7" />
+          <P d={`M${x} 30 L${(x as number) + 13} 22 L${(x as number) + 26} 30Z`} fill="#3a3a44" />
+          <R x={(x as number) + 8} y={14} w={10} h={8} fill="#fbfbf7" sw={1.1} />
+          <P d={`M${(x as number) + 5} 14 L${(x as number) + 13} 8 L${(x as number) + 21} 14Z`} fill="#3a3a44" sw={1.1} />
+          <R x={(x as number) + 11} y={42} w={4} h={12} fill="#7a5a3a" sw={1} />
+          <Stick x1={(x as number) + 24} y1={54} x2={(x as number) + 24} y2={30} w={1} color="#7a5a3a" />
+          <R x={(x as number) + 24} y={30} w={6} h={12} fill={f as string} sw={1} />
         </g>
       ))}
-      <R x={44} y={56} w={12} h={14} fill="#c0392b" sw={1.1} />
-      <text x={50} y={66} textAnchor="middle" fontSize={8} fontWeight={900} fill="#fff">
-        楽
-      </text>
-      <Mini x={20} y={60} c="#8a6a4a" />
-      <Mini x={80} y={60} c="#3a5a8c" />
-      {[30, 70].map((x) => (
-        <g key={x}>
-          <C x={x} y={64} r={3} fill="#f2c94c" sw={1} />
-          <R x={x - 1} y={63} w={2} h={2} fill="#fbf4e2" sw={0.6} />
-        </g>
-      ))}
+      <P d="M28 62 C40 56 60 56 72 62" stroke="#fbf4e2" sw={3} />
+      <P d="M28 62 C40 56 60 56 72 62" sw={0.8} />
+      <Mini x={50} y={50} c="#d97ab0" s={1.1} />
+      <P d="M45 46 C44 41 47 39 50 41 C53 39 56 41 55 46" fill="#2f2a2a" sw={1} />
+      <P d="M60 50 h6 l-2 -2 M66 50 l-2 2" sw={1.2} />
+      <P d="M38 40 C36 36 40 34 41 37 C42 34 46 36 44 40 L41 43Z" fill="#e5534b" sw={0.9} />
     </g>
   ),
 
   // ---------- 江戸・幕末 ----------
-  nakamuraza: () => (
+  tomikuji: () => (
     <g>
-      <Bg sky="#3a2a2a" ground="#7a5a3a" y={58} />
+      <Bg sky="#3a2a2a" ground="#7a5a3a" y={56} />
       <R x={4} y={4} w={92} h={6} fill="#c0392b" />
-      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-        <rect key={i} x={6 + i * 10} y={12} width={10} height={44} fill={['#2f2a2a', '#d9622b', '#2f6a4a'][i % 3]} stroke={O} strokeWidth={1} />
+      {[14, 34, 54, 74].map((x) => (
+        <g key={x}>
+          <Stick x1={x + 6} y1={10} x2={x + 6} y2={16} w={0.8} color="#7a5a3a" />
+          <R x={x} y={16} w={12} h={12} fill="#f2c94c" rx={6} sw={1} />
+        </g>
       ))}
-      <P d="M28 56 C28 30 72 30 72 56Z" fill="#3a2a2a" sw={0} op={0.25} />
-      <C x={50} y={36} r={14} fill="#fbfbf7" />
-      <P d="M38 30 C42 26 46 28 48 32 M62 30 C58 26 54 28 52 32" stroke="#e5534b" sw={2} />
-      <P d="M40 42 C44 46 46 44 48 48 M60 42 C56 46 54 44 52 48" stroke="#e5534b" sw={1.6} />
-      <C x={44} y={34} r={1.4} fill={O} sw={0} />
-      <C x={56} y={34} r={1.4} fill={O} sw={0} />
-      <P d="M45 44 Q50 41 55 44" sw={1.4} />
-      <P d="M36 22 C40 14 60 14 64 22" fill="#2f2a2a" />
-      <P d="M8 64 h14 M78 64 h14" stroke="#fbf4e2" sw={2} />
+      <R x={26} y={36} w={48} h={24} fill="#a87a4a" />
+      <R x={26} y={36} w={48} h={5} fill="#8a5a3a" sw={1} />
+      <C x={50} y={38.5} r={2.6} fill="#2f2a2a" sw={0.8} />
+      <Stick x1={50} y1={38} x2={70} y2={14} w={1.8} color="#d0d6dc" />
+      <R x={68} y={8} w={6} h={8} fill="#7a5a3a" sw={1} />
+      <R x={42} y={46} w={16} h={10} fill="#fbf4e2" sw={1} />
+      <text x={50} y={54} textAnchor="middle" fontSize={7} fontWeight={900} fill="#c0392b">
+        富
+      </text>
+      {[[12, 62], [20, 66], [82, 64], [90, 60]].map(([x, y]) => (
+        <g key={`${x}`}>
+          <E x={x} y={y} rx={4} ry={3} fill="#f2c94c" sw={1} />
+          <R x={x - 1} y={y - 1} w={2} h={2} fill="#3a2a2a" sw={0.5} />
+        </g>
+      ))}
+      <Mini x={14} y={46} c="#2f6a4a" s={0.9} />
+      <Mini x={86} y={46} c="#d9622b" s={0.9} />
     </g>
   ),
   ino: () => (

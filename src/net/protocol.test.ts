@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cpuAction } from '../game/ai';
 import { newGame, step } from '../game/engine';
 import type { GameState } from '../game/types';
-import { canAct } from './protocol';
+import { canAct, waitingOn } from './protocol';
 
 function game(): GameState {
   return newGame(
@@ -52,6 +52,24 @@ describe('通信対戦：操作してよい人', () => {
       s = step(s, a);
     }
     expect(seen).toEqual({ own: true, shared: true });
+  });
+
+  it('待っている人（代わりに1手進められる相手）は、今操作できる人間ただ1人', () => {
+    let s = game();
+    for (let i = 0; i < 3000 && s.phase.kind !== 'gameOver'; i++) {
+      const w = waitingOn(s);
+      const ph = s.phase;
+      if (w !== null) {
+        expect(s.players[w].isCpu).toBe(false);
+        expect(ph.player).toBe(w);
+      } else {
+        // CPUの番か、CPU・全員向けの結果
+        expect(ph.player === null || s.players[ph.player].isCpu).toBe(true);
+      }
+      const a = cpuAction({ ...s, players: s.players.map((p) => ({ ...p, isCpu: true })) });
+      if (!a) break;
+      s = step(s, a);
+    }
   });
 
   it('状態は通信で送れる大きさに収まる', () => {
