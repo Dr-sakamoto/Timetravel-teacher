@@ -420,10 +420,6 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
       case 'sum':
         delta = values[i] * e.mult;
         break;
-      case 'top':
-        delta = values[i] > 0 && values[i] === best ? e.win : 0;
-        note = delta > 0 ? '1位' : undefined;
-        break;
       case 'heads': {
         const n = p.students.filter(has).reduce((a, x) => a + (x.era === c.era ? 2 : 1), 0);
         count = n;
