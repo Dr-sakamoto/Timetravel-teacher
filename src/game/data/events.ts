@@ -42,13 +42,13 @@ export interface SwingCard {
  *   threshold … 「Xが need 以上なら +win、足りないと −lose」
  *   battle    … 「Xの数で勝負：1位 +win、2位 +second、最下位 −lose、ほかは0」（同点は同じ順位）
  * その時代だけの仕組み（時代ごとに1枚。点の数え方ではなく、起こることそのものが違う）
- *   steal     … 白亜紀「Xが一番多いクラスが、一番少ないクラスから生徒を1人奪う」
+ *   recruit   … 白亜紀「Xが一番多いクラスに、恐竜の子ども（👊👊）が仲間入りする」（空席があれば）
  *   together  … エジプト「全クラスのXの合計が need×クラス数 以上なら全クラス +win（Xが一番少ないクラスだけ0）、届かなければ全クラス −lose」
- *   ostracism … ギリシャ「全校でアイコンが一番多い子が1人、追放される」
+ *   truce     … ギリシャ「この学期のあいだ、カチコミと襲来が起こらなくなる」（山札・場・捨て札から消える）
  *   upgrade   … 中国「各クラスのXが一番多い子が受験。need 以上なら合格して、Xが1つ増える」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
- *   duel      … 中世「各クラスのXが一番多い子どうしの一騎打ち：1位 +win、最下位の子は落馬して転校」
- *   hostage   … 戦国「各クラスの、係に就いていないXが一番多い子が、となりのクラスへ人質に出される」
+ *   duel      … 中世「各クラスのXが一番多い子どうしの一騎打ち：1位 +win、最下位 −lose」
+ *   hostage   … 戦国「各クラスの、係に就いていないXが一番多い子が、となりのクラスへ人質に出される」（出せるクラスどうしで回すので人数は変わらない）
  *   lottery   … 江戸「全クラスが fee 点ずつ出し、くじで当たった1クラスが総取り」
  *   prize     … 近代「全校でXが一番多い子が受賞し、その子のクラスに +win」
  *   alien     … 未来「点は動かない。空いている席があるクラス全部に、アイコンのないエイリアンが1人ずつ転入する」
@@ -57,12 +57,12 @@ export type EraEffect =
   | { type: 'heads'; per: number }
   | { type: 'threshold'; need: number; win: number; lose: number }
   | { type: 'battle'; win: number; second: number; lose: number }
-  | { type: 'steal' }
+  | { type: 'recruit' }
   | { type: 'together'; need: number; win: number; lose: number }
-  | { type: 'ostracism' }
+  | { type: 'truce' }
   | { type: 'upgrade'; need: number }
   | { type: 'tribute'; per: number }
-  | { type: 'duel'; win: number }
+  | { type: 'duel'; win: number; lose: number }
   | { type: 'hostage' }
   | { type: 'lottery'; fee: number }
   | { type: 'prize'; win: number }
@@ -70,7 +70,7 @@ export type EraEffect =
 
 /** その時代出身の子のアイコンが2倍になる効果か（アイコンを数えないものは2倍にならない） */
 export function eraDoubles(e: EraEffect): boolean {
-  return e.type !== 'alien' && e.type !== 'ostracism' && e.type !== 'lottery';
+  return e.type !== 'alien' && e.type !== 'truce' && e.type !== 'lottery';
 }
 
 /** 時代イベント（全クラス）：カードごとの効果。その時代出身の生徒のアイコンは2倍 */
@@ -251,15 +251,15 @@ export const ERA_CARDS: ContestCard[] = [
   // 現代：優遇なし（生徒会長選挙は全アイコンで競う。文化祭は出し物なので🎨）。いつもの学校なので、特別な仕組みはない
   C('bunkasai', '文化祭', '🎪', 'art', { type: 'heads', per: 2 }, 'クラスの出し物。絵や音楽が得意な子が多いほど盛り上がる。', 'present'),
   C('seitokai', '生徒会長選挙', '🗳️', 'all', { type: 'battle', win: 15, second: 5, lose: 10 }, '一番頼れるクラスから会長が出る。', 'present'),
-  // 白亜紀：👊のみ。弱肉強食（強い群れが弱い群れから奪う）
-  C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'steal' }, '強い群れが、一番弱い群れから仲間を奪っていく。', 'cretaceous'),
+  // 白亜紀：👊のみ。強い群れに仲間が集まる
+  C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'recruit' }, '一番強い群れに、はぐれた恐竜の子どもがついてくる。', 'cretaceous'),
   C('trex_sumo', 'ティラノサウルスと力くらべ', '🦖', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, '力を合わせて押し返せ。力が足りないと踏みつぶされる。', 'cretaceous'),
   // 古代エジプト：🏃👑。全クラスで1つのピラミッドを積む（サボったクラスは分け前なし）
   C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'together', need: 6, win: 6, lose: 3 }, '全クラス総出で石を積む。完成すれば全員にほうび、サボったクラスは分け前なし。', 'egypt'),
   C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'heads', per: 2 }, 'ファラオに気に入られる子が多いほど、クラスの株が上がる。', 'egypt'),
-  // ギリシャ・ローマ：🏃📚。目立ちすぎた子は陶片追放
+  // ギリシャ・ローマ：🏃📚。祭典のあいだは休戦
   C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 15, second: 5, lose: 10 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。', 'greece'),
-  C('ostracism', '陶片追放', '🏺', 'all', { type: 'ostracism' }, '陶器のかけらに名前を書いて投票。力を持ちすぎた者はアテネから追い出される。', 'greece'),
+  C('truce', 'オリンピアの休戦', '🕊️', 'all', { type: 'truce' }, '祭典のあいだは、どの国も戦をやめた。この学期はもう、殴りこみも襲来もない。', 'greece'),
   // 古代中国：📚👊。科挙に受かった子はずっと強くなる
   C('keju', '科挙', '📜', 'study', { type: 'upgrade', need: 3 }, '超難関の官僚登用試験。合格すれば一生の箔がつく。', 'china'),
   C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
@@ -268,8 +268,8 @@ export const ERA_CARDS: ContestCard[] = [
   C('michinaga', '藤原道長の宴', '🌕', 'charm', { type: 'tribute', per: 3 }, '「この世をば…」。道長に一番気に入られたクラスへ、ほかのクラスから贈り物が届く。', 'heian'),
   // 中世・ルネサンス：🎨👊。代表1人どうしの一騎打ち
   C('medici', 'メディチ家のパトロン選び', '💰', 'art', { type: 'battle', win: 15, second: 5, lose: 10 }, 'フィレンツェの大富豪が援助するのは一番のクラスだけ。', 'europe'),
-  C('joust', '馬上槍試合', '🏇', 'fight', { type: 'duel', win: 10 }, '各クラスの一番の騎士が一騎打ち。負けた騎士は落馬して去っていく。', 'europe'),
-  // 戦国：👊👑。慕われている子ほど人質に取られる
+  C('joust', '馬上槍試合', '🏇', 'fight', { type: 'duel', win: 10, lose: 5 }, '各クラスの一番の騎士が一騎打ち。負けた騎士は落馬して恥をかく。', 'europe'),
+  // 戦国：👊👑。慕われている子を人質として交換し合う
   C('sekigahara', '関ヶ原の戦い', '⚔️', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '天下分け目の大合戦。勝てば大出世、負ければ大損。', 'sengoku'),
   C('hitojichi', '人質', '🏯', 'charm', { type: 'hostage' }, '同盟の証に、一番慕われている子をとなりのクラスへ差し出す。', 'sengoku'),
   // 江戸・幕末：🎨🏃。運だけの富くじ
@@ -354,20 +354,20 @@ export function eraEffectRule(c: ContestCard): string {
       return `${a}が${e.need}以上なら+${e.win}、足りないと−${e.lose}`;
     case 'battle':
       return `${a}の数で勝負：1位+${e.win}、2位+${e.second}、最下位−${e.lose}`;
-    case 'steal':
-      return `${a}が一番多いクラスが、一番少ないクラスから生徒を1人奪う`;
+    case 'recruit':
+      return `${a}が一番多いクラスに、恐竜の子ども（👊👊）が仲間入り（空席があれば）`;
     case 'together':
       return `全クラスの${a}の合計が${e.need}×クラス数以上なら全クラス+${e.win}（${a}が一番少ないクラスは0）、届かなければ全クラス−${e.lose}`;
-    case 'ostracism':
-      return '全校でアイコンが一番多い子が1人、追放される';
+    case 'truce':
+      return 'この学期のあいだ、カチコミと襲来が起こらなくなる';
     case 'upgrade':
       return `各クラスの${a}が一番多い子が受験：${a}${e.need}以上で合格し、${a}が1つ増える`;
     case 'tribute':
       return `${a}が一番多いクラスに、ほかの全クラスが${e.per}点ずつ贈る`;
     case 'duel':
-      return `各クラスの${a}が一番多い子が一騎打ち：1位+${e.win}、最下位の子は落馬して転校`;
+      return `各クラスの${a}が一番多い子が一騎打ち：1位+${e.win}、最下位−${e.lose}`;
     case 'hostage':
-      return `各クラスの、係に就いていない${a}が一番多い子が、となりのクラスへ移る`;
+      return `各クラスの、係に就いていない${a}が一番多い子を、となりのクラスと交換し合う`;
     case 'lottery':
       return `全クラスが${e.fee}点ずつ出し、くじで当たった1クラスが総取り`;
     case 'prize':
@@ -420,18 +420,18 @@ function contestGlyph(c: ContestCard): string {
       return `${a}${e.need}↑ +${e.win}／−${e.lose}`;
     case 'battle':
       return `${a}で勝負 🥇+${e.win} 🥈+${e.second} 最下位−${e.lose}`;
-    case 'steal':
-      return `${a}🥇 ⟵🧑 ${a}最下位`;
+    case 'recruit':
+      return `${a}🥇 → 🦖👊👊 仲間入り`;
     case 'together':
       return `みんなの${a} ${e.need}×クラス数↑ +${e.win}／−${e.lose}`;
-    case 'ostracism':
-      return '全校のアイコン🥇の子 → 👋';
+    case 'truce':
+      return '👊カチコミ・襲来 → 🚫';
     case 'upgrade':
       return `🧑${a}${e.need}↑ → ${a}＋1`;
     case 'tribute':
       return `${a}🥇 ⟵ ${e.per}点ずつ`;
     case 'duel':
-      return `🧑${a} 一騎打ち 🥇+${e.win} 最下位👋`;
+      return `🧑${a} 一騎打ち 🥇+${e.win} 最下位−${e.lose}`;
     case 'hostage':
       return `🧑${a} → となりのクラス`;
     case 'lottery':

@@ -490,13 +490,14 @@ describe('engine', () => {
       };
     };
 
-    it('nawabari: the strongest pack steals the best student from the weakest', () => {
+    it('nawabari: a baby dinosaur joins the strongest pack (nobody loses a student)', () => {
       const r = run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study', 'study', 'art'])]]);
       expect(r.delta).toEqual([0, 0, 0]);
-      expect(r.uids).toEqual([['y', 'c'], ['z'], []]);
-      // 一番が並んだら何も起こらない
+      expect(r.after.players.map((p) => p.students.length)).toEqual([6, 5, 5]);
+      expect(r.after.players[0].students.at(-1)!.attrs).toEqual(['fight', 'fight']);
+      // 一番が並んだら両方に来る
       const tie = run('nawabari', [[mk('y', ['fight'])], [mk('z', ['fight'])], [mk('c', ['study'])]]);
-      expect(tie.uids).toEqual([['y'], ['z'], ['c']]);
+      expect(tie.after.players.map((p) => p.students.length)).toEqual([6, 6, 5]);
     });
 
     it('giza: everyone builds one pyramid; the laziest class gets nothing', () => {
@@ -507,20 +508,16 @@ describe('engine', () => {
       expect(run('giza', [[s3('a')], [s3('b')], []]).delta).toEqual([-3, -3, -3]);
     });
 
-    it('ostracism: the student with the most icons in the whole school is exiled', () => {
-      const r = run('ostracism', [[mk('a', ['study', 'study'])], [mk('b', ['art', 'art', 'art', 'charm'])], [mk('c', ['sports'])]]);
-      expect(r.uids).toEqual([['a'], [], ['c']]);
-      expect(r.after.phase.kind === 'result' && r.after.phase.result.outUids).toEqual(['b']);
-      // 定員の下限のクラスの子は追放されない（次に多い子が追放される）
+    it('truce: no more kachikomi or raids this term', () => {
       const t = structuredClone(base);
-      t.players[0].students = [mk('a', ['study', 'study']), ...Array.from({ length: 4 }, (_, k) => mk(`p${k}`, []))];
-      t.players[1].students = [mk('b', ['art', 'art', 'art']), mk('q', []), mk('r', []), mk('s', [])];
-      t.players[2].students = [mk('c', ['sports']), ...Array.from({ length: 4 }, (_, k) => mk(`t${k}`, []))];
-      t.players.forEach((p) => (p.roles = []));
-      t.eventDeck.push('ostracism');
+      t.market[1] = 'kachikomi';
+      t.discard.push('kachikomi');
+      t.eventDeck.unshift('kachikomi', 'raid_greece');
+      t.eventDeck.push('truce');
       const after = step(t, pass);
-      expect(after.players[0].students.some((x) => x.uid === 'a')).toBe(false);
-      expect(after.players[1].students.some((x) => x.uid === 'b')).toBe(true);
+      const all = [...after.eventDeck, ...after.market, ...after.discard];
+      expect(all.some((id) => id === 'kachikomi' || id.startsWith('raid_'))).toBe(false);
+      expect(after.players.map((p) => p.points)).toEqual(t.players.map((p) => p.points));
     });
 
     it('keju: each class\'s best scholar takes the exam and gains a 📚 on passing', () => {
@@ -538,19 +535,25 @@ describe('engine', () => {
       expect(run('michinaga', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
     });
 
-    it('joust: champions duel; the winner scores and the last one falls off and leaves', () => {
+    it('joust: champions duel; the winner scores and the last one loses points (nobody leaves)', () => {
       const r = run('joust', [[mk('a', ['fight', 'fight', 'fight']), mk('a2', ['fight'])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight'])]]);
-      expect(r.delta).toEqual([10, 0, 0]);
-      expect(r.uids).toEqual([['a', 'a2'], ['b'], []]);
-      // 👊の子がいないクラスは出ない（落馬もしない）
-      const r2 = run('joust', [[mk('a', ['fight', 'fight'])], [mk('b', ['fight'])], [mk('c', ['study'])]]);
-      expect(r2.uids).toEqual([['a'], [], ['c']]);
+      expect(r.delta).toEqual([10, 0, -5]);
+      expect(r.uids).toEqual([['a', 'a2'], ['b'], ['c']]);
+      // 👊の子がいないクラスは出ない（減点もない）
+      expect(run('joust', [[mk('a', ['fight', 'fight'])], [mk('b', ['fight'])], [mk('c', ['study'])]]).delta).toEqual([10, -5, 0]);
     });
 
     it('hitojichi: every class sends its most-loved free student to the next seat', () => {
       const r = run('hitojichi', [[mk('a', ['charm', 'charm']), mk('a2', ['charm'])], [mk('b', ['charm'])], [mk('c', ['study'])]], undefined, [[{ role: 'leader', uid: 'a' }], [], []]);
-      // A の a は係なので出さず a2 を出す。C は👑の子がいないので出さない
-      expect(r.uids).toEqual([['a'], ['a2'], ['c', 'b']]);
+      // A の a は係なので出さず a2 を出す。C は👑の子がいないので出さず、受け取りもしない（A と B で交換）
+      expect(r.uids).toEqual([['a', 'b'], ['a2'], ['c']]);
+    });
+
+    it('no era event makes a class lose a student', () => {
+      for (const c of ERA_CARDS) {
+        const r = run(c.id, [[mk('a', ['fight', 'charm', 'study'])], [mk('b', ['fight', 'charm', 'art', 'art'])], [mk('c', ['sports'])]]);
+        r.after.players.forEach((p, i) => expect(p.students.length, `${c.id} class ${i}`).toBeGreaterThanOrEqual(5));
+      }
     });
 
     it('tomikuji: everyone pays in and one class takes the pot', () => {
