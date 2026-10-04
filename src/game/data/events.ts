@@ -225,8 +225,8 @@ const C = (id: string, name: string, icon: string, attr: Attr | 'all', effect: E
 
 /** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代の優遇アイコン（ERAS の favor）で競う。その時代出身の生徒はアイコン2倍 */
 export const ERA_CARDS: ContestCard[] = [
-  // 現代：優遇なし（全アイコンで競う）
-  C('bunkasai', '文化祭', '🎪', 'all', { type: 'battle', win: 15, lose: 10 }, 'クラスの出し物で勝負。一番盛り上がったクラスが優勝。', 'present'),
+  // 現代：優遇なし（生徒会長選挙は全アイコンで競う。文化祭は出し物なので🎨）
+  C('bunkasai', '文化祭', '🎪', 'art', { type: 'heads', per: 2 }, 'クラスの出し物。絵や音楽が得意な子が多いほど盛り上がる。', 'present'),
   C('seitokai', '生徒会長選挙', '🗳️', 'all', { type: 'battle', win: 15, lose: 10 }, '一番頼れるクラスから会長が出る。', 'present'),
   // 白亜紀：👊のみ
   C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'battle', win: 15, lose: 10 }, '一番強い群れが縄張りを総取り。2番手以下は何も得られない。', 'cretaceous'),

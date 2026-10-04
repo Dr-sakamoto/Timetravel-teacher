@@ -338,7 +338,9 @@ describe('engine', () => {
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
     for (const era of ERAS) {
       const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien').map((c) => c.attr));
-      expect([...used].sort(), era.id).toEqual(era.favor.length ? [...era.favor].sort() : ['all']);
+      // 現代は優遇なし：全アイコンで競うカードがある（文化祭だけは出し物なので🎨）
+      if (era.favor.length) expect([...used].sort(), era.id).toEqual([...era.favor].sort());
+      else expect(used.has('all'), era.id).toBe(true);
     }
     expect(ERAS.find((e) => e.id === 'future')!.favor).toEqual(['study']);
     expect(ERAS.find((e) => e.id === 'cretaceous')!.favor).toEqual(['fight']);
@@ -413,8 +415,8 @@ describe('engine', () => {
     expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 0, -10]);
     // 縄張り争い：同じく👊で勝負
     expect(run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 0, -10]);
-    // 文化祭：アイコンの数で勝負（現代の子は2倍）
-    expect(run('bunkasai', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([15, 0, -10]);
+    // 文化祭：🎨を持つ子1人につき+2（現代の子は2人分）
+    expect(run('bunkasai', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([4, 0, 0]);
     // 生徒会長選挙：同じくアイコンの数で勝負
     expect(run('seitokai', [A, B, C])).toEqual([15, 0, -10]);
     // 楽市・楽座：👑の数をそのまま加点
