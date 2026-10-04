@@ -132,7 +132,8 @@ export const PERSON_CARDS_PER_TERM = 7;
 /** 場に表向きで並ぶカードの枚数 */
 export const MARKET_SIZE = 4;
 /** 人物カードを取るのに払うクラスポイント（レア度ごと） */
-export const PERSON_COST: Record<Rarity, number> = { N: 4, R: 7, SR: 14, SSR: 22 };
+/** 下位レアは安くすぐ元が取れ、SSRは長い試合でないと元が取れない（短期戦ならR、長期戦ならSSRが狙い目） */
+export const PERSON_COST: Record<Rarity, number> = { N: 2, R: 4, SR: 12, SSR: 24 };
 /** グッズ・サイボーグ化を取るのに払うクラスポイント */
 export const GOODS_COST = 2;
 

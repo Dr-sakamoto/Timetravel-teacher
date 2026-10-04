@@ -73,7 +73,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
           </li>
           <li>
             <b>クラスポイントを払う</b>：人物（N {PERSON_COST.N}点／R {PERSON_COST.R}点／SR {PERSON_COST.SR}点／SSR {PERSON_COST.SSR}点）・グッズとサイボーグ化（{GOODS_COST}点）。
-            持ち点が足りないと取れない。<b>今すぐ点を取るか、点を払って将来の戦力を買うか</b>が悩みどころ。
+            持ち点が足りないと取れない。<b>今すぐ点を取るか、点を払って将来の戦力を買うか</b>が悩みどころ。安いRはすぐ元が取れ、高いSSRは長い試合でないと元が取れない。
           </li>
         </ul>
         <p>
