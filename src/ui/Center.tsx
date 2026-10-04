@@ -144,7 +144,15 @@ function effectOf(state: GameState, pi: number, id: string): ReactNode {
   const p = state.players[pi];
   if (id.startsWith('person:')) {
     const st = previewStudent(id);
-    return p.students.length >= MAX_CLASS ? `🏫 ${st.icon} ⇄ 👋` : `🏫 ＋${st.icon}`;
+    // 偉人は名前を出す（誰が来るのか分かると楽しい）
+    return (
+      <>
+        <div className="effect-name">
+          {st.icon} {st.name}
+        </div>
+        {p.students.length >= MAX_CLASS ? '🏫 ⇄ 👋' : '🏫 ＋1'} {st.attrs.map((a) => ATTR_ICON[a]).join('')}
+      </>
+    );
   }
   const c = EVENT_MAP[id];
   return c.kind === 'normal' ? `${ATTR_ICON[c.attr]} → +${attrScore(p, c.attr).total}` : cardGlyph(c);

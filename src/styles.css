@@ -689,6 +689,11 @@ button.chip {
   line-height: 1.2;
   letter-spacing: 0.05em;
 }
+.effect-name {
+  font-size: 1.1rem;
+  color: var(--yellow);
+  letter-spacing: 0;
+}
 /* 選んだ生徒・相手 */
 .pick-chip {
   display: inline-block;
