@@ -817,6 +817,11 @@ export function kachikomiTargets(s: GameState, pi: number): number[] {
   return s.players.filter((p) => p.id !== pi).map((p) => p.id);
 }
 
+/** 次に手番をする人（この月の手番がもう残っていなければ null） */
+export function nextTurnPlayer(s: GameState): number | null {
+  return s.queueIdx + 1 < s.queue.length ? s.queue[s.queueIdx + 1] : null;
+}
+
 /** 転校：めくった人から席順に、全クラスが1人ずつ外す */
 function startDrop(s: GameState, drawer: number) {
   const n = s.players.length;
@@ -833,9 +838,10 @@ function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[])
     }
     log(s, `${s.players[pi].name}のクラスは転校させられる子がいなかった。`, pi);
   }
+  // ゲリラの結果は誰の手番のものでもない
   setResult(
     s,
-    drawer,
+    null,
     {
       title: '転校',
       icon: '📦',
@@ -918,14 +924,15 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
   const c = EVENT_MAP[id];
   log(s, `ゲリラ発生！ ${c.icon}${c.name}`);
   switch (c.kind) {
+    // ゲリラは誰の手番でもない学校全体のできごと（めくった人のものとして見せない）
     case 'swing':
-      setResult(s, pi, resolveSwing(s, c), 'turn');
+      setResult(s, null, resolveSwing(s, c), 'turn');
       return;
     case 'contest':
-      setResult(s, pi, resolveContest(s, c), 'turn');
+      setResult(s, null, resolveContest(s, c), 'turn');
       return;
     case 'raid':
-      setResult(s, pi, resolveRaid(s, c), 'turn');
+      setResult(s, null, resolveRaid(s, c), 'turn');
       return;
     case 'push':
       startDrop(s, pi);

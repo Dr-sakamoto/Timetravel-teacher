@@ -661,6 +661,23 @@ describe('engine', () => {
     expect(s.players.map((p) => p.students.length)).toEqual([STARTING_MEMBERS - 1, STARTING_MEMBERS - 1]);
   });
 
+  it('guerrilla results never belong to the player who flipped them', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      let s = newGame(Array.from({ length: 4 }, (_, i) => ({ name: `P${i + 1}`, isCpu: true })), 2, seed);
+      let fired = 0;
+      while (s.phase.kind !== 'gameOver') {
+        const before = s.logCounter;
+        s = step(s, cpuAction(s)!);
+        if (!s.log.some((l) => l.id >= before && l.text.startsWith('ゲリラ発生'))) continue;
+        fired++;
+        // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところ
+        if (s.phase.kind === 'result') expect(s.phase.player).toBeNull();
+        else expect(s.phase.kind).toBe('push');
+      }
+      expect(fired).toBeGreaterThan(0);
+    }
+  });
+
   it('normal cards score only for the drawer; era and common events score for every class', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 21);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
