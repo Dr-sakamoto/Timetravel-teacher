@@ -62,9 +62,10 @@ export function Center({ state, dispatch, cpuBusy, pick, side }: Props) {
   /** 手番の人が選んでいる場のカード */
   const [sel, setSel] = useState<number | null>(null);
   const selected = canPick && sel !== null && sel < state.market.length ? sel : null;
+  const last = state.log.at(-1);
 
   return (
-    <div className="center">
+    <div className={`center ph-${ph.kind}`}>
       {/* 山札（左）・場のカード（中央）・捨て札（右）を1列に */}
       <div className="board">
         <div className="piles">
@@ -109,6 +110,13 @@ export function Center({ state, dispatch, cpuBusy, pick, side }: Props) {
         </div>
       </div>
       {showDeck && <DeckInfo state={state} onClose={() => setShowDeck(false)} />}
+      {/* 直前に起きたこと（結果の表示中は、めくったカードが説明するので出さない） */}
+      {last && ph.kind !== 'result' && (
+        <div className="lastlog" key={last.id}>
+          {last.player !== undefined && <span className="dot" style={{ background: state.players[last.player].color }} />}
+          {last.text}
+        </div>
+      )}
       <div className="action">
         <Action
           key={ph.kind}
