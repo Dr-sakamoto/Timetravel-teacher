@@ -1,9 +1,10 @@
 import type Peer from 'peerjs';
 import type { DataConnection } from 'peerjs';
 import { makePeer } from './peer';
-import { newGame, step } from '../game/engine';
+import { cpuAction } from '../game/ai';
+import { calendarLabel, newGame, step } from '../game/engine';
 import type { Action, GameState } from '../game/types';
-import { canAct, MAX_SEATS, PEER_PREFIX, TIMEOUT_MS, type Lobby, type Seat, type ToGuest, type ToHost } from './protocol';
+import { canAct, waitingOn, MAX_SEATS, PEER_PREFIX, TIMEOUT_MS, type Lobby, type Seat, type ToGuest, type ToHost } from './protocol';
 
 const SAVE_KEY = 'jikuu-saikyou-host-v1';
 
@@ -22,8 +23,8 @@ interface HostSave {
   lobby: Lobby;
   state: GameState;
   seq: number;
-  /** つながらなくなってCPUに任せている席 */
-  auto: number[];
+  /** 前の版で、つながらなくなってCPUに任せていた席（読み込んだら本人に返す） */
+  auto?: number[];
 }
 
 export function loadHostSave(): HostSave | null {
@@ -51,7 +52,6 @@ export class HostRoom {
   private conns = new Map<string, DataConnection>();
   private lastSeen = new Map<string, number>();
   private timer: ReturnType<typeof setInterval> | null = null;
-  private auto = new Set<number>();
   private closed = false;
   snap: HostSnap;
 
@@ -64,7 +64,11 @@ export class HostRoom {
     this.snap = resume
       ? { status: 'opening', code: resume.code, lobby: resume.lobby, state: resume.state, seq: resume.seq }
       : { status: 'opening', code, lobby: { seats: [{ name: hostName, kind: 'host', online: true }], years: 1 }, state: null, seq: 0 };
-    if (resume) resume.auto.forEach((i) => this.auto.add(i));
+    // 前の版でCPUに任せていた席は本人に返す（CPUが勝手に手番を進めないように）
+    if (resume?.auto?.length && this.snap.state) {
+      const auto = resume.auto;
+      this.snap.state = { ...this.snap.state, players: this.snap.state.players.map((p, j) => (auto.includes(j) ? { ...p, isCpu: false } : p)) };
+    }
     this.open(0);
     this.timer = setInterval(() => this.checkAlive(), 2000);
   }
@@ -110,7 +114,7 @@ export class HostRoom {
       else
         localStorage.setItem(
           SAVE_KEY,
-          JSON.stringify({ code: this.snap.code, lobby: this.snap.lobby, state: s, seq: this.snap.seq, auto: [...this.auto] } satisfies HostSave),
+          JSON.stringify({ code: this.snap.code, lobby: this.snap.lobby, state: s, seq: this.snap.seq } satisfies HostSave),
         );
     } catch {
       /* 保存できない環境では何もしない */
@@ -156,11 +160,6 @@ export class HostRoom {
       this.setSeats([...seats, { name: cleanName(name, i), kind: 'guest', cid, online: true }]);
     } else {
       this.setSeats(seats.map((s, j) => (j === i ? { ...s, online: true, name: this.snap.state ? s.name : cleanName(name, j) } : s)));
-      // CPUに任せていた席の人が戻ってきたら、本人に返す
-      if (this.snap.state && this.auto.has(i)) {
-        this.auto.delete(i);
-        this.setPlayerCpu(i, false);
-      }
     }
     this.broadcast();
   }
@@ -215,12 +214,6 @@ export class HostRoom {
 
   private setSeats(seats: Seat[]) {
     this.set({ lobby: { ...this.snap.lobby, seats } });
-  }
-
-  private setPlayerCpu(i: number, isCpu: boolean) {
-    const s = this.snap.state;
-    if (!s) return;
-    this.commit({ ...s, players: s.players.map((p, j) => (j === i ? { ...p, isCpu } : p)) });
   }
 
   private commit(next: GameState) {
@@ -303,12 +296,20 @@ export class HostRoom {
     this.commit(step(s, a));
   }
 
-  /** つながらなくなった人の席をCPUに任せる（本人が戻ってきたら返す） */
-  takeOver(i: number) {
+  /**
+   * 通信が切れた人の操作を待って止まっているときだけ、その1手だけをCPUの判断で進める。
+   * 席をCPUに渡しはしないので、この先の手番を勝手に進めることはない
+   */
+  stepFor(i: number) {
     const s = this.snap.state;
-    if (!s || this.snap.lobby.seats[i]?.kind !== 'guest' || s.players[i].isCpu) return;
-    this.auto.add(i);
-    this.setPlayerCpu(i, true);
+    const seat = this.snap.lobby.seats[i];
+    if (!s || seat?.kind !== 'guest' || seat.online || waitingOn(s) !== i) return;
+    const a = cpuAction(s);
+    if (!a) return;
+    const next = step(s, a);
+    if (next === s) return;
+    next.log.push({ id: next.logCounter++, when: calendarLabel(next), text: `📵${s.players[i].name}の通信が切れていたので、1手だけ代わりに進めた。`, player: i });
+    this.commit(next);
   }
 
   close() {
