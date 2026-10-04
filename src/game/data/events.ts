@@ -40,7 +40,7 @@ export interface SwingCard {
  *   sum       … 「Xの数だけ得点」（× mult）
  *   heads     … 「Xを持つ子1人につき +per」（その時代出身の子は2人分）
  *   threshold … 「Xが need 以上なら +win、足りないと −lose」
- *   battle    … 「Xの数で勝負：1位のクラスに +win、最下位に −lose」（同点ならどちらも）
+ *   battle    … 「Xの数で勝負：1位 +win、2位 +second、最下位 −lose、ほかは0」（同点は同じ順位）
  *   minus     … 「Xで得点、Y で減点」
  *   alien     … 点は動かない。空いている席があるクラス全部に、アイコンのないエイリアンが1人ずつ転入する
  */
@@ -48,7 +48,7 @@ export type EraEffect =
   | { type: 'sum'; mult: number }
   | { type: 'heads'; per: number }
   | { type: 'threshold'; need: number; win: number; lose: number }
-  | { type: 'battle'; win: number; lose: number }
+  | { type: 'battle'; win: number; second: number; lose: number }
   | { type: 'minus'; minus: Attr }
   | { type: 'alien' };
 
@@ -227,33 +227,33 @@ const C = (id: string, name: string, icon: string, attr: Attr | 'all', effect: E
 export const ERA_CARDS: ContestCard[] = [
   // 現代：優遇なし（生徒会長選挙は全アイコンで競う。文化祭は出し物なので🎨）
   C('bunkasai', '文化祭', '🎪', 'art', { type: 'heads', per: 2 }, 'クラスの出し物。絵や音楽が得意な子が多いほど盛り上がる。', 'present'),
-  C('seitokai', '生徒会長選挙', '🗳️', 'all', { type: 'battle', win: 15, lose: 10 }, '一番頼れるクラスから会長が出る。', 'present'),
+  C('seitokai', '生徒会長選挙', '🗳️', 'all', { type: 'battle', win: 15, second: 5, lose: 10 }, '一番頼れるクラスから会長が出る。', 'present'),
   // 白亜紀：👊のみ
-  C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'battle', win: 15, lose: 10 }, '一番強い群れが縄張りを総取り。2番手以下は何も得られない。', 'cretaceous'),
+  C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '強い群れほど広い縄張りを手に入れる。一番弱い群れは追い出される。', 'cretaceous'),
   C('trex_sumo', 'ティラノサウルスと力くらべ', '🦖', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, '力を合わせて押し返せ。力が足りないと踏みつぶされる。', 'cretaceous'),
   // 古代エジプト：🏃👑
   C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'threshold', need: 8, win: 8, lose: 3 }, '巨大な石を運んで積み上げろ。期日までに完成しなければ罰。', 'egypt'),
   C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'heads', per: 2 }, 'ファラオに気に入られる子が多いほど、クラスの株が上がる。', 'egypt'),
   // ギリシャ・ローマ：🏃📚
-  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 15, lose: 10 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。', 'greece'),
+  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 15, second: 5, lose: 10 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。', 'greece'),
   C('socrates_q', 'ソクラテスの問答', '🧔', 'study', { type: 'minus', minus: 'fight' }, 'アテネの広場で議論。腕っぷしで黙らせようとすると恥をかく。', 'greece'),
   // 古代中国：📚👊
   C('keju', '科挙', '📜', 'study', { type: 'threshold', need: 8, win: 8, lose: 3 }, '超難関の官僚登用試験。合格ラインに届かなければ不名誉。', 'china'),
-  C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 15, lose: 10 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
+  C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
   // 平安：🎨👑
-  C('tentoku', '天徳内裏歌合', '🌸', 'art', { type: 'battle', win: 15, lose: 10 }, '村上天皇の御前で和歌の勝負。勝ち負けがはっきりつく。', 'heian'),
+  C('tentoku', '天徳内裏歌合', '🌸', 'art', { type: 'battle', win: 15, second: 5, lose: 10 }, '村上天皇の御前で和歌の勝負。勝ち負けがはっきりつく。', 'heian'),
   C('michinaga', '藤原道長の宴', '🌕', 'charm', { type: 'heads', per: 2 }, '「この世をば…」。招かれるほど人望のある子が多いクラスが得をする。', 'heian'),
   // 中世・ルネサンス：🎨👊
-  C('medici', 'メディチ家のパトロン選び', '💰', 'art', { type: 'battle', win: 15, lose: 10 }, 'フィレンツェの大富豪が援助するのは一番のクラスだけ。', 'europe'),
-  C('joust', '馬上槍試合', '🏇', 'fight', { type: 'battle', win: 15, lose: 10 }, '騎士どうしの一騎打ち。勝てば名誉、負ければ落馬。', 'europe'),
+  C('medici', 'メディチ家のパトロン選び', '💰', 'art', { type: 'battle', win: 15, second: 5, lose: 10 }, 'フィレンツェの大富豪が援助するのは一番のクラスだけ。', 'europe'),
+  C('joust', '馬上槍試合', '🏇', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '騎士どうしの一騎打ち。勝てば名誉、負ければ落馬。', 'europe'),
   // 戦国：👊👑
-  C('sekigahara', '関ヶ原の戦い', '⚔️', 'fight', { type: 'battle', win: 15, lose: 10 }, '天下分け目の大合戦。勝てば大出世、負ければ大損。', 'sengoku'),
+  C('sekigahara', '関ヶ原の戦い', '⚔️', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '天下分け目の大合戦。勝てば大出世、負ければ大損。', 'sengoku'),
   C('rakuichi', '楽市・楽座', '🏮', 'charm', { type: 'sum', mult: 1 }, '信長の城下町。人望のある子がいるほど商人が集まる。', 'sengoku'),
   // 江戸・幕末：🎨🏃
   C('nakamuraza', '中村座の歌舞伎興行', '🎭', 'art', { type: 'sum', mult: 1 }, '江戸三座の大舞台。芸達者な子がいるほど客が入る。', 'edo'),
   C('ino', '伊能忠敬の日本地図測量', '🗾', 'sports', { type: 'heads', per: 2 }, '日本中を歩いて測る。歩ける子が多いほど地図が早くできる。', 'edo'),
   // 近代：📚👑
-  C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'battle', win: 15, lose: 10 }, '受賞するのは、一番の頭脳がそろったクラス。', 'modern'),
+  C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'battle', win: 15, second: 5, lose: 10 }, '受賞するのは、一番の頭脳がそろったクラス。', 'modern'),
   C('rokumeikan', '鹿鳴館の舞踏会', '💃', 'charm', { type: 'heads', per: 2 }, '文明開化の社交界。踊りに誘われる子が多いほど評判が上がる。', 'modern'),
   // 未来：📚のみ
   C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'threshold', need: 8, win: 10, lose: 4 }, 'ロボットを作って出場。頭脳が足りないと動かない。', 'future'),
@@ -332,7 +332,7 @@ export function eraEffectRule(c: ContestCard): string {
     case 'threshold':
       return `${a}が${e.need}以上なら+${e.win}、足りないと−${e.lose}`;
     case 'battle':
-      return `${a}の数で勝負：1位+${e.win}、最下位−${e.lose}`;
+      return `${a}の数で勝負：1位+${e.win}、2位+${e.second}、最下位−${e.lose}`;
     case 'minus':
       return `${a}の数だけ得点、${ATTR_ICON[e.minus]}の数だけ減点`;
     case 'alien':
@@ -384,7 +384,7 @@ function contestGlyph(c: ContestCard): string {
     case 'threshold':
       return `${a}${e.need}↑ +${e.win}／−${e.lose}`;
     case 'battle':
-      return `${a}で勝負 🥇+${e.win}／最下位−${e.lose}`;
+      return `${a}で勝負 🥇+${e.win} 🥈+${e.second} 最下位−${e.lose}`;
     case 'minus':
       return `+${a}　−${ATTR_ICON[e.minus]}`;
     case 'alien':
