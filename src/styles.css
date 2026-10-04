@@ -129,22 +129,46 @@ button.chip {
 }
 
 /* ---------- タイトル・設定 ---------- */
+/* タイトル画面：画面に固定して、どの大きさでもスクロールしない（文字とすき間は画面の高さに合わせて縮む） */
+html:has(.title-screen),
+body:has(.title-screen) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 .title-screen {
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: clamp(0.3rem, 2dvh, 1.5rem);
   text-align: center;
-  padding: 2rem 1rem;
+  padding: max(0.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
   background: radial-gradient(ellipse at 50% 60%, var(--felt), var(--felt-dark) 60%, var(--bg));
 }
-.title-parade {
-  font-size: 2.2rem;
+.title-head {
   display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.2rem, 1.5dvh, 1rem);
+  min-height: 0;
+  max-width: 100%;
+}
+.title-head > *,
+.title-foot {
+  max-width: 100%;
+}
+.title-parade {
+  font-size: clamp(0.9rem, min(4.5dvh, 6.2vw), 2.2rem);
+  display: flex;
+  gap: 0.15em;
+  flex-wrap: nowrap;
   justify-content: center;
+  max-width: 100%;
 }
 .title-parade span {
   display: inline-block;
@@ -156,13 +180,14 @@ button.chip {
   }
 }
 .title-sub {
-  margin-top: 1.5rem;
-  letter-spacing: 0.4em;
+  letter-spacing: min(0.4em, 1.2vw);
   color: #8ecbf5;
   font-weight: 700;
+  font-size: clamp(0.7rem, 2.2dvh, 1rem);
 }
 .title-logo {
-  font-size: clamp(2.4rem, 9vw, 4.6rem);
+  margin: 0;
+  font-size: clamp(1.8rem, min(9vw, 9dvh), 4.6rem);
   font-weight: 900;
   line-height: 1.1;
   text-shadow:
@@ -170,20 +195,55 @@ button.chip {
     0 0 30px rgba(246, 216, 96, 0.35);
 }
 .title-lead {
+  margin: 0;
   color: var(--chalk-dim);
-  line-height: 1.8;
+  line-height: 1.6;
+  font-size: clamp(0.75rem, 2.2dvh, 1rem);
 }
 .title-buttons {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
-  margin-top: 1.5rem;
+  gap: clamp(0.35rem, 1.6dvh, 0.8rem);
   align-items: center;
 }
+.title-buttons .btn.big {
+  min-width: min(16em, 80vw);
+  white-space: nowrap;
+  font-size: clamp(0.9rem, 2.8dvh, 1.3rem);
+  padding: clamp(0.35em, 1.2dvh, 0.6em) 1.6em;
+}
+.title-buttons .btn small {
+  font-size: 0.7em;
+  opacity: 0.8;
+}
 .title-foot {
-  margin-top: 2rem;
-  font-size: 0.8rem;
+  margin: 0;
+  font-size: clamp(0.65rem, 1.8dvh, 0.8rem);
   color: var(--chalk-dim);
+}
+/* 背の低い画面（スマホ横持ちなど）：左にロゴ、右にボタン。説明文は省く */
+@media (max-height: 560px) and (orientation: landscape) {
+  .title-screen {
+    flex-direction: row;
+    gap: 5vw;
+  }
+  .title-lead,
+  .title-foot {
+    display: none;
+  }
+}
+/* とても背の低い画面：行列の絵も省く */
+@media (max-height: 360px) {
+  .title-parade {
+    display: none;
+  }
+}
+/* 縦に短い縦持ち画面（初代iPhone SEなど）：説明文と下の注記を省く */
+@media (max-height: 640px) and (orientation: portrait) {
+  .title-lead,
+  .title-foot {
+    display: none;
+  }
 }
 .setup {
   max-width: 640px;
