@@ -1,8 +1,8 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
 import { canTake, currentEra, marketCost, previewStudent } from '../game/engine';
-import { EVENT_MAP, KACHIKOMI_CARDS, cardGlyph } from '../game/data/events';
-import { MAX_CLASS, STARTING_MEMBERS, attrScore } from '../game/calc';
+import { EVENT_MAP, KACHIKOMI_CARDS, cardGlyph, shortRule } from '../game/data/events';
+import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import { ATTR_ICON, type Action, type GameState, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
@@ -41,7 +41,7 @@ function MarketCard({ id, selected, dim, onClick }: { id: string; selected: bool
     );
   }
   const c = EVENT_MAP[id];
-  const attr = 'attr' in c && c.attr ? (c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr]) : null;
+  const attr = 'attr' in c && c.attr && c.attr !== 'all' ? ATTR_ICON[c.attr] : null;
   const tone = c.kind === 'normal' ? 'normal' : 'personal';
   return (
     <button className={`mcard tone-${tone} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
@@ -144,10 +144,20 @@ function effectOf(state: GameState, pi: number, id: string): ReactNode {
   const p = state.players[pi];
   if (id.startsWith('person:')) {
     const st = previewStudent(id);
-    return p.students.length >= MAX_CLASS ? `🏫 ${st.icon} ⇄ 👋` : `🏫 ＋${st.icon}`;
+    // 偉人は名前だけ（アイコンはカードを見れば分かる）
+    return (
+      <div className="effect-name">
+        {st.icon} {st.name}
+      </div>
+    );
   }
   const c = EVENT_MAP[id];
-  return c.kind === 'normal' ? `${ATTR_ICON[c.attr]} → +${attrScore(p, c.attr).total}` : cardGlyph(c);
+  return (
+    <>
+      {c.kind === 'normal' ? `${ATTR_ICON[c.attr]} → +${attrScore(p, c.attr).total}` : cardGlyph(c)}
+      <div className="effect-say">{shortRule(c)}</div>
+    </>
+  );
 }
 
 /** 選んだ生徒（未選択なら「？」） */
@@ -252,11 +262,11 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       const target = pick.target !== null ? state.players[pick.target] : null;
       return (
         <div className="say">
-          👊 名札をタップ → −{power}
+          👊 殴りこむ相手の名札をタップ（相手 −{power}）
           <div className="say-sub">
             <span className="pick-chip">{target ? target.name : '？'}</span>
           </div>
-          {pair(() => dispatch({ type: 'kachikomi', target: null }), '👊 カチコむ', pick.target !== null, () => dispatch({ type: 'kachikomi', target: pick.target }))}
+          {pair(() => dispatch({ type: 'kachikomi', target: null }), '👊 カチコむ（無料）', pick.target !== null, () => dispatch({ type: 'kachikomi', target: pick.target }))}
         </div>
       );
     }
@@ -295,9 +305,9 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       const attr = 'attr' in c && c.attr && c.attr !== 'all' ? ATTR_ICON[c.attr] : '';
       return (
         <div className="say">
-          {c.icon} 持たせる子をタップ（{attr}+1）
+          {c.icon} 装備する子をタップ（{attr}＋1）
           <div className="say-sub">{chosen(st)}</div>
-          {pair(() => dispatch({ type: 'equip', uid: null }), `${c.icon} 持たせる −${marketCost(ph.card)}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
+          {pair(() => dispatch({ type: 'equip', uid: null }), `${c.icon} 装備 −${marketCost(ph.card)}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
         </div>
       );
     }
@@ -308,6 +318,19 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         <div className="reveal">
           <EventCardView result={r} />
           <div className="reveal-side">
+            {/* 何が起きたかを一言で（取った人だけのカードは結果、全員のイベントは効果） */}
+            {r.tone === 'personal' && r.desc ? (
+              <div className="reveal-say">
+                {ph.player !== null && (
+                  <>
+                    <Who state={state} />：
+                  </>
+                )}
+                {r.desc}
+              </div>
+            ) : (
+              <div className="reveal-say">{r.say ?? r.rule ?? r.desc}</div>
+            )}
             {r.students && r.students.length > 0 && (
               <div className="deal">
                 {r.students.map((s) => (

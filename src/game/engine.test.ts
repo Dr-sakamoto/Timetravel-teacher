@@ -315,7 +315,7 @@ describe('engine', () => {
     expect(canTake(u, pi, 0)).toBe(false);
   });
 
-  it('swing events can go negative', () => {
+  it('swing events add icons and subtract icons (never heads)', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -325,9 +325,14 @@ describe('engine', () => {
     // 抜き打ちテストは📚の数だけ（👊では引かれない）
     t.eventDeck.push('poptest');
     expect(step(t, pass).players[pi].points - t.players[pi].points).toBe(1);
+    // 授業参観は👑で得点、👊で減点（人数では引かない）
     const u = structuredClone(t);
-    u.eventDeck.push('marathon');
+    u.eventDeck.push('visit');
     expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(0 - 2);
+    // 持久走大会は🏃の数だけ（人数では引かない）
+    const v = structuredClone(t);
+    v.eventDeck.push('marathon');
+    expect(step(v, pass).players[pi].points - v.players[pi].points).toBe(0);
   });
 
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
@@ -398,26 +403,28 @@ describe('engine', () => {
     const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
     const B = [mk('b1', ['sports', 'sports'])];
     const C = [mk('c1', ['study'])];
-    // ティラノサウルスと力くらべ：どのクラスも代表1人の👊×2
-    expect(run('trex_sumo', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, 4, 0]);
-    // 古代オリンピック：全クラスで一番🏃の多い1人のクラスだけ、その子の🏃×3
-    expect(run('olympia', [A, B, C])).toEqual([9, 0, 0]);
+    // ティラノサウルスと力くらべ：👊6以上で+6、足りなければ−3
+    expect(run('trex_sumo', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, -3, -3]);
+    // 古代オリンピック：🏃の数で勝負、1位+15・最下位−10
+    expect(run('olympia', [A, B, C])).toEqual([15, 0, -10]);
     // ギザの大ピラミッド建設：🏃8以上で+8、足りなければ−3
     expect(run('giza', [[...A, mk('a3', ['sports', 'sports', 'sports', 'sports'])], B, C])).toEqual([8, -3, -3]);
-    // 関ヶ原の戦い：1位+10、最下位−5
-    expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([10, 0, -5]);
-    // 縄張り争い：一番のクラスだけ👊×2
-    expect(run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([4, 0, 0]);
-    // 文化祭：そろっているアイコンの種類×2
-    expect(run('bunkasai', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([6, 2, 2]);
-    // 生徒会長選挙：全校で一番アイコンの多い1人のクラスだけ×2（現代の子は2倍なので 3×2×2）
-    expect(run('seitokai', [A, B, C])).toEqual([12, 0, 0]);
+    // 関ヶ原の戦い：👊の数で勝負、1位+15・最下位−10
+    expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 0, -10]);
+    // 縄張り争い：同じく👊で勝負
+    expect(run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 0, -10]);
+    // 文化祭：アイコンの数で勝負（現代の子は2倍）
+    expect(run('bunkasai', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([15, 0, -10]);
+    // 生徒会長選挙：同じくアイコンの数で勝負
+    expect(run('seitokai', [A, B, C])).toEqual([15, 0, -10]);
     // 楽市・楽座：👑の数をそのまま加点
     expect(run('rakuichi', [[mk('c', ['charm', 'charm'])], B, C])).toEqual([2, 0, 0]);
     // 鹿鳴館の舞踏会：👑を持つ子1人につき+2（近代の子は2人分）
     expect(run('rokumeikan', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'modern')], B, C])).toEqual([6, 0, 0]);
-    // 中村座の歌舞伎興行：🎨 − 🎨を持たない子の人数
-    expect(run('nakamuraza', [[mk('a', ['art', 'art']), mk('b', ['study'])], B, C])).toEqual([1, -1, -1]);
+    // 中村座の歌舞伎興行：🎨の数だけ得点
+    expect(run('nakamuraza', [[mk('a', ['art', 'art']), mk('b', ['study'])], B, C])).toEqual([2, 0, 0]);
+    // ソクラテスの問答：📚で得点、👊で減点
+    expect(run('socrates_q', [[mk('s', ['study', 'study']), mk('y', ['fight'])], B, C])).toEqual([1, 0, 1]);
   });
 
   it('goods add an icon to one student, one item each', () => {

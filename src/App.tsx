@@ -108,34 +108,36 @@ function Title({
   const parade = ['🦖', '👸', '🏛️', '🐉', '🌸', '🎨', '⚔️', '🌅', '🎩', '🏫', '🤖'];
   return (
     <div className="title-screen">
-      <div className="title-parade" aria-hidden>
-        {parade.map((e, i) => (
-          <span key={i} style={{ animationDelay: `${i * 0.25}s` }}>
-            {e}
-          </span>
-        ))}
+      <div className="title-head">
+        <div className="title-parade" aria-hidden>
+          {parade.map((e, i) => (
+            <span key={i} style={{ animationDelay: `${i * 0.25}s` }}>
+              {e}
+            </span>
+          ))}
+        </div>
+        <div className="title-sub">タイムトラベル・ティーチャー</div>
+        <h1 className="title-logo">
+          時空最強クラス
+          <br />
+          決定戦
+        </h1>
+        <p className="title-lead">
+          恐竜も、戦国武将も、天才科学者も。
+          <br />
+          あらゆる時代から転校生を集めて、最強のクラスを作れ！
+        </p>
       </div>
-      <div className="title-sub">タイムトラベル・ティーチャー</div>
-      <h1 className="title-logo">
-        時空最強クラス
-        <br />
-        決定戦
-      </h1>
-      <p className="title-lead">
-        恐竜も、戦国武将も、天才科学者も。
-        <br />
-        あらゆる時代から転校生を集めて、最強のクラスを作れ！
-      </p>
       <div className="title-buttons">
         <button className="btn primary big" onClick={onNew}>
           新しく始める
         </button>
         <button className="btn big" onClick={onOnline}>
-          📱 通信対戦（みんなのスマホで）
+          📱 通信対戦
         </button>
         {saved && (
           <button className="btn big" onClick={onContinue}>
-            続きから（{calendarLabel(saved)}）
+            ▶ 続きから <small>{calendarLabel(saved)}</small>
           </button>
         )}
         <button className="btn ghost" onClick={onRules}>

@@ -108,6 +108,8 @@ export interface EventResult {
   rule?: string;
   /** 効果を絵文字の式で（カードに大きく出す） */
   glyph?: string;
+  /** 何が起きるかの一言（めくったカードの横に出す） */
+  say?: string;
   /** 時代イベント・襲来：この時代の生徒は×2（得点演出用） */
   era?: EraId;
   /** 襲来：敵の強さ（得点演出用） */
