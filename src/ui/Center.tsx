@@ -303,9 +303,9 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       const attr = 'attr' in c && c.attr && c.attr !== 'all' ? ATTR_ICON[c.attr] : '';
       return (
         <div className="say">
-          {c.icon} 持たせる子をタップ（{attr}+1）
+          {c.icon} 装備する子をタップ（{attr}＋1）
           <div className="say-sub">{chosen(st)}</div>
-          {pair(() => dispatch({ type: 'equip', uid: null }), `${c.icon} 持たせる −${marketCost(ph.card)}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
+          {pair(() => dispatch({ type: 'equip', uid: null }), `${c.icon} 装備 −${marketCost(ph.card)}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
         </div>
       );
     }
@@ -316,6 +316,19 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         <div className="reveal">
           <EventCardView result={r} />
           <div className="reveal-side">
+            {/* 何が起きたかを一言で（取った人だけのカードは結果、全員のイベントは効果） */}
+            {r.tone === 'personal' && r.desc ? (
+              <div className="reveal-say">
+                {ph.player !== null && (
+                  <>
+                    <Who state={state} />：
+                  </>
+                )}
+                {r.desc}
+              </div>
+            ) : (
+              <div className="reveal-say">{r.say ?? r.rule ?? r.desc}</div>
+            )}
             {r.students && r.students.length > 0 && (
               <div className="deal">
                 {r.students.map((s) => (

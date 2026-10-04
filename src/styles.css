@@ -694,6 +694,20 @@ button.chip {
   color: var(--yellow);
   letter-spacing: 0;
 }
+/* めくったカードの横の一言（何が起きたか） */
+.reveal-say {
+  max-width: 16em;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  padding: 0.3rem 0.6rem;
+}
+.reveal-say:empty {
+  display: none;
+}
 /* 選んだ生徒・相手 */
 .pick-chip {
   display: inline-block;

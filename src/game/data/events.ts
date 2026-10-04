@@ -378,7 +378,7 @@ export function cardGlyph(c: EventCard): string {
     case 'raid':
       return `👊 − ${c.threat}`;
     case 'goods':
-      return `🧑 ＋${ATTR_ICON[c.attr]}`;
+      return `装備 ${ATTR_ICON[c.attr]}＋1`;
     case 'cyborg':
       return '🧑 → 🦾';
     case 'push':
@@ -418,4 +418,60 @@ function contestGlyph(c: ContestCard): string {
 
 export function fixedGlyph(f: FixedEvent): string {
   return f.rule === 'test' ? `📚 − 👊🧑×${TEST_YANKEE_PENALTY}　🥇🥈🥉` : '🌈 全部　🥇🥈🥉';
+}
+
+/** めくったカードの横に出す一言（何が起きるか）。ルール説明の短い版 */
+export function shortRule(c: EventCard): string {
+  switch (c.kind) {
+    case 'normal':
+      return `取った人：${ATTR_ICON[c.attr]}の数だけ得点`;
+    case 'kachikomi':
+      return `相手1クラスに 👊×${c.mult} のダメージ`;
+    case 'swing':
+      return c.minus ? `全員：${ATTR_ICON[c.plus]}の数 − ${c.minus === 'heads' ? '人数' : `${ATTR_ICON[c.minus]}の数`}` : `全員：${ATTR_ICON[c.plus]}の数だけ得点`;
+    case 'contest':
+      return `全員：${contestShort(c)}${c.effect.type === 'alien' || c.effect.type === 'variety' ? '' : '（この時代の子×2）'}`;
+    case 'raid':
+      return `全員：👊の数 − 敵${c.threat}（この時代の子×2）`;
+    case 'goods':
+      return `1人に装備：${ATTR_ICON[c.attr]}＋1`;
+    case 'cyborg':
+      return '1人をサイボーグに改造';
+    case 'push':
+      return '全員：1人ずつ転校';
+    case 'exchange':
+      return '相手の子と1人入れ替え';
+  }
+}
+
+function contestShort(c: ContestCard): string {
+  const a = c.attr === 'all' ? '全アイコン' : ATTR_ICON[c.attr];
+  const e = c.effect;
+  const x = (m: number) => (m !== 1 ? `×${m}` : '');
+  switch (e.type) {
+    case 'sum':
+      return `${a}の数${x(e.mult)}だけ得点`;
+    case 'top':
+      return `${a}が一番多いクラスが総取り${x(e.mult)}`;
+    case 'ace':
+      return `代表1人の${a}${x(e.mult)}で得点`;
+    case 'champion':
+      return `${a}が一番の1人がいるクラスだけ得点${x(e.mult)}`;
+    case 'heads':
+      return `${a}を持つ子1人につき+${e.per}`;
+    case 'threshold':
+      return `${a}が${e.need}以上で+${e.win}、足りないと−${e.lose}`;
+    case 'battle':
+      return `${a}が1位+${e.win}、最下位−${e.lose}`;
+    case 'minus':
+      return e.minus === 'without' ? `${a}の数 − ${a}なしの子` : `${a}の数 − ${ATTR_ICON[e.minus]}の数`;
+    case 'variety':
+      return `アイコンの種類×${e.per}`;
+    case 'alien':
+      return '空席に火星人が転入';
+  }
+}
+
+export function fixedShort(f: FixedEvent): string {
+  return f.rule === 'test' ? `全員：📚で順位を競う（👊の子は−${TEST_YANKEE_PENALTY}）` : '全員：アイコンの総数で順位を競う';
 }
