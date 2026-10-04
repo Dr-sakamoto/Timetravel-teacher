@@ -358,7 +358,7 @@ describe('engine', () => {
     for (const era of ERAS) {
       const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien').map((c) => c.attr));
       // 現代は優遇なし：全アイコンで競うカードがある（文化祭だけは出し物なので🎨）
-      if (era.favor.length) expect([...used].sort(), era.id).toEqual([...era.favor].sort());
+      if (era.favor.length) for (const a of used) expect([...era.favor, 'all'], era.id).toContain(a);
       else expect(used.has('all'), era.id).toBe(true);
     }
     expect(ERAS.find((e) => e.id === 'future')!.favor).toEqual(['study']);
@@ -448,24 +448,121 @@ describe('engine', () => {
     expect(run('trex_sumo', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, -3, -3]);
     // 古代オリンピック：🏃の数で勝負、1位+15・2位+5・最下位−10
     expect(run('olympia', [A, B, C])).toEqual([15, 5, -10]);
-    // ギザの大ピラミッド建設：🏃8以上で+8、足りなければ−3
-    expect(run('giza', [[...A, mk('a3', ['sports', 'sports', 'sports', 'sports'])], B, C])).toEqual([8, -3, -3]);
     // 関ヶ原の戦い：👊の数で勝負、1位+15・2位+5・最下位−10
     expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 5, -10]);
-    // 縄張り争い：同じく👊で勝負
-    expect(run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 5, -10]);
     // 文化祭：🎨を持つ子1人につき+2（現代の子は2人分）
     expect(run('bunkasai', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([4, 0, 0]);
     // 生徒会長選挙：同じくアイコンの数で勝負
     expect(run('seitokai', [A, B, C])).toEqual([15, 5, -10]);
-    // 楽市・楽座：👑の数をそのまま加点
-    expect(run('rakuichi', [[mk('c', ['charm', 'charm'])], B, C])).toEqual([2, 0, 0]);
     // 鹿鳴館の舞踏会：👑を持つ子1人につき+2（近代の子は2人分）
     expect(run('rokumeikan', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'modern')], B, C])).toEqual([6, 0, 0]);
-    // 中村座の歌舞伎興行：🎨の数だけ得点
-    expect(run('nakamuraza', [[mk('a', ['art', 'art']), mk('b', ['study'])], B, C])).toEqual([2, 0, 0]);
-    // ソクラテスの問答：📚で得点、👊で減点
-    expect(run('socrates_q', [[mk('s', ['study', 'study']), mk('y', ['fight'])], B, C])).toEqual([1, 0, 1]);
+  });
+
+  it('every era except the present has a special event that changes more than points', () => {
+    for (const era of ERAS) {
+      const special = ERA_CARDS.filter((c) => c.era === era.id && !['heads', 'threshold', 'battle'].includes(c.effect.type));
+      if (era.id === 'present') expect(special, era.id).toHaveLength(0);
+      else expect(special.length, era.id).toBeGreaterThanOrEqual(1);
+    }
+    // 特別な仕組みは時代ごとにみんな違う
+    const kinds = ERA_CARDS.filter((c) => !['heads', 'threshold', 'battle'].includes(c.effect.type)).map((c) => c.effect.type);
+    expect(new Set(kinds).size).toBe(kinds.length);
+  });
+
+  describe('era special events', () => {
+    let base = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
+    while (base.phase.kind !== 'draw') base = step(base, cpuAction(base)!);
+    /** 3クラスの生徒をそろえてイベントを起こす。生徒は5人ずつ（定員の下限4人より1人多い）になるよう、アイコンなしの子で埋める */
+    const run = (id: string, classes: Student[][], points = [10, 10, 10], roles: RoleSeat[][] = [[], [], []]) => {
+      const t = structuredClone(base);
+      classes.forEach((st, i) => {
+        const fill = Array.from({ length: Math.max(0, 5 - st.length) }, (_, k) => mk(`${i}-pad${k}`, []));
+        t.players[i].students = [...st, ...fill];
+        t.players[i].roles = roles[i];
+        t.players[i].points = points[i];
+      });
+      t.eventDeck.push(id);
+      const after = step(t, pass);
+      return {
+        after,
+        delta: after.players.map((p, i) => p.points - t.players[i].points),
+        uids: after.players.map((p) => p.students.map((x) => x.uid).filter((u) => !u.includes('pad'))),
+      };
+    };
+
+    it('nawabari: the strongest pack steals the best student from the weakest', () => {
+      const r = run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study', 'study', 'art'])]]);
+      expect(r.delta).toEqual([0, 0, 0]);
+      expect(r.uids).toEqual([['y', 'c'], ['z'], []]);
+      // 一番が並んだら何も起こらない
+      const tie = run('nawabari', [[mk('y', ['fight'])], [mk('z', ['fight'])], [mk('c', ['study'])]]);
+      expect(tie.uids).toEqual([['y'], ['z'], ['c']]);
+    });
+
+    it('giza: everyone builds one pyramid; the laziest class gets nothing', () => {
+      const s3 = (u: string) => mk(u, ['sports', 'sports', 'sports']);
+      // 合計 9+6+3 = 18 ≥ 6×3 → 完成。一番少ないクラスは0
+      expect(run('giza', [[s3('a'), s3('b'), s3('c')], [s3('d'), s3('e')], [s3('f')]]).delta).toEqual([6, 6, 0]);
+      // 合計 3+3+0 < 18 → 全クラス−3
+      expect(run('giza', [[s3('a')], [s3('b')], []]).delta).toEqual([-3, -3, -3]);
+    });
+
+    it('ostracism: the student with the most icons in the whole school is exiled', () => {
+      const r = run('ostracism', [[mk('a', ['study', 'study'])], [mk('b', ['art', 'art', 'art', 'charm'])], [mk('c', ['sports'])]]);
+      expect(r.uids).toEqual([['a'], [], ['c']]);
+      expect(r.after.phase.kind === 'result' && r.after.phase.result.outUids).toEqual(['b']);
+      // 定員の下限のクラスの子は追放されない（次に多い子が追放される）
+      const t = structuredClone(base);
+      t.players[0].students = [mk('a', ['study', 'study']), ...Array.from({ length: 4 }, (_, k) => mk(`p${k}`, []))];
+      t.players[1].students = [mk('b', ['art', 'art', 'art']), mk('q', []), mk('r', []), mk('s', [])];
+      t.players[2].students = [mk('c', ['sports']), ...Array.from({ length: 4 }, (_, k) => mk(`t${k}`, []))];
+      t.players.forEach((p) => (p.roles = []));
+      t.eventDeck.push('ostracism');
+      const after = step(t, pass);
+      expect(after.players[0].students.some((x) => x.uid === 'a')).toBe(false);
+      expect(after.players[1].students.some((x) => x.uid === 'b')).toBe(true);
+    });
+
+    it('keju: each class\'s best scholar takes the exam and gains a 📚 on passing', () => {
+      const r = run('keju', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study', 'study'])], [mk('c', ['study', 'study'], 'china')]]);
+      const attrs = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!.attrs;
+      expect(attrs(0, 'a')).toEqual(['study', 'study', 'study', 'study']);
+      expect(attrs(1, 'b')).toEqual(['study', 'study']);
+      // 中国の子は2倍なので📚2つでも合格
+      expect(attrs(2, 'c')).toEqual(['study', 'study', 'study']);
+    });
+
+    it('michinaga: every other class sends gifts to the class with the most 👑', () => {
+      expect(run('michinaga', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, -3, -3]);
+      // 一番が2クラスなら、残りのクラスがそれぞれに贈る
+      expect(run('michinaga', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
+    });
+
+    it('joust: champions duel; the winner scores and the last one falls off and leaves', () => {
+      const r = run('joust', [[mk('a', ['fight', 'fight', 'fight']), mk('a2', ['fight'])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight'])]]);
+      expect(r.delta).toEqual([10, 0, 0]);
+      expect(r.uids).toEqual([['a', 'a2'], ['b'], []]);
+      // 👊の子がいないクラスは出ない（落馬もしない）
+      const r2 = run('joust', [[mk('a', ['fight', 'fight'])], [mk('b', ['fight'])], [mk('c', ['study'])]]);
+      expect(r2.uids).toEqual([['a'], [], ['c']]);
+    });
+
+    it('hitojichi: every class sends its most-loved free student to the next seat', () => {
+      const r = run('hitojichi', [[mk('a', ['charm', 'charm']), mk('a2', ['charm'])], [mk('b', ['charm'])], [mk('c', ['study'])]], undefined, [[{ role: 'leader', uid: 'a' }], [], []]);
+      // A の a は係なので出さず a2 を出す。C は👑の子がいないので出さない
+      expect(r.uids).toEqual([['a'], ['a2'], ['c', 'b']]);
+    });
+
+    it('tomikuji: everyone pays in and one class takes the pot', () => {
+      const r = run('tomikuji', [[], [], []]);
+      expect([...r.delta].sort((x, y) => x - y)).toEqual([-3, -3, 6]);
+    });
+
+    it('nobel: the single best 📚 student in the school wins for their class', () => {
+      expect(run('nobel', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study']), mk('b2', ['study', 'study'])], []]).delta).toEqual([12, 0, 0]);
+      // 近代の子は2倍
+      expect(run('nobel', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study', 'study'], 'modern')], []]).delta).toEqual([0, 12, 0]);
+    });
   });
 
   it('goods add an icon to one student, one item each', () => {

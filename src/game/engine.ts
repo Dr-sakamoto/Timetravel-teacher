@@ -1,4 +1,4 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
+import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
 import { CARDS, CARD_MAP, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
@@ -14,6 +14,7 @@ import {
   PERSON_CARDS_PER_TERM,
   TEST_YANKEE_PENALTY,
   cardEra,
+  eraDoubles,
   cardRule,
   eventCost,
   fixedRule,
@@ -23,6 +24,7 @@ import {
   fixedShort,
   shortRule,
   type ContestCard,
+  type EraEffect,
   type FixedEvent,
   type GoodsCard,
   type NormalCard,
@@ -33,6 +35,7 @@ import { ARCHETYPE_MAP, BOY_NAMES, GIRL_NAMES, MODERN_POOL, STARTER_POOL, SURNAM
 import { ROLES } from './data/roles';
 import {
   type Action,
+  type Attr,
   type EraId,
   type EventResult,
   type GameState,
@@ -400,26 +403,34 @@ function resolveSwing(s: GameState, c: SwingCard): EventResult {
 /** 時代イベント（全クラス）：カードごとの効果。その時代の生徒のアイコンが2倍 */
 function resolveContest(s: GameState, c: ContestCard): EventResult {
   const e = c.effect;
-  if (e.type === 'alien') return resolveInvasion(s, c);
+  switch (e.type) {
+    case 'alien':
+      return resolveInvasion(s, c);
+    case 'heads':
+    case 'threshold':
+    case 'battle':
+      return resolveEraScore(s, c, e);
+    default:
+      return resolveEraSpecial(s, c, e);
+  }
+}
+
+/** 点を数える時代イベント（○人につき・目標・勝負） */
+function resolveEraScore(s: GameState, c: ContestCard, e: Extract<EraEffect, { type: 'heads' | 'threshold' | 'battle' }>): EventResult {
   /** その子が競うアイコンを持っているか */
   const has = (x: Student) => (c.attr === 'all' ? x.attrs.length > 0 : x.attrs.includes(c.attr));
-  const icon = c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr];
   const scores = s.players.map((p) => attrScore(p, c.attr, c.era));
   const values = scores.map((x) => x.total);
   const best = Math.max(...values);
   const worst = Math.min(...values);
   const rows = s.players.map((p, i): ResultRow => {
-    const sc = scores[i];
-    let holders = sc.holders;
+    const holders = scores[i].holders;
     let delta = 0;
     let count: number | undefined = values[i];
     let note: string | undefined;
     /** 勝負の順位（名札にメダルを出す） */
     let place: number | undefined;
     switch (e.type) {
-      case 'sum':
-        delta = values[i] * e.mult;
-        break;
       case 'heads': {
         const n = p.students.filter(has).reduce((a, x) => a + (x.era === c.era ? 2 : 1), 0);
         count = n;
@@ -440,22 +451,276 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
         if (best !== worst) place = rank - 1;
         break;
       }
-      case 'minus': {
-        const m = attrScore(p, e.minus);
-        delta = values[i] - m.total;
-        note = `${icon}${values[i]}−${ATTR_ICON[e.minus]}${m.total}`;
-        count = undefined;
-        holders = [...holders, ...m.holders];
-        break;
-      }
     }
     p.points += delta;
     if (delta > 0) holders.filter(has).forEach((h) => h.mvp++);
     return { player: i, count, rank: place, delta, note, uids: holders.map((h) => h.uid) };
   });
+  return eraResult(s, c, rows, { attr: c.attr });
+}
+
+/** 時代イベントの結果をまとめる（点の順に並べてログに残す） */
+function eraResult(s: GameState, c: ContestCard, rows: ResultRow[], extra: Partial<EventResult> = {}): EventResult {
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, art: c.id, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows };
+  return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows, ...extra };
+}
+
+/** その子1人の、アイコンaの点（その時代の子は2倍・係ボーナスも乗る）。'all' はアイコンの総数 */
+function studentPts(p: Player, x: Student, a: Attr | 'all', era?: EraId): number {
+  return contributions({ ...p, students: [x] }, a, era)[0]?.pts ?? 0;
+}
+
+/** 候補の中で、アイコンaの点が一番多い子（同点なら先に並んでいる子）。だれも持っていなければ null */
+function bestOf(p: Player, cands: Student[], a: Attr | 'all', era?: EraId): { student: Student; pts: number } | null {
+  let out: { student: Student; pts: number } | null = null;
+  for (const x of cands) {
+    const pts = studentPts(p, x, a, era);
+    if (pts > 0 && (!out || pts > out.pts)) out = { student: x, pts };
+  }
+  return out;
+}
+
+/** 生徒をほかのクラスへ移す（係は外れる。カードプールには戻さない） */
+function moveStudent(s: GameState, from: Player, to: Player, uid: string): Student {
+  const st = removeStudent(s, from, uid, false)!;
+  to.students.push(st);
+  return st;
+}
+
+/** その時代だけの仕組みのイベント（点の数え方ではなく、起こることそのものが違う） */
+function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, { type: 'heads' | 'threshold' | 'battle' | 'alien' }>): EventResult {
+  const ps = s.players;
+  const n = ps.length;
+  const rows: ResultRow[] = ps.map((_, i) => ({ player: i, delta: 0 }));
+  const add = (i: number, d: number) => {
+    ps[i].points += d;
+    rows[i].delta += d;
+  };
+  const scores = ps.map((p) => attrScore(p, c.attr, c.era));
+  const values = scores.map((x) => x.total);
+  const best = Math.max(...values);
+  const worst = Math.min(...values);
+  /** 移ったり出ていったりした子（結果に並べる） */
+  const moved: Student[] = [];
+  const out: string[] = [];
+  const name = (x: Student) => `${x.icon}${x.name}`;
+  /** 起きたこと（ログに残し、めくったカードの横に一言で出す） */
+  const said: string[] = [];
+  const tell = (text: string, pi?: number) => {
+    log(s, text, pi);
+    said.push(text);
+  };
+
+  switch (e.type) {
+    // 白亜紀：一番強いクラス（1クラスだけ）が、一番弱いクラスから一番アイコンの多い子を奪う
+    case 'steal': {
+      rows.forEach((r, i) => (r.count = values[i]));
+      const tops = values.flatMap((v, i) => (v === best ? [i] : []));
+      if (best === worst || tops.length > 1) {
+        rows.forEach((r) => (r.note = '互角'));
+        break;
+      }
+      const win = tops[0];
+      // 一番弱いクラスが複数なら、ポイントの多いほうが狙われる
+      const lose = values.flatMap((v, i) => (v === worst ? [i] : [])).sort((x, y) => ps[y].points - ps[x].points)[0];
+      const prey = [...droppable(ps[lose])].sort((x, y) => y.attrs.length - x.attrs.length)[0];
+      if (ps[win].students.length >= MAX_CLASS || !prey) {
+        rows[win].note = ps[win].students.length >= MAX_CLASS ? '満席' : '奪えず';
+        break;
+      }
+      const st = moveStudent(s, ps[lose], ps[win], prey.uid);
+      scores[win].holders.forEach((h) => h.mvp++);
+      moved.push(st);
+      rows[win].note = '奪った';
+      rows[lose].note = '奪われた';
+      rows[win].uids = [st.uid];
+      tell(`${ps[win].name}のクラスが${ps[lose].name}のクラスから${name(st)}を奪った！`, win);
+      break;
+    }
+    // エジプト：全クラスの合計で1つのピラミッド。完成なら全員にほうび、一番少ないクラスはサボりで0
+    case 'together': {
+      const sum = values.reduce((a, v) => a + v, 0);
+      const need = e.need * n;
+      const done = sum >= need;
+      tell(done ? `完成！（全クラスで${ATTR_ICON[c.attr as Attr] ?? ''}${sum}／${need}）` : `未完成…（全クラスで${ATTR_ICON[c.attr as Attr] ?? ''}${sum}／${need}）`);
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+        if (!done) {
+          add(i, -e.lose);
+          r.note = `未完成 ${sum}/${need}`;
+        } else if (values[i] === worst && best !== worst) {
+          r.note = 'サボり';
+        } else {
+          add(i, e.win);
+          r.note = `完成 ${sum}/${need}`;
+          scores[i].holders.forEach((h) => h.mvp++);
+        }
+      });
+      break;
+    }
+    // ギリシャ：全校でアイコンが一番多い子が1人だけ追放される（定員の下限のクラスの子は除く）
+    case 'ostracism': {
+      let pick: { pi: number; st: Student } | null = null;
+      ps.forEach((p, pi) => {
+        if (p.students.length <= MIN_CLASS) return;
+        for (const st of p.students) {
+          const better = !pick || st.attrs.length > pick.st.attrs.length || (st.attrs.length === pick.st.attrs.length && p.points > ps[pick.pi].points);
+          if (better) pick = { pi, st };
+        }
+      });
+      if (!pick) break;
+      const { pi, st } = pick as { pi: number; st: Student };
+      removeStudent(s, ps[pi], st.uid, false);
+      moved.push(st);
+      out.push(st.uid);
+      rows[pi].note = '追放';
+      rows[pi].uids = [st.uid];
+      tell(`${ps[pi].name}のクラスの${name(st)}が陶片追放された。`, pi);
+      break;
+    }
+    // 中国：各クラスの一番の子が受験。合格した子はアイコンが1つ増える（カードに印刷できるのは5個まで）
+    case 'upgrade': {
+      if (c.attr === 'all') break;
+      const a = c.attr;
+      ps.forEach((p, i) => {
+        const top = bestOf(p, p.students.filter((x) => baseIcons(x) < 5), a, c.era);
+        if (!top) {
+          rows[i].note = '受験者なし';
+          return;
+        }
+        rows[i].count = top.pts;
+        rows[i].uids = [top.student.uid];
+        if (top.pts < e.need) {
+          rows[i].note = '不合格';
+          return;
+        }
+        top.student.attrs = [...top.student.attrs, a];
+        top.student.mvp++;
+        moved.push(top.student);
+        rows[i].note = `合格 ${ATTR_ICON[a]}＋1`;
+        tell(`${p.name}のクラスの${name(top.student)}が合格！${ATTR_ICON[a]}が1つ増えた。`, i);
+      });
+      break;
+    }
+    // 平安：一番のクラスへ、ほかの全クラスから贈り物（一番が複数なら、それぞれに贈る）
+    case 'tribute': {
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+      });
+      if (best === worst) {
+        rows.forEach((r) => (r.note = '引き分け'));
+        break;
+      }
+      const tops = values.flatMap((v, i) => (v === best ? [i] : []));
+      ps.forEach((_, i) => {
+        if (tops.includes(i)) return;
+        for (const t of tops) {
+          add(i, -e.per);
+          add(t, e.per);
+        }
+        rows[i].note = '贈った';
+      });
+      tell(`${tops.map((t) => ps[t].name).join('・')}のクラスに贈り物が集まった。`);
+      tops.forEach((t) => {
+        rows[t].note = '招かれた';
+        scores[t].holders.forEach((h) => h.mvp++);
+      });
+      break;
+    }
+    // 中世：各クラスの代表1人どうしの一騎打ち。1位は+win、最下位の代表は落馬して転校（その子がいないクラスは出ない）
+    case 'duel': {
+      const champs = ps.map((p) => bestOf(p, p.students, c.attr, c.era));
+      const vs = champs.flatMap((x) => (x ? [x.pts] : []));
+      champs.forEach((x, i) => {
+        rows[i].count = x?.pts;
+        rows[i].uids = x ? [x.student.uid] : [];
+        if (!x) rows[i].note = '不参加';
+      });
+      if (vs.length < 2 || Math.max(...vs) === Math.min(...vs)) {
+        champs.forEach((x, i) => x && (rows[i].note = '引き分け'));
+        break;
+      }
+      const hi = Math.max(...vs);
+      const lo = Math.min(...vs);
+      champs.forEach((x, i) => {
+        if (!x) return;
+        if (x.pts === hi) {
+          add(i, e.win);
+          x.student.mvp++;
+          rows[i].note = '勝利';
+          moved.push(x.student);
+          tell(`${ps[i].name}のクラスの${name(x.student)}が勝った！`, i);
+        } else if (x.pts === lo) {
+          rows[i].note = '落馬';
+          if (ps[i].students.length <= MIN_CLASS) return;
+          removeStudent(s, ps[i], x.student.uid, false);
+          moved.push(x.student);
+          out.push(x.student.uid);
+          tell(`${ps[i].name}のクラスの${name(x.student)}が落馬して去っていった。`, i);
+        }
+      });
+      break;
+    }
+    // 戦国：全クラスいっせいに、係に就いていない一番の子をとなり（次の席）のクラスへ出す
+    case 'hostage': {
+      const sent = ps.map((p) => bestOf(p, tradeable(p), c.attr, c.era)?.student ?? null);
+      // 受け取ると定員を超えるクラス（満席で、自分は誰も出さない）には送れない。送れなくなると満席が増えることがあるので、落ち着くまで繰り返す
+      for (let changed = true; changed; ) {
+        changed = false;
+        sent.forEach((st, i) => {
+          const to = (i + 1) % n;
+          if (st && to !== i && ps[to].students.length - (sent[to] ? 1 : 0) + 1 > MAX_CLASS) {
+            sent[i] = null;
+            changed = true;
+          }
+        });
+      }
+      sent.forEach((st, i) => {
+        if (!st) {
+          rows[i].note = '出せる子なし';
+          return;
+        }
+        const to = ps[(i + 1) % n];
+        moveStudent(s, ps[i], to, st.uid);
+        moved.push(st);
+        rows[i].note = `→ ${to.name}`;
+        rows[(i + 1) % n].uids = [st.uid];
+      });
+      if (moved.length) tell(`${moved.map(name).join('・')}がとなりのクラスへ移った。`);
+      break;
+    }
+    // 江戸：全クラスが出し合い、くじで1クラスが総取り
+    case 'lottery': {
+      const win = randInt(s, n);
+      ps.forEach((_, i) => add(i, -e.fee));
+      add(win, e.fee * n);
+      rows.forEach((r, i) => (r.note = i === win ? '🎫当たり！' : 'はずれ'));
+      tell(`${ps[win].name}のクラスが当たり！（+${e.fee * n}）`, win);
+      break;
+    }
+    // 近代：全校で一番の子（同点なら全員）が受賞。その子のクラスに+win（1クラス1回まで）
+    case 'prize': {
+      const champs = ps.map((p) => bestOf(p, p.students, c.attr, c.era));
+      const hi = Math.max(0, ...champs.map((x) => x?.pts ?? 0));
+      champs.forEach((x, i) => {
+        rows[i].count = x?.pts ?? 0;
+        if (!x || x.pts !== hi) return;
+        add(i, e.win);
+        x.student.mvp++;
+        moved.push(x.student);
+        rows[i].note = '受賞';
+        tell(`${ps[i].name}のクラスの${name(x.student)}が受賞！`, i);
+        rows[i].uids = [x.student.uid];
+      });
+      break;
+    }
+  }
+  const result = eraResult(s, c, rows, { students: moved, outUids: out.length ? out : undefined });
+  // 何も起きなかったときはカードの効果を出す
+  return said.length ? { ...result, say: said.join(' ') } : result;
 }
 
 /** 火星人の侵略：空席のあるクラス全部に、アイコンのないエイリアンが1人ずつ転入する */
@@ -999,7 +1264,7 @@ export function deckBreakdown(s: GameState): DeckRow[] {
         case 'cyborg':
           return { ...base, group: '時代イベント' };
         case 'contest':
-          return { ...base, name: c.effect.type === 'alien' ? c.name : `${c.name}（${c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr]}）`, group: '時代イベント' };
+          return { ...base, name: c.attr === 'all' || !eraDoubles(c.effect) ? c.name : `${c.name}（${ATTR_ICON[c.attr]}）`, group: '時代イベント' };
         case 'raid':
           return { ...base, name: `${c.name}（強さ${c.threat}）`, group: '時代イベント' };
       }
