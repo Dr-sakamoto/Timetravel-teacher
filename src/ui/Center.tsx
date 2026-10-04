@@ -1,8 +1,8 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
 import { canTake, currentEra, marketCost, previewStudent } from '../game/engine';
-import { EVENT_MAP, KACHIKOMI_CARDS, cardGlyph } from '../game/data/events';
-import { MAX_CLASS, STARTING_MEMBERS, attrScore } from '../game/calc';
+import { EVENT_MAP, KACHIKOMI_CARDS, cardGlyph, shortRule } from '../game/data/events';
+import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import { ATTR_ICON, type Action, type GameState, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
@@ -144,18 +144,20 @@ function effectOf(state: GameState, pi: number, id: string): ReactNode {
   const p = state.players[pi];
   if (id.startsWith('person:')) {
     const st = previewStudent(id);
-    // 偉人は名前を出す（誰が来るのか分かると楽しい）
+    // 偉人は名前だけ（アイコンはカードを見れば分かる）
     return (
-      <>
-        <div className="effect-name">
-          {st.icon} {st.name}
-        </div>
-        {p.students.length >= MAX_CLASS ? '🏫 ⇄ 👋' : '🏫 ＋1'} {st.attrs.map((a) => ATTR_ICON[a]).join('')}
-      </>
+      <div className="effect-name">
+        {st.icon} {st.name}
+      </div>
     );
   }
   const c = EVENT_MAP[id];
-  return c.kind === 'normal' ? `${ATTR_ICON[c.attr]} → +${attrScore(p, c.attr).total}` : cardGlyph(c);
+  return (
+    <>
+      {c.kind === 'normal' ? `${ATTR_ICON[c.attr]} → +${attrScore(p, c.attr).total}` : cardGlyph(c)}
+      <div className="effect-say">{shortRule(c)}</div>
+    </>
+  );
 }
 
 /** 選んだ生徒（未選択なら「？」） */
@@ -260,11 +262,11 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       const target = pick.target !== null ? state.players[pick.target] : null;
       return (
         <div className="say">
-          👊 名札をタップ → −{power}
+          👊 殴りこむ相手の名札をタップ（相手 −{power}）
           <div className="say-sub">
             <span className="pick-chip">{target ? target.name : '？'}</span>
           </div>
-          {pair(() => dispatch({ type: 'kachikomi', target: null }), '👊 カチコむ', pick.target !== null, () => dispatch({ type: 'kachikomi', target: pick.target }))}
+          {pair(() => dispatch({ type: 'kachikomi', target: null }), '👊 カチコむ（無料）', pick.target !== null, () => dispatch({ type: 'kachikomi', target: pick.target }))}
         </div>
       );
     }

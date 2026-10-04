@@ -689,6 +689,12 @@ button.chip {
   line-height: 1.2;
   letter-spacing: 0.05em;
 }
+.effect-say {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--chalk-dim);
+}
 .effect-name {
   font-size: 1.1rem;
   color: var(--yellow);
