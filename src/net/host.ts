@@ -85,7 +85,7 @@ export class HostRoom {
         // 読み込み直した直後は、前のIDがまだ残っていることがある
         peer.destroy();
         if (tries < 6) setTimeout(() => this.open(tries + 1), 2500);
-        else this.set({ status: 'error', error: 'この部屋番号は使われています。部屋を作り直してください' });
+        else this.set({ status: 'error', error: 'この部屋番号は使われています。ルームを作り直してください' });
         return;
       }
       if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
@@ -150,7 +150,7 @@ export class HostRoom {
     const seats = this.snap.lobby.seats;
     let i = this.seatOf(cid);
     if (i < 0) {
-      if (this.snap.state) return this.sendTo(c, { t: 'reject', reason: 'この部屋のゲームはもう始まっています' });
+      if (this.snap.state) return this.sendTo(c, { t: 'reject', reason: 'このルームのゲームはもう始まっています' });
       if (seats.length >= MAX_SEATS) return this.sendTo(c, { t: 'reject', reason: '満員です（5人まで）' });
       i = seats.length;
       this.setSeats([...seats, { name: cleanName(name, i), kind: 'guest', cid, online: true }]);
@@ -269,7 +269,7 @@ export class HostRoom {
     const cid = seats[i].cid;
     if (cid) {
       const c = this.conns.get(cid);
-      if (c) this.sendTo(c, { t: 'reject', reason: '部屋から外されました' });
+      if (c) this.sendTo(c, { t: 'reject', reason: 'ルームから外されました' });
       this.conns.delete(cid);
     }
     this.setSeats(seats.filter((_, j) => j !== i));

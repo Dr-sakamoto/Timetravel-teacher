@@ -32,42 +32,41 @@ export function Online({ initialCode, onExit, onRules }: { initialCode: string; 
   return (
     <div className="setup online">
       <h1>📱 通信対戦</h1>
-      <p className="online-lead">みんなのスマホで同じ部屋に入って遊べます（2〜5人。足りない席はCPU）。部屋を作った人のスマホがゲームを進めるので、その人はアプリを開いたままにしてください。</p>
+      <p className="online-lead">1人がルームを作ると5桁の部屋番号が出ます。ほかの人はその部屋番号を入れて入ります（2〜5人。足りない席はCPU）。</p>
       <section>
         <h3>あなたの名前</h3>
         <div className="player-row">
           <input value={name} maxLength={12} placeholder="例：赤井先生" onChange={(e) => setName(e.target.value)} />
         </div>
+        {!okName && <p className="online-warn">先に名前を入れてください</p>}
       </section>
-      <section>
-        <h3>部屋に入る</h3>
-        <div className="player-row">
+      <div className="room-choice">
+        <section>
+          <h3>🏠 ルームを作る</h3>
+          <p className="online-lead">部屋番号が出るので、みんなに伝えてください。作った人のスマホがゲームを進めるので、開いたままにしておいてください。</p>
+          <button className="btn primary big" disabled={!okName} onClick={() => setMode({ kind: 'host', resume: false })}>
+            ルームを作る
+          </button>
+          {saved && (
+            <button className="btn small" onClick={() => setMode({ kind: 'host', resume: true })}>
+              前のルームを再開（{saved.code}）
+            </button>
+          )}
+        </section>
+        <section>
+          <h3>🔢 部屋番号で入る</h3>
           <input
             className="code-input"
             value={code}
             inputMode="numeric"
-            placeholder="部屋番号（5桁）"
+            placeholder="5桁の部屋番号"
             onChange={(e) => setCode(normalizeCode(e.target.value))}
           />
-          <button className="btn primary" disabled={!okName || code.length !== 5} onClick={() => setMode({ kind: 'guest', code })}>
-            参加する
+          <button className="btn primary big" disabled={!okName || code.length !== 5} onClick={() => setMode({ kind: 'guest', code })}>
+            ルームに入る
           </button>
-        </div>
-      </section>
-      <section>
-        <h3>部屋を作る</h3>
-        <div className="seg">
-          <button className="btn primary" disabled={!okName} onClick={() => setMode({ kind: 'host', resume: false })}>
-            新しい部屋を作る
-          </button>
-          {saved && (
-            <button className="btn" onClick={() => setMode({ kind: 'host', resume: true })}>
-              前の部屋を再開（{saved.code}）
-            </button>
-          )}
-        </div>
-      </section>
-      {!okName && <p className="online-warn">名前を入れてください</p>}
+        </section>
+      </div>
       <div className="actions">
         <button className="btn ghost" onClick={exit}>
           戻る
@@ -88,7 +87,7 @@ function SeatList({ seats, you, onRemove }: { seats: Seat[]; you: number; onRemo
             {i === you && <small>（あなた）</small>}
           </span>
           <span className="seat-kind">
-            {s.kind === 'cpu' ? '🤖 CPU' : s.kind === 'host' ? '👑 部屋主' : s.online ? '📱 参加中' : '📵 通信切れ'}
+            {s.kind === 'cpu' ? '🤖 CPU' : s.kind === 'host' ? '👑 ホスト' : s.online ? '📱 参加中' : '📵 通信切れ'}
           </span>
           {onRemove && i !== 0 && (
             <button className="btn small ghost" onClick={() => onRemove(i)} aria-label="外す">
@@ -152,7 +151,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
 
   if (!snap) return null;
   const quit = () => {
-    if (snap.state && snap.state.phase.kind !== 'gameOver' && !confirm('部屋を閉じますか？（あとで「前の部屋を再開」で続きから遊べます）')) return;
+    if (snap.state && snap.state.phase.kind !== 'gameOver' && !confirm('ルームを閉じますか？（あとで「前のルームを再開」で続きから遊べます）')) return;
     onExit();
   };
 
@@ -191,7 +190,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
   const seats = snap.lobby.seats;
   return (
     <div className="setup online">
-      <h1>📱 部屋を作りました</h1>
+      <h1>🏠 ルームを作りました</h1>
       {snap.status === 'error' ? (
         <p className="online-warn">{snap.error}</p>
       ) : snap.status === 'opening' ? (
@@ -199,7 +198,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
       ) : (
         <>
           <ShareCode code={snap.code} />
-          <p className="online-lead">参加する人は、このアプリの「通信対戦」で部屋番号を入れるか、招待リンクを開いてください。</p>
+          <p className="online-lead">みんなに部屋番号を伝えてください。参加する人は「📱 通信対戦」→「🔢 部屋番号で入る」で入れます（招待リンクを送ってもOK）。</p>
         </>
       )}
       <section>
@@ -229,7 +228,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
       </section>
       <div className="actions">
         <button className="btn ghost" onClick={onExit}>
-          部屋を閉じる
+          ルームを閉じる
         </button>
         <button className="btn primary big" disabled={seats.length < 2 || seats.some((s) => s.kind === 'guest' && !s.online)} onClick={() => room.current?.startGame()}>
           ゲーム開始！
@@ -257,7 +256,7 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
 
   if (!snap) return null;
   const quit = () => {
-    if (snap.state && snap.state.phase.kind !== 'gameOver' && snap.status === 'joined' && !confirm('部屋から抜けますか？（同じ部屋番号でまた入れば戻れます）')) return;
+    if (snap.state && snap.state.phase.kind !== 'gameOver' && snap.status === 'joined' && !confirm('ルームから抜けますか？（同じ部屋番号でまた入れば戻れます）')) return;
     onExit();
   };
 
@@ -267,9 +266,9 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
         <h1>📱 通信対戦</h1>
         <p className="online-warn">
           {snap.status === 'closed'
-            ? '部屋が閉じられました'
+            ? 'ルームが閉じられました'
             : snap.status === 'notFound'
-              ? `部屋 ${code} が見つかりません。部屋番号を確かめてください（探し続けています…）`
+              ? `部屋番号 ${code} のルームが見つかりません。番号を確かめてください（探し続けています…）`
               : snap.reason}
         </p>
         <div className="actions">
@@ -305,17 +304,17 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
 
   return (
     <div className="setup online">
-      <h1>📱 部屋 {code}</h1>
+      <h1>🏠 ルーム {code}</h1>
       {snap.lobby ? (
         <>
-          <p className="online-lead">部屋を作った人がゲームを始めるのを待っています…（期間：{snap.lobby.years}年）</p>
+          <p className="online-lead">ルームを作った人がゲームを始めるのを待っています…（期間：{snap.lobby.years}年）</p>
           <section>
             <h3>プレイヤー</h3>
             <SeatList seats={snap.lobby.seats} you={snap.you} />
           </section>
         </>
       ) : (
-        <p className="online-lead">{snap.status === 'reconnecting' ? 'つなぎ直しています…' : '部屋に入っています…'}</p>
+        <p className="online-lead">{snap.status === 'reconnecting' ? 'つなぎ直しています…' : 'ルームに入っています…'}</p>
       )}
       <div className="actions">
         <button className="btn ghost" onClick={onExit}>

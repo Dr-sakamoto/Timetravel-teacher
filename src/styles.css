@@ -2512,3 +2512,30 @@ button.chip {
 .net-warn {
   color: #ffd8a8;
 }
+.room-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+.room-choice section {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+.room-choice .code-input {
+  font: inherit;
+  max-width: none;
+  padding: 0.5em 0.8em;
+  border-radius: 8px;
+  border: 2px solid var(--chalk-dim);
+  background: #0f2a20;
+  color: var(--chalk);
+  text-align: center;
+}
+@media (max-width: 520px) {
+  .room-choice {
+    grid-template-columns: 1fr;
+  }
+}
