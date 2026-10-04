@@ -11,7 +11,7 @@ export interface NormalCard {
   count: number;
 }
 
-/** カチコミ：めくった人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させる */
+/** カチコミ：場から取った人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させる */
 export interface KachikomiCard {
   id: string;
   kind: 'kachikomi';
@@ -137,7 +137,7 @@ export function eventCost(c: EventCard): number {
 
 /** ゲリラ：場に並べようとめくった瞬間に、その場で起こるカード（だれも避けられない） */
 export function isGuerrilla(c: EventCard): boolean {
-  return c.kind === 'kachikomi' || c.kind === 'swing' || c.kind === 'contest' || c.kind === 'raid' || c.kind === 'push';
+  return c.kind === 'swing' || c.kind === 'contest' || c.kind === 'raid' || c.kind === 'push';
 }
 
 const N = (attr: Attr, name: string, icon: string, count: number): NormalCard => ({ id: `n_${attr}`, kind: 'normal', name, icon, attr, count });
@@ -303,7 +303,7 @@ export function cardRule(c: EventCard): string {
     case 'normal':
       return `取った人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return `手番の人が他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
+      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
     case 'swing':
       if (!c.minus) return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点`;
       return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点、${ATTR_ICON[c.minus]}の数だけ減点`;
