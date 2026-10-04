@@ -11,7 +11,13 @@ export function Portrait({ art }: { art: string }) {
   const spec = ART[art];
   return (
     <svg className="portrait" viewBox="0 6 100 94" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-      {'creature' in spec ? <CreaturePart kind={spec.creature} /> : <Human spec={spec} />}
+      {'photo' in spec ? (
+        <image href={`${import.meta.env.BASE_URL}${spec.photo}`} x={0} y={6} width={100} height={94} preserveAspectRatio="xMidYMid slice" />
+      ) : 'creature' in spec ? (
+        <CreaturePart kind={spec.creature} />
+      ) : (
+        <Human spec={spec} />
+      )}
     </svg>
   );
 }
