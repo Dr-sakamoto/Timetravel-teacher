@@ -670,6 +670,90 @@ button.chip {
 }
 
 /* ---------- 中央の操作 ---------- */
+/* めくったカードの効果（絵文字の式） */
+.ecard-glyph {
+  margin: 2px;
+  padding: 0.2rem 0.3rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  color: var(--ink);
+}
+/* 取るとどうなるか（絵文字の式） */
+.effect {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+}
+/* 選んだ生徒・相手 */
+.pick-chip {
+  display: inline-block;
+  min-width: 2.5em;
+  padding: 0 0.6em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px dashed var(--chalk-dim);
+  font-weight: 900;
+}
+/* 結果：入ってきた子は光らせ、出ていった子は灰色に */
+.deal-card {
+  position: relative;
+  width: 64px;
+  animation: deal 0.45s ease-out both;
+}
+.deal-card .tcg {
+  width: 100%;
+}
+.deal-card.in .tcg {
+  box-shadow:
+    0 0 0 2px var(--yellow),
+    0 0 14px rgba(246, 216, 96, 0.8);
+}
+.deal-card.out .tcg {
+  filter: grayscale(1) brightness(0.75);
+  transform: rotate(-6deg);
+}
+.deal-mark {
+  position: absolute;
+  top: -0.6rem;
+  right: -0.5rem;
+  font-size: 1.2rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+/* 手番の人の名札は脈打つ */
+.opp.acting {
+  animation: acting 1.1s ease-in-out infinite;
+}
+@keyframes acting {
+  50% {
+    box-shadow:
+      0 0 0 4px var(--yellow),
+      0 0 18px rgba(246, 216, 96, 0.8);
+  }
+}
+.lastlog {
+  max-width: 100%;
+  font-size: 0.8rem;
+  color: var(--chalk-dim);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: lastlog-in 0.4s ease-out;
+}
+.lastlog .dot {
+  margin-right: 0.3em;
+}
+@keyframes lastlog-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
 .action {
   width: 100%;
   display: flex;
@@ -925,6 +1009,8 @@ button.chip {
   position: absolute;
   right: 0.5rem;
   top: -1.2rem;
+  z-index: 4;
+  white-space: nowrap;
   font-weight: 900;
   font-size: 1.3rem;
   padding: 0 0.4em;
@@ -1540,14 +1626,100 @@ button.chip {
   box-shadow: none;
 }
 
-/* ---------- スマホ縦持ち：上から 相手 → 山札 → 場 → 操作 → 自分の教室 と積む ---------- */
-@media (orientation: portrait) and (max-width: 600px) {
-  .table-wrap {
-    padding: 0.3rem 0.4rem 0.6rem;
+/* ---------- スマホ共通：見せるものを絞る ---------- */
+@media (orientation: portrait) and (max-width: 900px), (orientation: landscape) and (max-height: 600px) {
+  /* ゲーム中は画面を動かさない：卓を画面に固定し、拡大やはみ出しでのスクロールも起こさない */
+  html:has(.table-wrap),
+  body:has(.table-wrap) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
   }
+  .table-wrap {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    margin: 0;
+    overflow: hidden;
+  }
+  /* ログは卓の上に重ねる窓にする（中だけスクロールできる） */
+  .log {
+    position: fixed;
+    top: 2.4rem;
+    right: 0.5rem;
+    left: auto;
+    width: min(360px, calc(100vw - 1rem));
+    max-height: 55dvh;
+    margin: 0;
+    z-index: 40;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+    font-size: 0.72rem;
+    overscroll-behavior: contain;
+  }
+  /* 相手の名札は名前と点数だけ（座席のマスは省き、光った生徒のアイコンは名札に重ねる） */
+  .opp-seat {
+    display: none;
+  }
+  .opp-seats {
+    position: static;
+    display: block;
+    padding: 0;
+  }
+  /* 光った生徒のアイコンは名札の下にぶら下げる（名前と点を隠さない） */
+  .opp-lit {
+    inset: auto 0.3rem auto auto;
+    top: 100%;
+    margin-top: 2px;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    z-index: 3;
+  }
+  /* 空いている机は省く（人数は名札の 👥 で分かる） */
+  :is(.pm-near, .pm-stage) .seat.empty {
+    display: none;
+  }
+  /* 係決めの時代の標語は、時代チップで分かるので省く */
+  .say-sub.era-motto {
+    display: none;
+  }
+}
+
+/* ---------- スマホ縦持ち：上から 相手 → 山札 → 場 → 操作 → 自分の教室 と積み、1画面に収める ---------- */
+@media (orientation: portrait) and (max-width: 900px) {
+  .table-wrap {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: max(0.3rem, env(safe-area-inset-top)) 0.4rem max(0.4rem, env(safe-area-inset-bottom));
+  }
+  .felt {
+    flex: 1;
+    min-height: 0;
+  }
+  .stage {
+    flex: 1;
+    min-height: 0;
+    gap: 0.4rem;
+  }
+  .stage > .center {
+    flex: 1;
+    min-height: 0;
+  }
+  /* 上のバーは1行に：日付・今の時代・メニュー */
   .topbar {
+    grid-template-columns: auto 1fr auto;
     gap: 0.3rem;
     margin-bottom: 0.3rem;
+  }
+  .topbar .erabar {
+    grid-column: auto;
+    order: 0;
+  }
+  .era-chip:not(.now),
+  .calendar > span {
+    display: none;
   }
   .calendar {
     font-size: 0.85rem;
@@ -1578,9 +1750,16 @@ button.chip {
   .opponents {
     gap: 0.35rem;
   }
+  .opponents {
+    flex-wrap: nowrap;
+  }
   .opp {
-    flex: 1 1 40%;
+    flex: 1 1 0;
+    min-width: 0;
     max-width: 50%;
+  }
+  .opponents:has(> :nth-child(3)) .opp {
+    font-size: 0.8rem;
   }
   .opp-name {
     overflow: hidden;
@@ -1593,14 +1772,50 @@ button.chip {
   /* 中央：山札・捨て札を上の段に小さく、場の4枚を下の段に大きく */
   .center {
     width: 100%;
-    gap: 0.5rem;
+    justify-content: center;
+    gap: 0.4rem;
     padding: 0.2rem;
     border-radius: 14px;
-    container-type: inline-size;
+    container-type: size;
   }
   .board {
-    --cw: min(84px, 21.5cqw);
+    /* 場の領域は操作の欄の残り全部。カードはその幅（4枚）と高さ（山札の段＋場の段）に収まる大きさ */
+    --cw: min(88px, calc((100cqw - 2.2rem) / 4), calc((100cqh - 2.2rem) / 2.27));
+    flex: 1 1 0;
+    min-height: 0;
+    align-self: stretch;
+    container-type: size;
+    align-content: center;
     gap: 0.5rem 0.9rem;
+  }
+  .action {
+    flex: none;
+  }
+  /* 結果：カードは場のカードと同じくらいの大きさで */
+  .center:has(.reveal) .action {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+  }
+  .reveal {
+    flex-wrap: nowrap;
+    gap: 0.8rem;
+    max-height: 100%;
+  }
+  .reveal .ecard {
+    width: min(150px, 40vw);
+    min-height: 0;
+  }
+  .reveal .deal {
+    margin-top: 0;
+  }
+  .deal-card {
+    width: min(76px, 20vw);
+  }
+  /* 係決めの間は場を使わないので、教室に場所をゆずる */
+  .felt:has(.role-editor) .center.ph-roles .board {
+    display: none;
   }
   .market {
     order: 1;
@@ -1652,10 +1867,11 @@ button.chip {
   .say .btn {
     padding: 0.45em 1.3em;
   }
-  /* 自分の教室：係4つ＋座席9つを5列で */
-  .playmat.near.pm-near .floor {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.55rem 0.35rem;
+  /* 教室：係の場と生徒を2段に（空いている机は省く）。カードの高さは画面の高さに合わせる */
+  .playmat:is(.pm-near, .pm-stage) .floor {
+    grid-template-columns: repeat(var(--fhalf), minmax(0, 10.5dvh));
+    justify-content: center;
+    gap: 0.5rem 0.35rem;
   }
   .role-zone.last::after {
     display: none;
@@ -1701,25 +1917,79 @@ button.chip {
     top: -7px;
     padding: 0 0.3rem;
   }
-  /* 手番の相手の教室：名前は省いて絵とアイコンだけ */
-  .pm-stage .floor {
-    gap: 0.4rem 0.25rem;
+  /* 手番の相手の教室も、自分の教室と同じ見た目で出す */
+  .pm-stage .tcg-head {
+    min-height: 0;
+    padding: 1px 2px;
   }
-  .pm-stage .tcg-head,
-  .pm-stage :is(.zone-badge, .zone-note, .zone-desc) {
-    display: none;
+  .pm-stage .tcg-name {
+    font-size: 0.6rem;
+    -webkit-line-clamp: 1;
   }
   .pm-stage .tcg-attr,
   .pm-stage .tcg-attrs.n4 .tcg-attr,
   .pm-stage .tcg-attrs.n5 .tcg-attr,
   .pm-stage .tcg-attrs.n6 .tcg-attr {
-    font-size: 0.55rem;
+    font-size: 0.72rem;
     padding: 0;
   }
   .pm-stage .tcg-role {
-    font-size: 0.5rem;
-    top: -5px;
-    padding: 0 0.2rem;
+    font-size: 0.55rem;
+    top: -7px;
+    padding: 0 0.3rem;
+  }
+  .lastlog {
+    font-size: 0.75rem;
+  }
+  /* 係決めの説明は1〜2行に */
+  .role-editor .role-bar {
+    gap: 0.3rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.75rem;
+  }
+  .role-editor .role-bar > span {
+    flex-basis: 100%;
+    text-align: center;
+  }
+}
+
+/* 縦持ちで背の低い画面：操作の欄と教室を詰める */
+@media (orientation: portrait) and (max-width: 900px) and (max-height: 700px) {
+  .say {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+  }
+  .say-sub {
+    margin-top: 0.2rem;
+  }
+  .say .btn {
+    padding: 0.3em 1em;
+  }
+  .playmat:is(.pm-near, .pm-stage) .floor {
+    grid-template-columns: repeat(var(--fhalf), minmax(0, 9.5dvh));
+    gap: 0.4rem 0.3rem;
+  }
+}
+
+/* 縦持ちでとても背の低い画面（初代iPhone SEなど）：さらに詰める */
+@media (orientation: portrait) and (max-width: 900px) and (max-height: 600px) {
+  .lastlog {
+    display: none;
+  }
+  .say {
+    font-size: 0.72rem;
+    line-height: 1.3;
+  }
+  .say .say-sub:last-child {
+    flex-wrap: nowrap;
+  }
+  .say .btn {
+    font-size: 0.78rem;
+    padding: 0.3em 0.8em;
+    white-space: nowrap;
+  }
+  .playmat:is(.pm-near, .pm-stage) .floor {
+    grid-template-columns: repeat(var(--fhalf), minmax(0, 8.8dvh));
   }
 }
 
@@ -1838,12 +2108,11 @@ button.chip {
     gap: 1px;
   }
   .opp-lit {
-    inset: -3px 0;
-    font-size: 0.6rem;
+    font-size: 0.75rem;
   }
   .opp .plate-delta {
-    font-size: 0.75rem;
-    top: -0.75rem;
+    font-size: 1rem;
+    top: -0.8rem;
   }
   .stage {
     flex-direction: row;
@@ -1865,7 +2134,7 @@ button.chip {
     --gx: 0.15rem;
     flex: 1;
     min-height: 0;
-    grid-template-columns: repeat(var(--half), minmax(0, 12dvh));
+    grid-template-columns: repeat(var(--fhalf), minmax(0, 12dvh));
     gap: 0.35rem var(--gx);
     margin-top: 0.3rem;
   }
@@ -1967,7 +2236,7 @@ button.chip {
   }
   :is(.near-seat, .peek) .playmat .floor {
     --gx: 0.25rem;
-    grid-template-columns: repeat(var(--cells), minmax(0, 15dvh));
+    grid-template-columns: repeat(var(--filled), minmax(0, 15dvh));
     justify-content: center;
     gap: 0.2rem var(--gx);
     margin-top: 0.45rem;
@@ -2062,12 +2331,14 @@ button.chip {
     display: none;
   }
   .board {
-    /* カード1枚の幅：卓の中央の高さと幅（7枚並ぶ）に合わせて決める */
-    --cw: min(88px, 39cqh, 12.2cqw);
-    flex: none;
+    /* 場の領域は操作の欄の残り全部。カードはその高さと幅（7枚並ぶ）に収まる大きさ */
+    --cw: min(88px, calc((100cqh - 1.2rem) / 1.37), calc((100cqw - 4.6rem) / 7));
+    flex: 1 1 0;
+    min-height: 0;
+    container-type: size;
+    align-content: center;
     flex-wrap: nowrap;
     gap: 0.5rem;
-    padding-bottom: 6px;
   }
   .market {
     flex-wrap: nowrap;
@@ -2157,11 +2428,15 @@ button.chip {
   }
   .say {
     max-height: 100%;
-    overflow-y: auto;
+    overflow: hidden;
   }
   /* 相手の教室を横に出していて中央が狭いとき：文字は省いて絵だけ */
   @container (max-width: 600px) {
-    .pile-label,
+    .pile-label {
+      display: none;
+    }
+  }
+  @container (max-width: 440px) {
     .mcard-name {
       display: none;
     }
@@ -2169,7 +2444,7 @@ button.chip {
   /* さらに狭いとき：場を上の段、山札と捨て札を下の段に */
   @container (max-width: 380px) {
     .board {
-      --cw: min(76px, 25cqh, 21cqw);
+      --cw: min(76px, calc((100cqh - 2.6rem) / 2.74), calc((100cqw - 2rem) / 4));
       flex-wrap: wrap;
       row-gap: 0.55rem;
     }
@@ -2178,6 +2453,10 @@ button.chip {
       flex-basis: 100%;
       justify-content: center;
     }
+  }
+  .lastlog {
+    font-size: 0.7rem;
+    flex: none;
   }
   /* 情報を絞る：今の学期以外の時代は絵だけ、まだ解放していない係の場は名前と🔒だけ */
   .era-chip:not(.now) .era-name {

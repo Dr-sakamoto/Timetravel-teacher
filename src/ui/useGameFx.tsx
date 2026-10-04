@@ -33,14 +33,19 @@ interface Plan {
   length: number;
 }
 
-function planOf(s: GameState): Plan | null {
+/**
+ * 演出は手前（me）の教室でだけ見せる（相手の教室は卓に出していないので）。
+ * 全クラスに効くカードなら自分の分を、取った人だけのカードなら自分が取ったときだけ。
+ */
+function planOf(s: GameState, me: number): Plan | null {
   if (s.phase.kind !== 'result') return null;
   const r = s.phase.result;
   const a = r.attr;
   if (!a || a === 'all' || r.tone === 'fixed' || r.tone === 'personal') return null;
-  const pid = s.phase.player ?? r.rows[0]?.player;
+  if (r.tone === 'normal' && s.phase.player !== me) return null;
+  const pid = me;
   const row = r.rows.find((x) => x.player === pid);
-  if (pid === undefined || !row) return null;
+  if (!row) return null;
   const p = s.players[pid];
   const card = { attr: a, era: r.era, threat: r.threat, minus: r.minus };
   // 時代イベントの代表戦などは、点に関わった子（row.uids）だけを見せる
@@ -55,10 +60,10 @@ function planOf(s: GameState): Plan | null {
 }
 
 /** 今めくられたカードの得点演出。演出のないカード（学校行事・転入・カチコミなど）なら null */
-export function useGameFx(state: GameState, root: RefObject<HTMLElement>, scale: number): GameFx | null {
+export function useGameFx(state: GameState, root: RefObject<HTMLElement>, scale: number, me: number): GameFx | null {
   const result = state.phase.kind === 'result' ? state.phase.result : null;
   // 結果が変わったときだけ計画し直す（演出中は毎フレーム描き直すので）
-  const plan = useMemo(() => planOf(state), [result]);
+  const plan = useMemo(() => planOf(state, me), [result, me]);
   const length = plan?.length ?? 0;
   const { t, rects } = useFxClock<FxRects>(
     result,

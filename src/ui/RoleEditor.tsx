@@ -71,11 +71,7 @@ export function RoleEditor({ player, year, slots, onConfirm }: Props) {
     <div className="role-editor">
       <div className="role-bar">
         <span>
-          {need > 0 && !ready ? (
-            <b>🆕の係の場をタップして、新しく解放する係を{need}つ選んでね</b>
-          ) : (
-            <>カードを係の場へドラッグ（タップで持ち上げて置き場をタップでもOK）。1つの係に{MAX_PER_ROLE}人</>
-          )}
+          {need > 0 && !ready ? <b>👆 🆕 をあと{need - unlock.length}つ</b> : <>👆 カード → 係の場（{MAX_PER_ROLE}人まで）</>}
         </span>
         {warn && <div className="role-warn">{warn}</div>}
         <button

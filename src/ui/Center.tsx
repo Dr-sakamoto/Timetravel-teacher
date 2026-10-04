@@ -1,10 +1,10 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
 import { canTake, currentEra, marketCost, previewStudent } from '../game/engine';
-import { EVENT_MAP, KACHIKOMI_CARDS, cardRule } from '../game/data/events';
+import { EVENT_MAP, KACHIKOMI_CARDS, cardGlyph } from '../game/data/events';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
-import { ATTR_ICON, type Action, type GameState } from '../game/types';
+import { ATTR_ICON, type Action, type GameState, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
 import { TcgCard } from './TcgCard';
 
@@ -67,7 +67,7 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
   const selected = canPick && sel !== null && sel < state.market.length ? sel : null;
 
   return (
-    <div className="center">
+    <div className={`center ph-${ph.kind}`}>
       {/* 山札（左）・場のカード（中央）・捨て札（右）を1列に */}
       <div className="board">
         <div className="piles">
@@ -131,80 +131,93 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
   );
 }
 
-function Action({ state, dispatch, cpuBusy, canContinue = true, pick, side, sel }: Props & { sel: number | null }) {
+/** 手番の人の名前（色つき） */
+function Who({ state }: { state: GameState }) {
+  const ph = state.phase;
+  if (ph.kind === 'gameOver' || ph.player === null) return null;
+  const p = state.players[ph.player];
+  return <b style={{ color: p.color }}>{p.name}</b>;
+}
+
+/** 場のカードを取るとどうなるかを、絵文字の式で（文章にしない） */
+function effectOf(state: GameState, pi: number, id: string): ReactNode {
+  const p = state.players[pi];
+  if (id.startsWith('person:')) {
+    const st = previewStudent(id);
+    return p.students.length >= MAX_CLASS ? `🏫 ${st.icon} ⇄ 👋` : `🏫 ＋${st.icon}`;
+  }
+  const c = EVENT_MAP[id];
+  return c.kind === 'normal' ? `${ATTR_ICON[c.attr]} → +${attrScore(p, c.attr).total}` : cardGlyph(c);
+}
+
+/** 選んだ生徒（未選択なら「？」） */
+const chosen = (st?: Student) => <span className="pick-chip">{st ? `${st.icon}${st.name}` : '？'}</span>;
+
+function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Props & { sel: number | null }) {
   const ph = state.phase;
   if (ph.kind === 'gameOver') return null;
   const actor = ph.player !== null ? state.players[ph.player] : null;
-  const who = actor ? <b style={{ color: actor.color }}>{actor.name}</b> : null;
+  const who = <Who state={state} />;
 
   if (cpuBusy && ph.kind !== 'result')
     return (
       <div className="say cpu">
-        {actor?.isCpu ? '🤖' : '⏳'} {who} の番…
+        {actor?.isCpu ? '🤖' : '⏳'} {who}
       </div>
     );
+
+  /** やめる・決めるの2つのボタン */
+  const pair = (cancel: (() => void) | null, label: ReactNode, ok: boolean, go: () => void) => (
+    <div className="say-sub">
+      {cancel && (
+        <button className="btn ghost" onClick={cancel}>
+          やめる
+        </button>
+      )}
+      <button className="btn primary" disabled={!ok} onClick={go}>
+        {label}
+      </button>
+    </div>
+  );
 
   switch (ph.kind) {
     case 'memberDraw': {
       const p = state.players[ph.player];
       return (
         <div className="say">
-          {who} が生徒を引く（{p.students.length}/{STARTING_MEMBERS}）
+          {who} 👆🏫 {p.students.length}/{STARTING_MEMBERS}
           <div className="say-sub">
             <button className="btn small ghost" onClick={() => dispatch({ type: 'drawAllMembers' })}>
-              まとめて引く
+              ⏩ まとめて
             </button>
           </div>
         </div>
       );
     }
-    case 'roles': {
-      const era = ERAS[currentEra(state)];
-      return (
-        <div className="say">
-          {who} の係決め — 生徒のカードを係の場に置こう（ドラッグ／タップ）
-          <div className="say-sub era-motto">
-            {era.icon}
-            {era.name}「{era.motto}」
-          </div>
-        </div>
-      );
-    }
+    case 'roles':
+      return <div className="say">{who} 🏷️ 係決め</div>;
     case 'draw': {
-      if (sel === null)
-        return (
-          <div className="say">
-            {who} の番 — 場のカードを1枚選ぼう（持ち点 {state.players[ph.player].points}）
-          </div>
-        );
+      if (sel === null) return <div className="say">{who} 👆 1枚えらぶ</div>;
       const id = state.market[sel];
       const cost = marketCost(id);
       const p = state.players[ph.player];
-      const person = id.startsWith('person:') ? previewStudent(id) : null;
       const ok = canTake(state, ph.player, sel);
-      const card = person ? null : EVENT_MAP[id];
-      /** 授業カードなら、取ったら今すぐ入る点 */
+      const card = id.startsWith('person:') ? null : EVENT_MAP[id];
       const gainNow = card?.kind === 'normal' ? attrScore(p, card.attr).total : null;
-      const why = ok
-        ? null
+      const label = ok
+        ? `取る ${cost > 0 ? `−${cost}` : gainNow !== null ? `+${gainNow}` : ''}`
         : cost > 0 && p.points < cost
-          ? `ポイントが足りない（持ち点 ${p.points}）`
-          : person
-            ? '満席で、代わりに転校させられる子がいない'
-            : '使える生徒・相手がいない';
-      const text = person
-        ? `${person.icon}${person.name}（${person.rarity}・${person.attrs.map((a) => ATTR_ICON[a]).join('')}）が転入${p.students.length >= MAX_CLASS ? '。満席なので代わりに1人転校させる' : ''}`
-        : cardRule(EVENT_MAP[id]);
+          ? '💰 たりない'
+          : '🙅 使えない';
       return (
         <div className="say">
-          {who}：{text}
-          {why && <div className="say-sub warn">{why}</div>}
+          <div className="effect">{effectOf(state, ph.player, id)}</div>
           <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'pass', slot: sel })} title="このカードを捨て札にして、何もせずに手番を終える">
-              捨てて見送る
+            <button className="btn ghost" onClick={() => dispatch({ type: 'pass', slot: sel })} title="このカードを捨てて、手番を終える">
+              🗑️ 見送る
             </button>
             <button className="btn primary" disabled={!ok} onClick={() => dispatch({ type: 'take', slot: sel })}>
-              取る{cost > 0 ? `（−${cost}点）` : gainNow !== null ? `（+${gainNow}点）` : ''}
+              {label}
             </button>
           </div>
         </div>
@@ -215,17 +228,12 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, side, sel 
       const newcomer = previewStudent(state.market[ph.slot]);
       return (
         <div className="say">
-          🚪 {who} のクラスは満席 — {newcomer.icon}
-          {newcomer.name}を迎える代わりに、係に就いていない生徒を1人転校させる
-          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
+          🚪 満席 — 👋 出ていく子をタップ
           <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'makeRoom', uid: null })}>
-              やめる
-            </button>
-            <button className="btn primary" disabled={!pick.uid} onClick={() => pick.uid && dispatch({ type: 'makeRoom', uid: pick.uid })}>
-              転校させて迎える（−{marketCost(state.market[ph.slot])}点）
-            </button>
+            {chosen(st)} ⇄ {newcomer.icon}
+            {newcomer.name}
           </div>
+          {pair(() => dispatch({ type: 'makeRoom', uid: null }), `⇄ 入れ替え −${marketCost(state.market[ph.slot])}`, !!pick.uid, () => pick.uid && dispatch({ type: 'makeRoom', uid: pick.uid }))}
         </div>
       );
     }
@@ -233,13 +241,9 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, side, sel 
       const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
       return (
         <div className="say">
-          📦 転校（ゲリラ）— {who} は係に就いていない生徒を1人選んで転校させる（必ず1人）
-          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
-          <div className="say-sub">
-            <button className="btn primary" disabled={!pick.uid} onClick={() => pick.uid && dispatch({ type: 'push', uid: pick.uid })}>
-              転校させる
-            </button>
-          </div>
+          📦 {who} 👋 1人 転校 — タップ
+          <div className="say-sub">{chosen(st)}</div>
+          {pair(null, '👋 転校', !!pick.uid, () => pick.uid && dispatch({ type: 'push', uid: pick.uid }))}
         </div>
       );
     }
@@ -248,16 +252,11 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, side, sel 
       const target = pick.target !== null ? state.players[pick.target] : null;
       return (
         <div className="say">
-          👊 ゲリラ発生！ {who} のクラスのヤンキーがカチコミに行く — 殴りこむ相手の名札をタップ（相手は−{power}）
-          <div className="say-sub">→ {target ? target.name : '相手：未選択'}</div>
+          👊 名札をタップ → −{power}
           <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'kachikomi', target: null })}>
-              やめる
-            </button>
-            <button className="btn primary" disabled={pick.target === null} onClick={() => dispatch({ type: 'kachikomi', target: pick.target })}>
-              カチコむ
-            </button>
+            <span className="pick-chip">{target ? target.name : '？'}</span>
           </div>
+          {pair(() => dispatch({ type: 'kachikomi', target: null }), '👊 カチコむ', pick.target !== null, () => dispatch({ type: 'kachikomi', target: pick.target }))}
         </div>
       );
     }
@@ -267,24 +266,16 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, side, sel 
       const theirs = target?.students.find((x) => x.uid === pick.theirUid);
       return (
         <div className="say">
-          🔁 {who} のクラス替え — 手前の教室から出す生徒を選び、相手の名札をタップして連れてくる生徒を選ぶ（アイコンの数が同じ子どうしだけ。グッズの＋1は数えない。相手の係の子は選べない）
+          🔁 自分の子 → 相手の名札 → 相手の子
           <div className="say-sub">
-            {mine ? `${mine.icon}${mine.name}` : '自分の生徒：未選択'} ⇄ {theirs ? `${theirs.icon}${theirs.name}（${target!.name}）` : target ? `${target.name}の生徒：未選択` : '相手：未選択'}
+            {chosen(mine)} ⇄ {chosen(theirs)}
           </div>
-          <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'exchange', uid: null })}>
-              やめる
-            </button>
-            <button
-              className="btn primary"
-              disabled={!pick.uid || pick.target === null || !pick.theirUid}
-              onClick={() =>
-                pick.uid && pick.target !== null && pick.theirUid && dispatch({ type: 'exchange', uid: pick.uid, target: pick.target, theirUid: pick.theirUid })
-              }
-            >
-              入れ替える
-            </button>
-          </div>
+          {pair(
+            () => dispatch({ type: 'exchange', uid: null }),
+            '🔁 入れ替える',
+            !!pick.uid && pick.target !== null && !!pick.theirUid,
+            () => pick.uid && pick.target !== null && pick.theirUid && dispatch({ type: 'exchange', uid: pick.uid, target: pick.target, theirUid: pick.theirUid }),
+          )}
         </div>
       );
     }
@@ -292,75 +283,47 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, side, sel 
       const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
       return (
         <div className="say">
-          🦾 {who} のサイボーグ化 — {cardRule(EVENT_MAP.cyborg)}。手前の教室から生徒をタップ
-          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
-          <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'cyborg', uid: null })}>
-              やめる
-            </button>
-            <button className="btn primary" disabled={!pick.uid} onClick={() => dispatch({ type: 'cyborg', uid: pick.uid })}>
-              サイボーグにする（−{marketCost('cyborg')}点）
-            </button>
-          </div>
+          🦾 改造する子をタップ
+          <div className="say-sub">{chosen(st)}</div>
+          {pair(() => dispatch({ type: 'cyborg', uid: null }), `🦾 改造 −${marketCost('cyborg')}`, !!pick.uid, () => dispatch({ type: 'cyborg', uid: pick.uid }))}
         </div>
       );
     }
     case 'equip': {
       const c = EVENT_MAP[ph.card];
       const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+      const attr = 'attr' in c && c.attr && c.attr !== 'all' ? ATTR_ICON[c.attr] : '';
       return (
         <div className="say">
-          {c.icon} {who} がグッズ「{c.name}」を買う — {cardRule(c)}。手前の教室から装備する生徒をタップ
-          <div className="say-sub">{st ? `${st.icon}${st.name}` : '生徒：未選択'}</div>
-          <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'equip', uid: null })}>
-              やめる
-            </button>
-            <button className="btn primary" disabled={!pick.uid} onClick={() => dispatch({ type: 'equip', uid: pick.uid })}>
-              装備する（−{marketCost(ph.card)}点）
-            </button>
-          </div>
+          {c.icon} 持たせる子をタップ（{attr}+1）
+          <div className="say-sub">{chosen(st)}</div>
+          {pair(() => dispatch({ type: 'equip', uid: null }), `${c.icon} 持たせる −${marketCost(ph.card)}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
         </div>
       );
     }
     case 'result': {
       const r = ph.result;
+      const out = new Set(r.outUids ?? []);
       return (
         <div className="reveal">
           <EventCardView result={r} />
           <div className="reveal-side">
-            {side}
-            {r.rows.length > 0 && (
-              <div className="tally">
-                {r.rows.map((row) => {
-                  const p = state.players[row.player];
-                  return (
-                    <div key={row.player} className="tally-row" style={{ borderColor: p.color }}>
-                      <span className="tally-rank">{row.note ?? (row.rank !== undefined ? `${row.rank + 1}位` : '')}</span>
-                      <span className="tally-name">{p.name}</span>
-                      {row.count !== undefined && <span className="tally-count">{row.count}</span>}
-                      <span className={`tally-delta ${row.delta > 0 ? 'up' : row.delta < 0 ? 'down' : ''}`}>
-                        {row.delta > 0 ? '+' : ''}
-                        {row.delta}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
             {r.students && r.students.length > 0 && (
               <div className="deal">
                 {r.students.map((s) => (
-                  <TcgCard key={s.uid} student={s} />
+                  <div key={s.uid} className={`deal-card ${out.has(s.uid) ? 'out' : 'in'}`}>
+                    <TcgCard student={s} size="mini" />
+                    <span className="deal-mark">{out.has(s.uid) ? '👋' : '✨'}</span>
+                  </div>
                 ))}
               </div>
             )}
             {canContinue ? (
               <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
-                次へ
+                次へ ▶
               </button>
             ) : (
-              <div className="say-sub">⏳ {who ?? '誰か'} が「次へ」を押すのを待っています</div>
+              <div className="say-sub">⏳ {who}</div>
             )}
           </div>
         </div>

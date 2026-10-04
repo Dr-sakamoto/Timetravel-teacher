@@ -18,6 +18,8 @@ import {
   eventCost,
   fixedRule,
   isGuerrilla,
+  cardGlyph,
+  fixedGlyph,
   type ContestCard,
   type FixedEvent,
   type GoodsCard,
@@ -376,7 +378,7 @@ function resolveNormal(s: GameState, c: NormalCard, pi: number): EventResult {
   sc.holders.forEach((h) => h.mvp++);
   const rows: ResultRow[] = [{ player: pi, count: sc.total, delta: sc.total, uids: sc.holders.map((h) => h.uid) }];
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), glyph: cardGlyph(c), rows };
 }
 
 /** 共通イベント（全クラス）：プラスのアイコン − マイナスのアイコン（または人数）。状況でプラスにもマイナスにもなる */
@@ -392,7 +394,7 @@ function resolveSwing(s: GameState, c: SwingCard): EventResult {
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, attr: c.plus, minus: c.minus, tone: 'contest', desc: c.desc, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, attr: c.plus, minus: c.minus, tone: 'contest', desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), rows };
 }
 
 /** 時代イベント（全クラス）：カードごとの効果。その時代の生徒のアイコンが2倍 */
@@ -468,7 +470,7 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, art: c.id, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, art: c.id, attr: c.attr, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), rows };
 }
 
 /** 火星人の侵略：空席のあるクラス全部に、アイコンのないエイリアンが1人ずつ転入する */
@@ -494,7 +496,7 @@ function resolveInvasion(s: GameState, c: ContestCard): EventResult {
     return { player: i, delta: 0, note: '👽転入', uids: [st.uid] };
   });
   log(s, `【${c.name}】 空席のあるクラスにエイリアンが転入した。`);
-  return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), rows, students: aliens.slice(0, 1) };
+  return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), rows, students: aliens.slice(0, 1) };
 }
 
 /** サイボーグ化の対象（自分のクラスの子。もうサイボーグの子は除く） */
@@ -513,7 +515,7 @@ function resolveRaid(s: GameState, c: RaidCard): EventResult {
   });
   sortRows(rows);
   logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, art: c.id, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), rows };
+  return { title: c.name, icon: c.icon, art: c.id, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), glyph: cardGlyph(c), rows };
 }
 
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {
@@ -525,7 +527,7 @@ function resolveFixed(s: GameState, f: FixedEvent): EventResult {
   }
   sortRows(rows);
   logRows(s, f.name, rows);
-  return { title: f.name, icon: f.icon, attr: f.rule === 'test' ? 'study' : 'all', tone: 'fixed', desc: '', rule: fixedRule(f), rows };
+  return { title: f.name, icon: f.icon, attr: f.rule === 'test' ? 'study' : 'all', tone: 'fixed', desc: '', rule: fixedRule(f), glyph: fixedGlyph(f), rows };
 }
 
 function setResult(s: GameState, pi: number | null, result: EventResult, ctx: ResultCtx) {
@@ -589,9 +591,10 @@ function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[])
       icon: '📦',
       tone: 'personal',
       desc: gone.length ? `${gone.map((x) => x.icon + x.name).join('・')} が転校していった。` : 'どのクラスも転校させられる子がいなかった。',
-      rule: cardRule(EVENT_MAP.push),
+      rule: cardRule(EVENT_MAP.push), glyph: cardGlyph(EVENT_MAP.push),
       rows: [],
       students: gone,
+      outUids: gone.map((x) => x.uid),
     },
     'turn',
   );
@@ -677,7 +680,7 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
       return;
     case 'kachikomi':
       if (attrScore(p, 'fight').total === 0)
-        setResult(s, pi, { title: c.name, icon: c.icon, tone: 'personal', desc: `${p.name}のクラスには👊を持つ子がいないので、カチコミは起きなかった。`, rule: cardRule(c), rows: [] }, 'turn');
+        setResult(s, pi, { title: c.name, icon: c.icon, tone: 'personal', desc: `${p.name}のクラスには👊を持つ子がいないので、カチコミは起きなかった。`, rule: cardRule(c), glyph: cardGlyph(c), rows: [] }, 'turn');
       else s.phase = { kind: 'kachikomi', player: pi };
       return;
     case 'push':
@@ -726,7 +729,7 @@ function buyPerson(s: GameState, pi: number, slot: number, gone?: Student) {
   addStudent(s, p, st);
   log(s, `${p.name}のクラスに${st.name}が転入！（−${cost}点）`, pi);
   const desc = `${st.icon}${st.name}がやってきた！（−${cost}点）${gone ? ` 入れ替わりに${gone.icon}${gone.name}が転校していった。` : ''}`;
-  setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc, rows: [{ player: pi, delta: -cost, note: 'スカウト' }], students: gone ? [st, gone] : [st] }, 'turn');
+  setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc, rows: [{ player: pi, delta: -cost, note: 'スカウト' }], students: gone ? [st, gone] : [st], outUids: gone ? [gone.uid] : undefined }, 'turn');
 }
 
 /** 手番：場のカードを1枚取る */
@@ -873,7 +876,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: `${p.name}のクラスが${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, rows },
+        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: `${p.name}のクラスが${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), rows },
         'turn',
       );
       return s;
@@ -896,7 +899,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: `${mine.icon}${mine.name} ⇄ ${theirs.icon}${theirs.name}（${to.name}）`, rows: [], students: [theirs, mine] },
+        { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: `${mine.icon}${mine.name} ⇄ ${theirs.icon}${theirs.name}（${to.name}）`, rows: [], students: [theirs, mine], outUids: [mine.uid] },
         'turn',
       );
       return s;
@@ -929,7 +932,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'サイボーグ化', icon: '🦾', art: 'cyborg', tone: 'personal', desc: `${was}がサイボーグになった！`, rule: cardRule(EVENT_MAP.cyborg), rows: [], students: [st] },
+        { title: 'サイボーグ化', icon: '🦾', art: 'cyborg', tone: 'personal', desc: `${was}がサイボーグになった！`, rule: cardRule(EVENT_MAP.cyborg), glyph: cardGlyph(EVENT_MAP.cyborg), rows: [], students: [st] },
         'turn',
       );
       return s;
@@ -951,7 +954,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: c.name, icon: c.icon, attr: c.attr, tone: 'personal', desc: `${st.icon}${st.name}が装備した！`, rule: cardRule(c), rows: [], students: [st] },
+        { title: c.name, icon: c.icon, attr: c.attr, tone: 'personal', desc: `${st.icon}${st.name}が装備した！`, rule: cardRule(c), glyph: cardGlyph(c), rows: [], students: [st] },
         'turn',
       );
       return s;

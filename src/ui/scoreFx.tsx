@@ -442,7 +442,8 @@ export const VARIANTS: Variant[] = [popFly, stamp, receipt, absorb];
 
 /** めくったカードの種類ごとの演出：通常カード→A、襲来→C、時代イベント→B、共通イベント→D */
 export function variantFor(card: FxCard, normal: boolean): Variant {
-  return normal ? popFly : isRaid(card) ? receipt : card.era ? stamp : absorb;
+  // 襲来も吸い込み（明細のレシートは文字が多いので使わない）
+  return normal ? popFly : card.era && !isRaid(card) ? stamp : absorb;
 }
 
 // ---------- 位置の計測と時計 ----------
