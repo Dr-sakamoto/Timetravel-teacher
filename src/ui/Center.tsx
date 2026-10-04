@@ -68,43 +68,48 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
 
   return (
     <div className="center">
-      {ph.kind !== 'memberDraw' && state.market.length > 0 && (
-        <div className={`market ${canPick ? 'glow' : ''}`}>
-          {state.market.map((id, i) => (
-            <MarketCard
-              key={`${i}-${id}`}
-              id={id}
-              selected={selected === i}
-              dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
-              onClick={canPick ? () => setSel(i) : undefined}
-            />
-          ))}
-        </div>
-      )}
-      <div className="piles">
-        <button className="pile event-pile" disabled title="イベントの山札">
-          <span className="pile-back">🃏</span>
-          <span className="pile-label">イベント</span>
-          <span className="pile-count">{state.eventDeck.length}</span>
-        </button>
-        <button className="pile discard" title="山札の内訳を見る" onClick={() => setShowDeck(true)}>
-          <span className="pile-back">🗑️</span>
-          <span className="pile-label">捨て札・内訳</span>
-          <span className="pile-count">{state.discard.length}</span>
-        </button>
-        {ph.kind === 'memberDraw' ? (
-          <button className={`pile modern-pile ${canMember ? 'glow' : ''}`} disabled={!canMember} onClick={() => dispatch({ type: 'drawMember' })}>
-            <span className="pile-back">🏫</span>
-            <span className="pile-label">現代の生徒</span>
-            <span className="pile-count">{state.starters.length}</span>
+      {/* 山札（左）・場のカード（中央）・捨て札（右）を1列に */}
+      <div className="board">
+        <div className="piles">
+          <button className="pile event-pile" disabled title="イベントの山札">
+            <span className="pile-back">🃏</span>
+            <span className="pile-label">イベント</span>
+            <span className="pile-count">{state.eventDeck.length}</span>
           </button>
-        ) : (
-          <div className="pile era-pile" style={{ borderColor: era.color }} title={`まだ転入していない${era.name}の生徒`}>
-            <span className="pile-back">{era.icon}</span>
-            <span className="pile-label">{era.id === 'present' ? '現代の生徒' : `${era.name}の偉人`}</span>
-            <span className="pile-count">{state.pools[era.id].length}</span>
+          {ph.kind === 'memberDraw' ? (
+            <button className={`pile modern-pile ${canMember ? 'glow' : ''}`} disabled={!canMember} onClick={() => dispatch({ type: 'drawMember' })}>
+              <span className="pile-back">🏫</span>
+              <span className="pile-label">現代の生徒</span>
+              <span className="pile-count">{state.starters.length}</span>
+            </button>
+          ) : (
+            <div className="pile era-pile" style={{ borderColor: era.color }} title={`まだ転入していない${era.name}の生徒`}>
+              <span className="pile-back">{era.icon}</span>
+              <span className="pile-label">{era.id === 'present' ? '現代の生徒' : `${era.name}の偉人`}</span>
+              <span className="pile-count">{state.pools[era.id].length}</span>
+            </div>
+          )}
+        </div>
+        {ph.kind !== 'memberDraw' && state.market.length > 0 && (
+          <div className={`market ${canPick ? 'glow' : ''}`}>
+            {state.market.map((id, i) => (
+              <MarketCard
+                key={`${i}-${id}`}
+                id={id}
+                selected={selected === i}
+                dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
+                onClick={canPick ? () => setSel(i) : undefined}
+              />
+            ))}
           </div>
         )}
+        <div className="piles">
+          <button className="pile discard" title="山札の内訳を見る" onClick={() => setShowDeck(true)}>
+            <span className="pile-back">🗑️</span>
+            <span className="pile-label">捨て札・内訳</span>
+            <span className="pile-count">{state.discard.length}</span>
+          </button>
+        </div>
       </div>
       {showDeck && <DeckInfo state={state} onClose={() => setShowDeck(false)} />}
       <div className="action">

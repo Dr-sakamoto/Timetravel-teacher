@@ -32,7 +32,6 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const allCpu = state.players.every((p) => p.isCpu);
   const [speed, setSpeed] = useState<'normal' | 'fast'>('normal');
   const [showLog, setShowLog] = useState(false);
-  const [portraitOk, setPortraitOk] = useState(false);
   /** タップして中身を見ている相手 */
   const [peek, setPeek] = useState<number | null>(null);
   const [focus, setFocus] = useState(() => mySeat ?? state.players.find((p) => !p.isCpu)?.id ?? 0);
@@ -264,16 +263,6 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
       )}
 
       {fx && <div className="fx-layer">{fx.overlay}</div>}
-
-      {!portraitOk && (
-        <div className="rotate-hint">
-          <div className="rotate-hint-icon">📱</div>
-          <b>スマホを横向きにしてね</b>
-          <button className="btn small ghost" onClick={() => setPortraitOk(true)}>
-            このまま遊ぶ
-          </button>
-        </div>
-      )}
 
       {showLog && (
         <div className="log" ref={logRef}>
