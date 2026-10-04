@@ -416,6 +416,8 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
     let delta = 0;
     let count: number | undefined = values[i];
     let note: string | undefined;
+    /** 勝負の順位（名札にメダルを出す） */
+    let place: number | undefined;
     switch (e.type) {
       case 'sum':
         delta = values[i] * e.mult;
@@ -431,10 +433,15 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
         delta = values[i] >= e.need ? e.win : -e.lose;
         note = values[i] >= e.need ? '成功' : '失敗';
         break;
-      case 'battle':
-        delta = best === worst ? 0 : values[i] === best ? e.win : values[i] === worst ? -e.lose : 0;
-        note = best === worst ? '引き分け' : values[i] === best ? '勝利' : values[i] === worst ? '敗北' : undefined;
+      case 'battle': {
+        // 順位：自分より多いクラスの数＋1（同点は同じ順位）。1位と最下位が先、2位はその次
+        const rank = values.filter((v) => v > values[i]).length + 1;
+        const p = best === worst ? 0 : rank === 1 ? 1 : values[i] === worst ? -1 : rank === 2 ? 2 : 3;
+        delta = p === 1 ? e.win : p === 2 ? e.second : p === -1 ? -e.lose : 0;
+        note = best === worst ? '引き分け' : p === -1 ? '最下位' : `${rank}位`;
+        if (best !== worst) place = rank - 1;
         break;
+      }
       case 'minus': {
         const m = attrScore(p, e.minus);
         delta = values[i] - m.total;
@@ -446,7 +453,7 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
     }
     p.points += delta;
     if (delta > 0) holders.filter(has).forEach((h) => h.mvp++);
-    return { player: i, count, delta, note, uids: holders.map((h) => h.uid) };
+    return { player: i, count, rank: place, delta, note, uids: holders.map((h) => h.uid) };
   });
   sortRows(rows);
   logRows(s, c.name, rows);
