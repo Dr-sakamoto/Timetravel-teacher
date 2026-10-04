@@ -107,6 +107,8 @@ export interface MoveCard {
   icon: string;
   desc: string;
   count: number;
+  /** 学期の山札に入る確率（省略時は必ず入る） */
+  odds?: number;
 }
 
 export type EventCard = NormalCard | KachikomiCard | SwingCard | ContestCard | RaidCard | GoodsCard | CyborgCard | MoveCard;
@@ -161,7 +163,7 @@ export const SWING_CARDS: SwingCard[] = [
 ];
 
 export const MOVE_CARDS: MoveCard[] = [
-  { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: '全クラス：係に就いていない生徒を1人、必ず転校させる（クラスから外す）', count: 2 },
+  { id: 'push', kind: 'push', name: '転校', icon: '📦', desc: '全クラス：係に就いていない生徒を1人、必ず転校させる（クラスから外す）', count: 1, odds: 2 / 3 },
   { id: 'exchange', kind: 'exchange', name: 'クラス替え', icon: '🔁', desc: '取った人：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える（印刷されたアイコンの数が同じ子どうしだけ）', count: 1 },
 ];
 

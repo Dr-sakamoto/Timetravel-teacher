@@ -271,6 +271,7 @@ function buildDeck(s: GameState): string[] {
   for (const e of ALL_EVENT_CARDS) {
     const only = cardEra(e);
     if (only && only !== era) continue;
+    if ('odds' in e && e.odds !== undefined && rand(s) >= e.odds) continue;
     for (let i = 0; i < e.count; i++) deck.push(e.id);
   }
   const figures = shuffle(s, [...s.pools[era]]).slice(0, PERSON_CARDS_PER_TERM);
