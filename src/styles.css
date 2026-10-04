@@ -711,6 +711,7 @@ button.chip {
   border-radius: 10px;
   padding: 0.3rem 0.6rem;
 }
+.effect-say:empty,
 .reveal-say:empty {
   display: none;
 }

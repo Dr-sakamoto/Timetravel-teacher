@@ -20,7 +20,7 @@ export function classScore(p: Player): number {
   for (const a of ATTRS) v += attrScore(p, a).total * ATTR_WEIGHT[a];
   for (const c of SWING_CARDS) {
     const plus = attrScore(p, c.plus).total;
-    const minus = !c.minus ? 0 : c.minus === 'heads' ? p.students.length : attrScore(p, c.minus).total;
+    const minus = c.minus ? attrScore(p, c.minus).total : 0;
     v += plus - minus;
   }
   v += (attrScore(p, 'study').total - countAttr(p, 'fight') * TEST_YANKEE_PENALTY) * 2;

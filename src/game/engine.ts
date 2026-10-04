@@ -1,4 +1,4 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
+import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
 import { CARDS, CARD_MAP, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
@@ -383,15 +383,15 @@ function resolveNormal(s: GameState, c: NormalCard, pi: number): EventResult {
   return { title: c.name, icon: c.icon, attr: c.attr, tone: 'normal', desc: '', rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows };
 }
 
-/** 共通イベント（全クラス）：プラスのアイコン − マイナスのアイコン（または人数）。状況でプラスにもマイナスにもなる */
+/** 共通イベント（全クラス）：プラスのアイコンの数だけ得点（マイナスのアイコンがあれば、その数だけ減点） */
 function resolveSwing(s: GameState, c: SwingCard): EventResult {
   const rows = s.players.map((p, i): ResultRow => {
     const plus = attrScore(p, c.plus);
-    const minus = !c.minus ? { total: 0, holders: [] as Student[] } : c.minus === 'heads' ? { total: p.students.length, holders: [] as Student[] } : attrScore(p, c.minus);
+    const minus = c.minus ? attrScore(p, c.minus) : { total: 0, holders: [] as Student[] };
     const delta = plus.total - minus.total;
     p.points += delta;
     if (delta > 0) plus.holders.forEach((h) => h.mvp++);
-    const note = c.minus ? `${ATTR_ICON[c.plus]}${plus.total}−${c.minus === 'heads' ? '👥' : ATTR_ICON[c.minus]}${minus.total}` : undefined;
+    const note = c.minus ? `${ATTR_ICON[c.plus]}${plus.total}−${ATTR_ICON[c.minus]}${minus.total}` : undefined;
     return { player: i, count: c.minus ? undefined : plus.total, delta, note, uids: [...plus.holders, ...minus.holders].map((h) => h.uid) };
   });
   sortRows(rows);
@@ -407,9 +407,7 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
   const has = (x: Student) => (c.attr === 'all' ? x.attrs.length > 0 : x.attrs.includes(c.attr));
   const icon = c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr];
   const scores = s.players.map((p) => attrScore(p, c.attr, c.era));
-  // 代表：クラスで一番そのアイコンの点が多い1人
-  const aces = s.players.map((p) => contributions(p, c.attr, c.era).sort((x, y) => y.pts - x.pts)[0]);
-  const values = s.players.map((_, i) => (e.type === 'ace' || e.type === 'champion' ? aces[i]?.pts ?? 0 : scores[i].total));
+  const values = scores.map((x) => x.total);
   const best = Math.max(...values);
   const worst = Math.min(...values);
   const rows = s.players.map((p, i): ResultRow => {
@@ -422,29 +420,15 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
       case 'sum':
         delta = values[i] * e.mult;
         break;
-      case 'champion':
-        delta = values[i] > 0 && values[i] === best ? values[i] * e.mult : 0;
-        note = delta > 0 ? '優勝' : undefined;
-        break;
       case 'top':
-        delta = values[i] > 0 && values[i] === best ? values[i] * e.mult : 0;
-        note = delta > 0 ? '総取り' : undefined;
-        break;
-      case 'ace':
-        delta = values[i] * e.mult;
+        delta = values[i] > 0 && values[i] === best ? e.win : 0;
+        note = delta > 0 ? '1位' : undefined;
         break;
       case 'heads': {
         const n = p.students.filter(has).reduce((a, x) => a + (x.era === c.era ? 2 : 1), 0);
         count = n;
         delta = n * e.per;
         note = `${n}人`;
-        break;
-      }
-      case 'variety': {
-        const kinds = new Set(p.students.flatMap((x) => x.attrs)).size;
-        count = kinds;
-        delta = kinds * e.per;
-        note = `${kinds}種類`;
         break;
       }
       case 'threshold':
@@ -456,16 +440,14 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
         note = best === worst ? '引き分け' : values[i] === best ? '勝利' : values[i] === worst ? '敗北' : undefined;
         break;
       case 'minus': {
-        const m = e.minus === 'without' ? p.students.filter((x) => !has(x)) : attrScore(p, e.minus).holders;
-        const lost = e.minus === 'without' ? m.length : attrScore(p, e.minus).total;
-        delta = values[i] - lost;
-        note = `${icon}${values[i]}−${e.minus === 'without' ? '🙅' : ATTR_ICON[e.minus]}${lost}`;
+        const m = attrScore(p, e.minus);
+        delta = values[i] - m.total;
+        note = `${icon}${values[i]}−${ATTR_ICON[e.minus]}${m.total}`;
         count = undefined;
-        holders = [...holders, ...m];
+        holders = [...holders, ...m.holders];
         break;
       }
     }
-    if (e.type === 'ace' || e.type === 'champion') holders = aces[i] ? [aces[i].student] : [];
     p.points += delta;
     if (delta > 0) holders.filter(has).forEach((h) => h.mvp++);
     return { player: i, count, delta, note, uids: holders.map((h) => h.uid) };

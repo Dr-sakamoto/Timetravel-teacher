@@ -1,4 +1,5 @@
 import { ATTR_ICON, type Attr, type EraId, type Rarity } from '../types';
+import { ERAS } from './eras';
 
 /** 通常カード（○○の時間）：場から取った人だけ、クラス全員のそのアイコンの合計数（＋係ボーナス）が入る。全時代共通 */
 export interface NormalCard {
@@ -21,42 +22,36 @@ export interface KachikomiCard {
   count: number;
 }
 
-/** 共通イベント（全クラス）：「プラスのアイコン − マイナスのアイコン（または人数）」が入る。クラスの状況でプラスにもマイナスにもなる */
+/** 共通イベント（全クラス）：プラスのアイコンの数だけ得点（マイナスのアイコンがあれば、その数だけ減点） */
 export interface SwingCard {
   id: string;
   kind: 'swing';
   name: string;
   icon: string;
   plus: Attr;
-  /** 引かれるアイコン（または人数）。なければプラスだけ */
-  minus?: Attr | 'heads';
+  /** 減点になるアイコン。なければプラスだけ */
+  minus?: Attr;
   desc: string;
   count: number;
 }
 
 /**
- * 時代イベントの効果（数えるアイコンはカードの attr。その時代出身の生徒のアイコンはどれも2倍、係ボーナスも乗る）
- *   sum       … クラスのアイコンの合計 × mult
- *   top       … アイコンの合計が一番多いクラスだけ、合計 × mult（同点ならどちらも）
- *   ace       … どのクラスも、クラスで一番アイコンの多い1人（代表）の数 × mult
- *   champion  … 全クラスで一番アイコンの多い1人がいるクラスだけ、その子の数 × mult（同点ならどちらも）
- *   heads     … そのアイコンを持つ子1人につき per 点（その時代出身の子は2人分）
- *   threshold … アイコンの合計が need 以上なら +win、届かなければ −lose
- *   battle    … アイコンの合計が1位のクラスに +win、最下位のクラスに −lose
- *   minus     … アイコンの合計 − 引くアイコンの合計（'without' はそのアイコンを持たない子の人数）
- *   variety   … クラスにそろっているアイコンの種類数 × per
+ * 時代イベントの効果（どれも1文で言えるもの。数えるアイコンはカードの attr。その時代出身の生徒のアイコンは2倍、係ボーナスも乗る）
+ *   sum       … 「Xの数だけ得点」（× mult）
+ *   top       … 「Xが一番多いクラスに +win」（同点ならどちらも）
+ *   heads     … 「Xを持つ子1人につき +per」（その時代出身の子は2人分）
+ *   threshold … 「Xが need 以上なら +win、足りないと −lose」
+ *   battle    … 「Xが1位のクラスに +win、最下位に −lose」
+ *   minus     … 「Xで得点、Y で減点」
  *   alien     … 点は動かない。空いている席があるクラス全部に、アイコンのないエイリアンが1人ずつ転入する
  */
 export type EraEffect =
   | { type: 'sum'; mult: number }
-  | { type: 'top'; mult: number }
-  | { type: 'ace'; mult: number }
-  | { type: 'champion'; mult: number }
+  | { type: 'top'; win: number }
   | { type: 'heads'; per: number }
   | { type: 'threshold'; need: number; win: number; lose: number }
   | { type: 'battle'; win: number; lose: number }
-  | { type: 'minus'; minus: Attr | 'without' }
-  | { type: 'variety'; per: number }
+  | { type: 'minus'; minus: Attr }
   | { type: 'alien' };
 
 /** 時代イベント（全クラス）：カードごとの効果。その時代出身の生徒のアイコンは2倍 */
@@ -157,14 +152,14 @@ export const NORMAL_CARDS: NormalCard[] = [
 
 export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, count: 3 }];
 
-const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | 'heads' | undefined, desc: string): SwingCard => ({
+const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | undefined, desc: string): SwingCard => ({
   id, kind: 'swing', name, icon, plus, minus, desc, count: 1,
 });
 export const SWING_CARDS: SwingCard[] = [
   W('poptest', '抜き打ちテスト', '📝', 'study', undefined, '日ごろの勉強がものを言う。'),
   W('visit', '授業参観', '👀', 'charm', 'fight', '親の前でいいところを見せたい。'),
-  W('marathon', '持久走大会', '🥵', 'sports', 'heads', '全員が走る。走れない子は足を引っぱる。'),
-  W('chorus', '合唱練習', '🎶', 'art', 'heads', '全員で歌う。音痴が混ざると台なし。'),
+  W('marathon', '持久走大会', '🥵', 'sports', undefined, '全員が走る。足の速い子が多いクラスが有利。'),
+  W('chorus', '合唱コンクール', '🎶', 'art', undefined, '全員で歌う。歌のうまい子が多いほど響く。'),
 ];
 
 export const MOVE_CARDS: MoveCard[] = [
@@ -233,17 +228,17 @@ const C = (id: string, name: string, icon: string, attr: Attr | 'all', effect: E
 /** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代の優遇アイコン（ERAS の favor）で競う。その時代出身の生徒はアイコン2倍 */
 export const ERA_CARDS: ContestCard[] = [
   // 現代：優遇なし（全アイコンで競う）
-  C('bunkasai', '文化祭', '🎪', 'all', { type: 'variety', per: 2 }, 'クラスの出し物。いろんな得意がそろうほど盛り上がる。', 'present'),
-  C('seitokai', '生徒会長選挙', '🗳️', 'all', { type: 'champion', mult: 2 }, '全校で一番の万能な子が会長に。そのクラスだけが鼻が高い。', 'present'),
+  C('bunkasai', '文化祭', '🎪', 'all', { type: 'battle', win: 8, lose: 3 }, 'クラスの出し物で勝負。一番盛り上がったクラスが優勝。', 'present'),
+  C('seitokai', '生徒会長選挙', '🗳️', 'all', { type: 'top', win: 6 }, '一番頼れるクラスから会長が出る。', 'present'),
   // 白亜紀：👊のみ
-  C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'top', mult: 2 }, '一番強い群れが縄張りを総取り。2番手以下は何も得られない。', 'cretaceous'),
-  C('trex_sumo', 'ティラノサウルスと力くらべ', '🦖', 'fight', { type: 'ace', mult: 2 }, 'どのクラスも代表1人が、ティラノサウルスと押しあう。', 'cretaceous'),
+  C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'top', win: 10 }, '一番強い群れが縄張りを総取り。2番手以下は何も得られない。', 'cretaceous'),
+  C('trex_sumo', 'ティラノサウルスと力くらべ', '🦖', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, '力を合わせて押し返せ。力が足りないと踏みつぶされる。', 'cretaceous'),
   // 古代エジプト：🏃👑
   C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'threshold', need: 8, win: 8, lose: 3 }, '巨大な石を運んで積み上げろ。期日までに完成しなければ罰。', 'egypt'),
-  C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'champion', mult: 3 }, 'ファラオのお気に入りになれるのは、一番人望のある1人だけ。', 'egypt'),
+  C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'heads', per: 2 }, 'ファラオに気に入られる子が多いほど、クラスの株が上がる。', 'egypt'),
   // ギリシャ・ローマ：🏃📚
-  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'champion', mult: 3 }, 'オリーブ冠をもらえるのは優勝者1人だけ。その子のクラスに栄光。', 'greece'),
-  C('socrates_q', 'ソクラテスの問答', '🧔', 'study', { type: 'minus', minus: 'without' }, 'アテネの広場で問い詰められる。答えられない子は恥をかく。', 'greece'),
+  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'top', win: 10 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。', 'greece'),
+  C('socrates_q', 'ソクラテスの問答', '🧔', 'study', { type: 'minus', minus: 'fight' }, 'アテネの広場で議論。腕っぷしで黙らせようとすると恥をかく。', 'greece'),
   // 古代中国：📚👊
   C('keju', '科挙', '📜', 'study', { type: 'threshold', need: 8, win: 8, lose: 3 }, '超難関の官僚登用試験。合格ラインに届かなければ不名誉。', 'china'),
   C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 8, lose: 4 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
@@ -251,19 +246,19 @@ export const ERA_CARDS: ContestCard[] = [
   C('tentoku', '天徳内裏歌合', '🌸', 'art', { type: 'battle', win: 6, lose: 3 }, '村上天皇の御前で和歌の勝負。勝ち負けがはっきりつく。', 'heian'),
   C('michinaga', '藤原道長の宴', '🌕', 'charm', { type: 'heads', per: 2 }, '「この世をば…」。招かれるほど人望のある子が多いクラスが得をする。', 'heian'),
   // 中世・ルネサンス：🎨👊
-  C('medici', 'メディチ家のパトロン選び', '💰', 'art', { type: 'top', mult: 2 }, 'フィレンツェの大富豪が援助するのは一番のクラスだけ。', 'europe'),
-  C('joust', '馬上槍試合', '🏇', 'fight', { type: 'ace', mult: 2 }, 'どのクラスも代表の騎士1人が一騎打ちに出る。', 'europe'),
+  C('medici', 'メディチ家のパトロン選び', '💰', 'art', { type: 'top', win: 8 }, 'フィレンツェの大富豪が援助するのは一番のクラスだけ。', 'europe'),
+  C('joust', '馬上槍試合', '🏇', 'fight', { type: 'battle', win: 8, lose: 4 }, '騎士どうしの一騎打ち。勝てば名誉、負ければ落馬。', 'europe'),
   // 戦国：👊👑
   C('sekigahara', '関ヶ原の戦い', '⚔️', 'fight', { type: 'battle', win: 10, lose: 5 }, '天下分け目の大合戦。勝てば大出世、負ければ大損。', 'sengoku'),
   C('rakuichi', '楽市・楽座', '🏮', 'charm', { type: 'sum', mult: 1 }, '信長の城下町。人望のある子がいるほど商人が集まる。', 'sengoku'),
   // 江戸・幕末：🎨🏃
-  C('nakamuraza', '中村座の歌舞伎興行', '🎭', 'art', { type: 'minus', minus: 'without' }, '江戸三座の大舞台。演技のできない子は大根役者として足を引っぱる。', 'edo'),
+  C('nakamuraza', '中村座の歌舞伎興行', '🎭', 'art', { type: 'sum', mult: 1 }, '江戸三座の大舞台。芸達者な子がいるほど客が入る。', 'edo'),
   C('ino', '伊能忠敬の日本地図測量', '🗾', 'sports', { type: 'heads', per: 2 }, '日本中を歩いて測る。歩ける子が多いほど地図が早くできる。', 'edo'),
   // 近代：📚👑
-  C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'champion', mult: 3 }, '受賞できるのは世界で一番の頭脳1人だけ。そのクラスに栄誉。', 'modern'),
+  C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'top', win: 10 }, '受賞するのは、一番の頭脳がそろったクラス。', 'modern'),
   C('rokumeikan', '鹿鳴館の舞踏会', '💃', 'charm', { type: 'heads', per: 2 }, '文明開化の社交界。踊りに誘われる子が多いほど評判が上がる。', 'modern'),
   // 未来：📚のみ
-  C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'ace', mult: 3 }, 'どのクラスも、一番の天才が作ったロボットで勝負。', 'future'),
+  C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'threshold', need: 8, win: 10, lose: 4 }, 'ロボットを作って出場。頭脳が足りないと動かない。', 'future'),
   C('martian', '火星人の侵略', '👽', 'study', { type: 'alien' }, '空いている席に、何もできない火星人が勝手に座る。', 'future'),
 ];
 
@@ -312,10 +307,10 @@ export function cardRule(c: EventCard): string {
     case 'kachikomi':
       return `手番の人が他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
     case 'swing':
-      if (!c.minus) return `全クラス：クラス全員の${ATTR_ICON[c.plus]}の数を加点`;
-      return `全クラス：${ATTR_ICON[c.plus]}の数 − ${c.minus === 'heads' ? 'クラスの人数' : `${ATTR_ICON[c.minus]}の数`}（マイナスもある）`;
+      if (!c.minus) return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点`;
+      return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点、${ATTR_ICON[c.minus]}の数だけ減点`;
     case 'contest':
-      return c.effect.type === 'alien' || c.effect.type === 'variety' ? `全クラス：${eraEffectRule(c)}` : `全クラス：${eraEffectRule(c)}（この時代の生徒は2倍）`;
+      return c.effect.type === 'alien' ? `全クラス：${eraEffectRule(c)}` : `全クラス：${eraEffectRule(c)}（この時代の生徒は2倍）`;
     case 'raid':
       return `全クラス：クラスの👊の数 − ${c.threat}（この時代の生徒は2倍）`;
     case 'goods':
@@ -327,31 +322,25 @@ export function cardRule(c: EventCard): string {
   }
 }
 
-/** 時代イベントの効果の説明文 */
+/** 時代イベントの効果の説明文（1文） */
 export function eraEffectRule(c: ContestCard): string {
-  const a = c.attr === 'all' ? '全アイコン' : ATTR_ICON[c.attr];
+  const a = c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr];
   const e = c.effect;
   switch (e.type) {
     case 'sum':
-      return `クラス全員の${a}の数${e.mult !== 1 ? `×${e.mult}` : ''}を加点`;
+      return `${a}の数${e.mult !== 1 ? `×${e.mult}` : ''}だけ得点`;
     case 'top':
-      return `${a}の数が一番多いクラスだけ、その数×${e.mult}を加点`;
-    case 'ace':
-      return `どのクラスも、${a}が一番多い代表1人の${a}の数×${e.mult}を加点`;
-    case 'champion':
-      return `全クラスで${a}が一番多い1人のクラスだけ、その子の${a}の数×${e.mult}を加点`;
+      return `${a}が一番多いクラスに+${e.win}`;
     case 'heads':
       return `${a}を持つ子1人につき+${e.per}`;
     case 'threshold':
-      return `${a}の数が${e.need}以上なら+${e.win}、足りなければ−${e.lose}`;
+      return `${a}が${e.need}以上なら+${e.win}、足りないと−${e.lose}`;
     case 'battle':
-      return `${a}の数が1位のクラスは+${e.win}、最下位のクラスは−${e.lose}`;
+      return `${a}が1位のクラスに+${e.win}、最下位に−${e.lose}`;
     case 'minus':
-      return e.minus === 'without' ? `${a}の数 − ${a}を持たない子の人数（マイナスもある）` : `${a}の数 − ${ATTR_ICON[e.minus]}の数（マイナスもある）`;
-    case 'variety':
-      return `クラスにそろっているアイコンの種類数×${e.per}を加点`;
+      return `${a}の数だけ得点、${ATTR_ICON[e.minus]}の数だけ減点`;
     case 'alien':
-      return '空席のあるクラスに、アイコンのない火星人が1人ずつ転入';
+      return '空いている席に、アイコンのない火星人が1人ずつ来る';
   }
 }
 
@@ -372,7 +361,7 @@ export function cardGlyph(c: EventCard): string {
     case 'kachikomi':
       return `👊×${c.mult} → 😵`;
     case 'swing':
-      return c.minus ? `${ATTR_ICON[c.plus]} − ${c.minus === 'heads' ? '👥' : ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
+      return c.minus ? `+${ATTR_ICON[c.plus]}　−${ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
     case 'contest':
       return contestGlyph(c);
     case 'raid':
@@ -391,26 +380,19 @@ export function cardGlyph(c: EventCard): string {
 function contestGlyph(c: ContestCard): string {
   const a = c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr];
   const e = c.effect;
-  const x = (m: number) => (m !== 1 ? `×${m}` : '');
   switch (e.type) {
     case 'sum':
-      return `${a}${x(e.mult)} → +`;
+      return `${a}${e.mult !== 1 ? `×${e.mult}` : ''} → +`;
     case 'top':
-      return `🥇 ${a}${x(e.mult)}`;
-    case 'ace':
-      return `🧑${a}${x(e.mult)}`;
-    case 'champion':
-      return `🏆🧑 ${a}${x(e.mult)}`;
+      return `🥇${a} → +${e.win}`;
     case 'heads':
-      return `🧑${a} → +${e.per}`;
+      return `🧑${a} → +${e.per}ずつ`;
     case 'threshold':
-      return `${a} ${e.need}↑ ⭕+${e.win} ❌−${e.lose}`;
+      return `${a}${e.need}↑ +${e.win}／−${e.lose}`;
     case 'battle':
-      return `🥇+${e.win}　最下位−${e.lose}`;
+      return `${a} 🥇+${e.win}／最下位−${e.lose}`;
     case 'minus':
-      return e.minus === 'without' ? `${a} − 🚫${a}🧑` : `${a} − ${ATTR_ICON[e.minus]}`;
-    case 'variety':
-      return `🌈種類 ×${e.per}`;
+      return `+${a}　−${ATTR_ICON[e.minus]}`;
     case 'alien':
       return '🪑 → 👽';
   }
@@ -420,55 +402,27 @@ export function fixedGlyph(f: FixedEvent): string {
   return f.rule === 'test' ? `📚 − 👊🧑×${TEST_YANKEE_PENALTY}　🥇🥈🥉` : '🌈 全部　🥇🥈🥉';
 }
 
-/** カードの一言説明（選んだとき・めくったときに出す）。ルール説明のごく短い版 */
+/** カードの一言説明（選んだとき・めくったときに出す）。式だけで足りるものは空 */
 export function shortRule(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
       return `${ATTR_ICON[c.attr]}の数だけ得点`;
     case 'kachikomi':
-      return `相手1クラスに👊×${c.mult}のダメージ`;
+      return `相手に👊×${c.mult}のダメージ`;
     case 'swing':
-      return c.minus ? `${ATTR_ICON[c.plus]}の数 − ${c.minus === 'heads' ? '人数' : `${ATTR_ICON[c.minus]}の数`}` : `${ATTR_ICON[c.plus]}の数だけ得点`;
+      return c.minus ? `${ATTR_ICON[c.plus]}で得点、${ATTR_ICON[c.minus]}で減点` : `${ATTR_ICON[c.plus]}の数だけ得点`;
     case 'contest':
-      return `${contestShort(c)}${c.effect.type === 'alien' || c.effect.type === 'variety' ? '' : '（時代の子×2）'}`;
+      return c.effect.type === 'alien' ? eraEffectRule(c) : `${eraEffectRule(c)}（${ERAS.find((x) => x.id === c.era)!.icon}の子×2）`;
     case 'raid':
-      return `👊の数 − 敵${c.threat}（時代の子×2）`;
+      return `👊の数から敵の強さ${c.threat}を引いた分だけ得点（${ERAS.find((x) => x.id === c.era)!.icon}の子×2）`;
     case 'goods':
-      return '生徒1人に（1人1つまで）';
+      return '';
     case 'cyborg':
-      return '生徒1人をサイボーグに改造';
+      return `${CYBORG_ATTRS.map((a) => ATTR_ICON[a]).join('')}のサイボーグに改造`;
     case 'push':
-      return '全クラス1人ずつ転校';
+      return 'どのクラスも1人ずつ転校';
     case 'exchange':
       return '相手の子と1人交換';
-  }
-}
-
-function contestShort(c: ContestCard): string {
-  const a = c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr];
-  const e = c.effect;
-  const x = (m: number) => (m !== 1 ? `×${m}` : '');
-  switch (e.type) {
-    case 'sum':
-      return `${a}の数${x(e.mult)}だけ得点`;
-    case 'top':
-      return `${a}最多のクラスが総取り${x(e.mult)}`;
-    case 'ace':
-      return `代表1人の${a}${x(e.mult)}`;
-    case 'champion':
-      return `${a}最多の1人のクラスだけ${x(e.mult)}`;
-    case 'heads':
-      return `${a}の子1人につき+${e.per}`;
-    case 'threshold':
-      return `${a}${e.need}以上+${e.win}／未満−${e.lose}`;
-    case 'battle':
-      return `${a}1位+${e.win}／最下位−${e.lose}`;
-    case 'minus':
-      return e.minus === 'without' ? `${a}の数 − ${a}なしの子` : `${a}の数 − ${ATTR_ICON[e.minus]}の数`;
-    case 'variety':
-      return `アイコンの種類×${e.per}`;
-    case 'alien':
-      return '空席に火星人が転入';
   }
 }
 
