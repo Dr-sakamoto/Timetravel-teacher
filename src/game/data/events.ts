@@ -378,7 +378,7 @@ export function cardGlyph(c: EventCard): string {
 }
 
 function contestGlyph(c: ContestCard): string {
-  const a = c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr];
+  const a = c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr];
   const e = c.effect;
   switch (e.type) {
     case 'sum':
@@ -399,7 +399,7 @@ function contestGlyph(c: ContestCard): string {
 }
 
 export function fixedGlyph(f: FixedEvent): string {
-  return f.rule === 'test' ? `📚 − 👊🧑×${TEST_YANKEE_PENALTY}　🥇🥈🥉` : '🌈 全部　🥇🥈🥉';
+  return f.rule === 'test' ? `📚 − 👊🧑×${TEST_YANKEE_PENALTY}　🥇🥈🥉` : 'アイコンの数　🥇🥈🥉';
 }
 
 /** カードの一言説明（選んだとき・めくったときに出す）。式だけで足りるものは空 */

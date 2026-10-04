@@ -405,7 +405,7 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
   if (e.type === 'alien') return resolveInvasion(s, c);
   /** その子が競うアイコンを持っているか */
   const has = (x: Student) => (c.attr === 'all' ? x.attrs.length > 0 : x.attrs.includes(c.attr));
-  const icon = c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr];
+  const icon = c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr];
   const scores = s.players.map((p) => attrScore(p, c.attr, c.era));
   const values = scores.map((x) => x.total);
   const best = Math.max(...values);
@@ -998,7 +998,7 @@ export function deckBreakdown(s: GameState): DeckRow[] {
         case 'cyborg':
           return { ...base, group: '時代イベント' };
         case 'contest':
-          return { ...base, name: c.effect.type === 'alien' ? c.name : `${c.name}（${c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr]}）`, group: '時代イベント' };
+          return { ...base, name: c.effect.type === 'alien' ? c.name : `${c.name}（${c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr]}）`, group: '時代イベント' };
         case 'raid':
           return { ...base, name: `${c.name}（強さ${c.threat}）`, group: '時代イベント' };
       }

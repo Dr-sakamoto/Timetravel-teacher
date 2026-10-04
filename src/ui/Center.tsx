@@ -41,7 +41,7 @@ function MarketCard({ id, selected, dim, onClick }: { id: string; selected: bool
     );
   }
   const c = EVENT_MAP[id];
-  const attr = 'attr' in c && c.attr ? (c.attr === 'all' ? '🌈' : ATTR_ICON[c.attr]) : null;
+  const attr = 'attr' in c && c.attr && c.attr !== 'all' ? ATTR_ICON[c.attr] : null;
   const tone = c.kind === 'normal' ? 'normal' : 'personal';
   return (
     <button className={`mcard tone-${tone} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
