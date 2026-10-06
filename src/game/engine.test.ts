@@ -607,13 +607,100 @@ describe('engine', () => {
       });
     });
 
-    it('keju: each class\'s best scholar takes the exam and gains a 📚 on passing', () => {
-      const r = run('keju', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study', 'study'])], [mk('c', ['study', 'study'], 'china')]]);
-      const attrs = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!.attrs;
-      expect(attrs(0, 'a')).toEqual(['study', 'study', 'study', 'study']);
-      expect(attrs(1, 'b')).toEqual(['study', 'study']);
-      // その時代の子も2倍にはならない
-      expect(attrs(2, 'c')).toEqual(['study', 'study']);
+    it('chibi: the other classes ally against the class with the most 👊; if together they have more, the big fleet burns', () => {
+      // 連合の👊 2+2=4 ＞ 3 → 大船団 −10、ほかの全クラス +4
+      expect(run('chibi', [[mk('y', ['fight', 'fight', 'fight'])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight'])]]).delta).toEqual([-10, 4, 4]);
+      // 大船団がどのクラスでも同じ
+      expect(run('chibi', [[mk('y', ['fight', 'fight'])], [mk('b', ['fight', 'fight', 'fight'])], [mk('c', ['fight', 'fight'])]]).delta).toEqual([4, -10, 4]);
+      // 連合が届かなければ大船団 +10
+      expect(run('chibi', [[mk('y', ['fight', 'fight', 'fight', 'fight'])], [mk('b', ['fight'])], [mk('c', ['fight'])]]).delta).toEqual([10, 0, 0]);
+      // 一番が並ぶ・だれも👊を持たないなら、にらみ合いで何も起こらない
+      expect(run('chibi', [[mk('y', ['fight'])], [mk('b', ['fight'])], []]).delta).toEqual([0, 0, 0]);
+      expect(run('chibi', [[mk('y', ['study'])], [], []]).delta).toEqual([0, 0, 0]);
+    });
+
+    it('sangu: the best 📚 student without a role becomes a strategist, and their 📚 counts double until the term ends', () => {
+      const r = run('sangu', [[mk('a', ['study', 'study']), mk('a2', ['study', 'study', 'study'])], [mk('b', ['art'])], [mk('c', ['study'])]], [10, 10, 10], [[{ role: 'study', uid: 'a2' }], [], []]);
+      expect(r.delta).toEqual([0, 0, 0]);
+      const st = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!;
+      // 係に就いている a2 ではなく、係のない a が軍師に
+      expect(st(0, 'a').gunshi).toBe('study');
+      expect(st(0, 'a2').gunshi).toBeUndefined();
+      expect(st(1, 'b').gunshi).toBeUndefined();
+      expect(st(2, 'c').gunshi).toBe('study');
+      // a2（学習係）3×2 ＋ a（軍師）2×2 ＝ 10。アイコンそのものは増えない
+      expect(attrScore(r.after.players[0], 'study').total).toBe(10);
+      expect(st(0, 'a').attrs).toEqual(['study', 'study']);
+      // 学期が変わると軍師でなくなる
+      let t = structuredClone(r.after);
+      const term = (x: GameState) => termOfMonth(MONTHS[x.monthIdx]);
+      const start = term(t);
+      while (term(t) === start) t = step(t, cpuAction(t)!);
+      expect(t.players.flatMap((p) => p.students).some((x) => x.gunshi)).toBe(false);
+    });
+
+    it('himiko: in each class, the student without goods who has the most icons receives a bronze mirror (👑+1)', () => {
+      const worn = { ...mk('a', ['charm', 'charm', 'charm']), goods: { id: 'g_book', name: '参考書', icon: '📕', attr: 'study' as Attr } };
+      const r = run('himiko', [[worn, mk('a2', ['study', 'art']), mk('a3', ['sports'])], [mk('b', ['study'])], []]);
+      expect(r.delta).toEqual([0, 0, 0]);
+      const st = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!;
+      // グッズを持っている a は受け取れない。残りでアイコンが一番多い a2 が受け取る
+      expect(st(0, 'a').goods?.id).toBe('g_book');
+      expect(st(0, 'a2').goods?.id).toBe('g_mirror');
+      expect(st(0, 'a2').attrs).toEqual(['study', 'art', 'charm']);
+      expect(st(1, 'b').goods?.id).toBe('g_mirror');
+      expect(r.after.players[0].students.filter((x) => x.goods?.id === 'g_mirror')).toHaveLength(1);
+    });
+
+    describe('taoyuan: the class with the fewest points picks sworn brothers, and they share what they gain until the term ends', () => {
+      const sworn = () => run('taoyuan', [[mk('a', ['charm'])], [mk('b', ['charm', 'charm'])], [mk('c', ['study'])]], [10, 4, 10]).after;
+
+      it('the class with the fewest points chooses up to two other classes', () => {
+        const t = sworn();
+        expect(t.phase).toEqual({ kind: 'oath', player: 1, max: 2 });
+        // 自分・同じクラス2回・選ばない、はだめ
+        expect(step(t, { type: 'oath', targets: [1] })).toBe(t);
+        expect(step(t, { type: 'oath', targets: [0, 0] })).toBe(t);
+        expect(step(t, { type: 'oath', targets: [] })).toBe(t);
+        const after = step(t, { type: 'oath', targets: [2] });
+        expect(after.oath).toEqual({ players: [1, 2], base: [4, 10] });
+        expect(after.phase).toMatchObject({ kind: 'result', player: null });
+        expect(after.players.map((p) => p.points)).toEqual([10, 4, 10]);
+        // CPUも選べる
+        expect(step(t, cpuAction(t)!)).not.toBe(t);
+      });
+
+      it('nothing happens if an oath is already in place', () => {
+        const t = structuredClone(base);
+        t.oath = { players: [0, 1], base: [0, 0] };
+        t.eventDeck.push('taoyuan');
+        const after = step(t, pass);
+        expect(after.phase).toMatchObject({ kind: 'result' });
+        expect(after.oath).toEqual(t.oath);
+      });
+
+      it('at the end of the term, the sworn classes split their combined gains evenly', () => {
+        let t = step(sworn(), { type: 'oath', targets: [0, 2] });
+        // 誓ったあとの稼ぎを合わせて、3クラスで同じだけ分ける（割り切れない分は1点差まで）
+        t.players[1].points += 12;
+        t.players[0].points -= 2;
+        t.players[2].points += 3;
+        let before = t;
+        while (!(t.phase.kind === 'result' && t.phase.ctx === 'oath')) {
+          before = t;
+          t = step(t, cpuAction(t)!);
+        }
+        const gains = before.players.map((p, i) => p.points - before.oath!.base[before.oath!.players.indexOf(i)]);
+        const total = gains.reduce((x, g) => x + g, 0);
+        const shared = t.players.map((p, i) => p.points - before.oath!.base[before.oath!.players.indexOf(i)]);
+        expect(shared.reduce((x, g) => x + g, 0)).toBe(total);
+        expect(Math.max(...shared) - Math.min(...shared)).toBeLessThanOrEqual(1);
+        expect(t.oath).toBeUndefined();
+        // 次へで新しい学期（または進級）に進む
+        t = step(t, { type: 'continue' });
+        expect(['roles', 'result']).toContain(t.phase.kind);
+        expect(t.oath).toBeUndefined();
+      });
     });
 
     it('michinaga: every other class sends gifts to the class with the most 👑', () => {

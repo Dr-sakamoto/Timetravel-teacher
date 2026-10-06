@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, NEW_WORLD_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow, voteTargets } from './engine';
+import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -204,6 +204,13 @@ export function cpuAction(s: GameState): Action | null {
         }
       }
       return { type: 'newWorld', item: best!.item, uid: best!.uid };
+    }
+    case 'oath': {
+      // 桃園の誓い：自分より強い（これから稼ぎそうな）クラスと義兄弟になる。いなければ一番強い1クラスだけ
+      const mine = classScore(s.players[ph.player]);
+      const targets = oathTargets(s, ph.player).sort((x, y) => classScore(s.players[y]) - classScore(s.players[x]));
+      const stronger = targets.filter((t) => classScore(s.players[t]) >= mine);
+      return { type: 'oath', targets: (stronger.length ? stronger : targets).slice(0, stronger.length ? ph.max : 1) };
     }
     case 'result':
       return { type: 'continue' };

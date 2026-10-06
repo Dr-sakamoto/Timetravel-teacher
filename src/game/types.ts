@@ -67,6 +67,8 @@ export interface Student {
   goods?: Goods;
   /** ペストにかかっている（🏃を数えない。学期の区切りで治る。グッズとは別なので装備もできる） */
   plague?: boolean;
+  /** 三顧の礼で軍師に迎えられた：このアイコンに係ボーナス（×2）が付く。学期の区切りで終わる */
+  gunshi?: Attr;
   /** 得点に貢献した回数 */
   mvp: number;
 }
@@ -125,7 +127,7 @@ export interface EventResult {
   outUids?: string[];
 }
 
-export type ResultCtx = 'turn' | 'hatch' | 'monthEnd' | 'yearEnd' | 'final';
+export type ResultCtx = 'turn' | 'hatch' | 'monthEnd' | 'yearEnd' | 'final' | 'oath';
 
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
@@ -147,6 +149,8 @@ export type Phase =
   | { kind: 'cyborg'; player: number; slot: number }
   /** 新大陸の品（コロンブスの新大陸到達・ゲリラ）：📚の多いクラスから順に、品と装備させる子を選ぶ（取られた品は次のクラスは選べない。left はこの後に選ぶクラス） */
   | { kind: 'newWorld'; player: number; left: number[]; items: string[]; got: { player: number; uid: string; item: string }[] }
+  /** 桃園の誓い（ゲリラ）：劉備役のクラスが、義兄弟になるクラスを max まで選ぶ */
+  | { kind: 'oath'; player: number; max: number }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
@@ -185,6 +189,8 @@ export interface GameState {
   uidCounter: number;
   logCounter: number;
   log: LogEntry[];
+  /** 桃園の誓い：義兄弟のクラスと、誓ったときの各クラスのポイント（学期の区切りで山分けして消える） */
+  oath?: { players: number[]; base: number[] };
 }
 
 export type Action =
@@ -205,4 +211,6 @@ export type Action =
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
   | { type: 'equip'; uid: string | null }
   | { type: 'newWorld'; item: string; uid: string }
-  | { type: 'cyborg'; uid: string | null };
+  | { type: 'cyborg'; uid: string | null }
+  /** 桃園の誓い：義兄弟になるクラス（自分以外・1つ以上） */
+  | { type: 'oath'; targets: number[] };

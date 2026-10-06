@@ -60,6 +60,8 @@ export function counted(s: Student): Attr[] {
 
 /** 係ボーナスが付いているか（その生徒が、アイコンaの係に就いていて、aを持っている） */
 export function hasRoleBonus(p: Player, s: Student, a: Attr): boolean {
+  // 三顧の礼の軍師は、係に就いていなくても係ボーナスが付く
+  if (s.gunshi === a && counted(s).includes(a)) return true;
   const r = roleOf(p, s.uid);
   return r !== null && ROLES[r].attr === a && counted(s).includes(a);
 }

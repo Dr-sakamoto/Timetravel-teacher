@@ -55,12 +55,12 @@ export const ART: Record<string, ArtSpec> = {
   archimedes: { skin: SKIN.fair, hair: 'curly', hairColor: grey, outfit: 'bare', c1: '#fbfbf7', beard: 'full', beardColor: grey, expr: 'surprised', prop: 'bubbles' },
   spartacus: { skin: SKIN.tan, hair: 'messy', hairColor: dark, outfit: 'bare', c1: '#8a5a32', expr: 'angry', acc: ['scar'], prop: 'sword' },
 
-  // ---- 古代中国 ----
+  // ---- 三国志 ----
   zhuge: { skin: SKIN.fair, outfit: 'robe', c1: '#f4f2ea', c2: '#3a5a8c', hat: 'guanjin', hatColor: '#3a5a8c', beard: 'thin', beardColor: black, expr: 'calm', prop: 'featherfan' },
+  caocao: { skin: SKIN.fair, outfit: 'robe', c1: '#3a3a5a', c2: '#f2c94c', hat: 'guanjin', hatColor: '#1f1f2e', beard: 'goatee', beardColor: black, expr: 'cool', prop: 'sword' },
+  liubei: { skin: SKIN.fair, outfit: 'robe', c1: '#2f8a4c', c2: '#f2c94c', hat: 'softcap', hatColor: '#2f8a4c', beard: 'thin', beardColor: black, expr: 'smile', prop: 'twoswords' },
+  zhouyu: { skin: SKIN.fair, hair: 'short', hairColor: black, outfit: 'robe', c1: '#c0392b', c2: '#f4f2ea', hat: 'guanjin', hatColor: '#c0392b', expr: 'smile', prop: 'note' },
   lubu: { skin: SKIN.fair, hair: 'short', hairColor: black, outfit: 'yoroi', c1: '#c0392b', c2: '#f2c94c', hat: 'pheasant', expr: 'angry', prop: 'halberd' },
-  guanyu: { skin: SKIN.red, outfit: 'robe', c1: '#2f8a4c', c2: '#f2c94c', hat: 'softcap', hatColor: '#2f8a4c', beard: 'long', beardColor: black, expr: 'calm', prop: 'guandao' },
-  confucius: { skin: SKIN.fair, hair: 'bun', hairColor: grey, outfit: 'robe', c1: '#8a6a4a', c2: '#f4f2ea', beard: 'long', beardColor: white, expr: 'calm', acc: ['old'], prop: 'book' },
-  zhangfei: { skin: SKIN.tan, hair: 'messy', hairColor: black, outfit: 'yoroi', c1: '#3a3a44', c2: '#c0392b', beard: 'whiskers', beardColor: black, expr: 'shout', prop: 'spear' },
 
   // ---- 平安 ----
   seimei: { skin: SKIN.pale, outfit: 'robe', c1: '#fbfbf7', c2: '#7b5ea7', hat: 'eboshi', expr: 'calm', prop: 'ofuda' },

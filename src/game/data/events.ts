@@ -51,7 +51,10 @@ export interface SwingCard {
  *   arena     … ギリシャ「各クラスの、Xと also の合計が一番多い子が闘技場で戦う：1位 +win、負けたクラス（出せる子がいないクラスも）−lose」
  *   dialogue  … ギリシャ「各クラスのXが一番多い子が代表になってソクラテス（強さ need）と対話：代表のXが need 以上なら +win、届かない（代表がいない）と論破されて −lose」
  *   ostracism … ギリシャ「全クラスが自分以外のクラスに秘密で投票し、票が一番多いクラスが、係に就いていない子を1人転校させる」
- *   upgrade   … 中国「各クラスのXが一番多い子が受験。need 以上なら合格して、Xが1つ増える」
+ *   alliance  … 三国志「Xが一番多いクラス（1クラスだけ）と、ほかの全クラスの連合が戦う：連合のXの合計が多ければ一番のクラス −lose・ほかの全クラス +ally、届かなければ一番のクラス +win」
+ *   gunshi    … 三国志「各クラスの係に就いていない子のうちXが一番多い子が軍師になり、学期の区切りまで係ボーナス（X×2）が付く」
+ *   mirror    … 三国志「各クラスのグッズを持っていない子のうちアイコンが一番多い子1人に、魏の銅鏡（👑＋1のグッズ）が届く」
+ *   oath      … 三国志「ポイントが一番少ないクラスが、ほかのクラスを max まで選んで義兄弟になる。学期の区切りまでに義兄弟が得た点・失った点を合わせて山分けする」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
  *   masterpiece … 中世「各クラスのXが一番多い子1人の、Xの数 × per」
  *   printing  … 中世「Xを持っていない子全員のXが1つ増える（全員持っていれば何も起こらない）」
@@ -80,7 +83,10 @@ export type EraEffect =
   | { type: 'arena'; also: Attr; win: number; lose: number }
   | { type: 'dialogue'; need: number; win: number; lose: number }
   | { type: 'ostracism' }
-  | { type: 'upgrade'; need: number }
+  | { type: 'alliance'; win: number; lose: number; ally: number }
+  | { type: 'gunshi' }
+  | { type: 'mirror' }
+  | { type: 'oath'; max: number }
   | { type: 'tribute'; per: number }
   | { type: 'masterpiece'; per: number }
   | { type: 'printing' }
@@ -91,7 +97,7 @@ export type EraEffect =
   | { type: 'prize'; win: number }
   | { type: 'alien' };
 
-/** カードに載るアイコンの上限（科挙・生徒会長選挙・シンギュラリティ・活版印刷で増えるのもここまで。グッズの＋1は別） */
+/** カードに載るアイコンの上限（生徒会長選挙・シンギュラリティ・活版印刷で増えるのもここまで。グッズの＋1は別） */
 export const MAX_ICONS = 6;
 
 /** 機械のグッズ（装備した子はシンギュラリティで機械として数える） */
@@ -254,6 +260,9 @@ export const NEW_WORLD_GOODS: GoodsCard[] = [
 ];
 export const NEW_WORLD_MAP: Record<string, GoodsCard> = Object.fromEntries(NEW_WORLD_GOODS.map((g) => [g.id, g]));
 
+/** 魏の銅鏡（卑弥呼の使いでだけ手に入る。山札には入らない。装備するとグッズと同じくアイコン＋1） */
+export const WEI_MIRROR: GoodsCard = G('g_mirror', '魏の銅鏡', '🪞', 'charm');
+
 /** サイボーグ化（未来の学期だけ山札に入る） */
 export const CYBORG_CARDS: CyborgCard[] = [{ id: 'cyborg', kind: 'cyborg', name: 'サイボーグ化', icon: '🦾', era: 'future', count: 1 }];
 /** サイボーグになった生徒のアイコン */
@@ -304,9 +313,11 @@ export const ERA_CARDS: ContestCard[] = [
   C('colosseum', 'コロッセオの剣闘', '⚔️', 'sports', { type: 'arena', also: 'fight', win: 12, lose: 4 }, '各クラスの一番の剣闘士が闘技場へ。勝てば喝采、負ければ大恥。', 'greece', 1),
   C('socratic', 'ソクラテスの問答', '🧔', 'study', { type: 'dialogue', need: 4, win: 8, lose: 3 }, '「きみは何を知っている？」 クラスの代表がソクラテスと対話する。答えに詰まれば論破される。', 'greece', 1),
   C('ostracism', '陶片追放', '🏺', 'all', { type: 'ostracism' }, '陶器のかけらに名前を書いて、こっそり投票。票が一番集まったクラスから、1人がアテネを去る。', 'greece', 1),
-  // 古代中国：📚👊。科挙に受かった子はずっと強くなる
-  C('keju', '科挙', '📜', 'study', { type: 'upgrade', need: 3 }, '超難関の官僚登用試験。合格すれば一生の箔がつく。', 'china'),
-  C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
+  // 三国志：📚👊。一番強いクラスに連合軍が挑み、軍師は学期のあいだ冴えわたり、義兄弟はもうけも損も分け合う
+  C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'alliance', win: 10, lose: 10, ally: 4 }, '208年、曹操の大船団に、孫権と劉備の連合軍が火攻めで挑んだ。一番強いクラスに、ほかのクラスが力を合わせて立ち向かう。', 'china', 1),
+  C('sangu', '三顧の礼', '🏠', 'study', { type: 'gunshi' }, '劉備は諸葛亮の家を3回たずねて、やっと軍師に迎えた。迎えられた子は、学期が終わるまで知恵が冴えわたる。', 'china', 1),
+  C('himiko', '卑弥呼の使い', '🪞', 'all', { type: 'mirror' }, '239年、日本の女王・卑弥呼の使いが魏をたずね、皇帝から「親魏倭王」の位と銅鏡100枚を贈られた。', 'china', 1),
+  C('taoyuan', '桃園の誓い', '🍑', 'all', { type: 'oath', max: 2 }, '物語『三国志演義』では、まだ何者でもなかった劉備が、関羽・張飛と桃の園で義兄弟になった。生まれた日はちがっても、喜びも苦しみも分け合う。', 'china', 1),
   // 平安：🎨👑。権力者のもとに、ほかのクラスから贈り物が集まる
   C('tentoku', '天徳内裏歌合', '🌸', 'art', { type: 'battle', win: 15, second: 5, lose: 10 }, '村上天皇の御前で和歌の勝負。勝ち負けがはっきりつく。', 'heian'),
   C('michinaga', '藤原道長の宴', '🌕', 'charm', { type: 'tribute', per: 3 }, '「この世をば…」。道長に一番気に入られたクラスへ、ほかのクラスから贈り物が届く。', 'heian'),
@@ -425,8 +436,14 @@ export function eraEffectRule(c: ContestCard): string {
       return `全クラスの${a}の合計が${e.need}×クラス数以上なら全クラス+${e.win}（${a}が一番少ないクラスは0）、届かなければ全クラス−${e.lose}`;
     case 'ostracism':
       return '全クラスがほかのクラスに秘密で投票し、票が一番多いクラスが1人転校させる';
-    case 'upgrade':
-      return `各クラスの${a}が一番多い子が受験：${a}${e.need}以上で合格し、${a}が1つ増える`;
+    case 'alliance':
+      return `${a}が一番多いクラスに、ほかのクラスが連合して挑む：連合の${a}の合計が多ければ一番のクラス−${e.lose}・ほかの全クラス+${e.ally}、届かなければ一番のクラス+${e.win}`;
+    case 'gunshi':
+      return `各クラスの係でない子のうち${a}が一番多い子が軍師になり、学期の区切りまで${a}が2倍`;
+    case 'mirror':
+      return `各クラスのグッズを持っていない子のうち${a}が一番多い子1人に、魏の銅鏡（${WEI_MIRROR.icon}${ATTR_ICON[WEI_MIRROR.attr]}＋1）が届く`;
+    case 'oath':
+      return `ポイントが一番少ないクラスが、ほかのクラスを${e.max}つまで選んで義兄弟に。学期の区切りまで、義兄弟のもうけと損は山分け`;
     case 'tribute':
       return `${a}が一番多いクラスに、ほかの全クラスが${e.per}点ずつ贈る`;
     case 'masterpiece':
@@ -514,8 +531,14 @@ function contestGlyph(c: ContestCard): string {
       return `みんなの${a} ${e.need}×クラス数↑ +${e.win}／−${e.lose}`;
     case 'ostracism':
       return '🗳️ 票🥇のクラス → 👋🧑';
-    case 'upgrade':
-      return `🧑${a}${e.need}↑ → ${a}＋1`;
+    case 'alliance':
+      return `${a}🥇 vs 連合 🔥−${e.lose}／+${e.win}`;
+    case 'gunshi':
+      return `🧑${a}🥇 → 軍師 ${a}×2`;
+    case 'mirror':
+      return `🧑${a}🥇 ⟵ ${WEI_MIRROR.icon}`;
+    case 'oath':
+      return `ポイント最下位 🍑 義兄弟 → 点を山分け`;
     case 'tribute':
       return `${a}🥇 ⟵ ${e.per}点ずつ`;
     case 'masterpiece':

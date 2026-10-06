@@ -16,6 +16,7 @@ import {
   NEW_WORLD_MAP,
   PERSON_CARDS_PER_TERM,
   TEST_YANKEE_PENALTY,
+  WEI_MIRROR,
   cardEra,
   personCost,
   cardRule,
@@ -354,6 +355,11 @@ function monthEnd(s: GameState) {
 }
 
 function advanceMonth(s: GameState) {
+  // 桃園の誓い：学期の区切りの前に山分けを見せる（次へで、もう一度ここに来て先へ進む）
+  if (s.oath && termBreakNext(s)) {
+    settleOath(s);
+    return;
+  }
   s.monthIdx++;
   if (s.monthIdx >= MONTHS.length) {
     yearEnd(s);
@@ -362,8 +368,51 @@ function advanceMonth(s: GameState) {
   const m = MONTHS[s.monthIdx];
   if (m === 9 || m === 1) {
     curePlague(s);
+    dismissGunshi(s);
     startTerm(s);
   } else startTurns(s);
+}
+
+/** 学期の区切り：三顧の礼の軍師の任期が終わる */
+function dismissGunshi(s: GameState) {
+  const ones = s.players.flatMap((p) => p.students.filter((x) => x.gunshi));
+  if (!ones.length) return;
+  for (const x of ones) delete x.gunshi;
+  log(s, `軍師の任期が終わった。${ones.map((x) => x.icon + x.name).join('・')}がふつうの生徒に戻った。`);
+}
+
+/** 次の月から新しい学期（または次の学年）になるか */
+function termBreakNext(s: GameState): boolean {
+  const i = s.monthIdx + 1;
+  return i >= MONTHS.length || MONTHS[i] === 9 || MONTHS[i] === 1;
+}
+
+/** 桃園の誓いの山分け：誓ってから義兄弟のクラスが得た点・失った点を合わせて、同じだけ分ける（割り切れない分はポイントの少ないクラスから1点ずつ） */
+function settleOath(s: GameState) {
+  const oath = s.oath!;
+  delete s.oath;
+  const ps = s.players;
+  const gains = oath.players.map((pi, k) => ps[pi].points - oath.base[k]);
+  const total = gains.reduce((a, g) => a + g, 0);
+  const share = Math.floor(total / oath.players.length);
+  let rest = total - share * oath.players.length;
+  const extra = new Set<number>();
+  for (const pi of [...oath.players].sort((x, y) => ps[x].points - ps[y].points || x - y)) {
+    if (rest-- <= 0) break;
+    extra.add(pi);
+  }
+  const rows: ResultRow[] = oath.players.map((pi, k) => {
+    const after = oath.base[k] + share + (extra.has(pi) ? 1 : 0);
+    const delta = after - ps[pi].points;
+    ps[pi].points = after;
+    return { player: pi, count: gains[k], delta, note: `稼ぎ${gains[k] >= 0 ? '+' : ''}${gains[k]} → 山分け` };
+  });
+  const c = EVENT_MAP.taoyuan as ContestCard;
+  sortRows(rows);
+  logRows(s, `${c.name}の山分け`, rows);
+  const say = `義兄弟の稼ぎは合わせて${total >= 0 ? '+' : ''}${total}点。${oath.players.map((pi) => ps[pi].name).join('・')}のクラスで山分けした。`;
+  log(s, say);
+  setResult(s, null, { title: `${c.name}の山分け`, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say, rows }, 'oath');
 }
 
 /** 学期の区切り：ペストにかかっていた子が治る */
@@ -376,6 +425,7 @@ function curePlague(s: GameState) {
 
 function yearEnd(s: GameState) {
   curePlague(s);
+  dismissGunshi(s);
   s.monthIdx = MONTHS.length - 1;
   if (s.year < s.years) {
     log(s, `${s.year}年生が終わった。進級！`);
@@ -458,6 +508,9 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
     case 'newworld':
       // 品を選ぶ番が順に回るので、ゲリラの側で始める（fireGuerrilla → startNewWorld）
       throw new Error('newworld is started by startNewWorld');
+    case 'oath':
+      // 義兄弟を選ぶ場面を挟むので、ゲリラの側で始める（fireGuerrilla → startOath）
+      throw new Error('oath is started by startOath');
     case 'heads':
     case 'tiers':
     case 'disaster':
@@ -698,27 +751,75 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // 中国：各クラスの一番の子が受験。合格した子はアイコンが1つ増える（MAX_ICONS まで）
-    case 'upgrade': {
+    // 三国志：一番強いクラス（1クラスだけ）に、ほかの全クラスが連合して挑む。連合の合計が上回れば火攻めで一番のクラスが −lose・ほかの全クラスが +ally、届かなければ一番のクラスが +win
+    case 'alliance': {
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+      });
+      const tops = values.flatMap((v, i) => (v === best ? [i] : []));
+      if (best === 0 || tops.length > 1) {
+        rows.forEach((r) => (r.note = 'にらみ合い'));
+        tell('どのクラスも動かず、にらみ合いに終わった。');
+        break;
+      }
+      const fleet = tops[0];
+      const allies = values.reduce((a, v) => a + v, 0) - best;
+      if (allies > best) {
+        add(fleet, -e.lose);
+        rows[fleet].note = '火攻めで敗北';
+        ps.forEach((_, i) => {
+          if (i === fleet) return;
+          add(i, e.ally);
+          scores[i].holders.forEach((h) => h.mvp++);
+          rows[i].note = '連合の勝利';
+        });
+        tell(`連合軍（${ATTR_ICON.fight}${allies}）が火攻めで${ps[fleet].name}のクラスの大船団（${ATTR_ICON.fight}${best}）を破った！`);
+      } else {
+        add(fleet, e.win);
+        scores[fleet].holders.forEach((h) => h.mvp++);
+        rows[fleet].note = '大船団の勝利';
+        ps.forEach((_, i) => i !== fleet && (rows[i].note = '連合の敗北'));
+        tell(`${ps[fleet].name}のクラスの大船団（${ATTR_ICON.fight}${best}）が連合軍（${ATTR_ICON.fight}${allies}）を退けた！`, fleet);
+      }
+      break;
+    }
+    // 三国志：各クラスの係に就いていない子のうち一番の子が軍師に迎えられる。学期の区切りまで、そのアイコンに係ボーナスが付く
+    case 'gunshi': {
       if (c.attr === 'all') break;
       const a = c.attr;
       ps.forEach((p, i) => {
-        const top = bestOf(p, p.students.filter((x) => baseIcons(x) < MAX_ICONS), a);
+        const top = bestOf(p, p.students.filter((x) => roleOf(p, x.uid) === null && !x.gunshi), a);
         if (!top) {
-          rows[i].note = '受験者なし';
+          rows[i].note = '迎える子なし';
           return;
         }
-        rows[i].count = top.pts;
-        rows[i].uids = [top.student.uid];
-        if (top.pts < e.need) {
-          rows[i].note = '不合格';
-          return;
-        }
-        top.student.attrs = [...top.student.attrs, a];
+        top.student.gunshi = a;
         top.student.mvp++;
         moved.push(top.student);
-        rows[i].note = `合格 ${ATTR_ICON[a]}＋1`;
-        tell(`${p.name}のクラスの${name(top.student)}が合格！${ATTR_ICON[a]}が1つ増えた。`, i);
+        rows[i].count = studentPts(p, top.student, a);
+        rows[i].uids = [top.student.uid];
+        rows[i].note = `軍師 ${ATTR_ICON[a]}×2`;
+        tell(`${p.name}のクラスの${name(top.student)}が軍師に迎えられた！`, i);
+      });
+      break;
+    }
+    // 三国志：各クラスのグッズを持っていない子のうちアイコンが一番多い子1人に、魏の銅鏡が届く（同じなら先に並んでいる子）
+    case 'mirror': {
+      ps.forEach((p, i) => {
+        const cands = equippable(p).filter((x) => !isEgg(x));
+        const st = [...cands].sort((x, y) => counted(y).length - counted(x).length)[0];
+        if (!st) {
+          rows[i].note = '受け取れる子なし';
+          return;
+        }
+        st.goods = { id: WEI_MIRROR.id, name: WEI_MIRROR.name, icon: WEI_MIRROR.icon, attr: WEI_MIRROR.attr };
+        st.attrs = [...st.attrs, WEI_MIRROR.attr];
+        st.mvp++;
+        moved.push(st);
+        rows[i].uids = [st.uid];
+        rows[i].note = `${WEI_MIRROR.icon} ${ATTR_ICON[WEI_MIRROR.attr]}＋1`;
+        tell(`${p.name}のクラスの${name(st)}に${WEI_MIRROR.icon}${WEI_MIRROR.name}が届いた。`, i);
       });
       break;
     }
@@ -1041,7 +1142,7 @@ export function nextTurnPlayer(s: GameState): number | null {
 /** いまゲリラの最中か（転校で出ていく子を選んでいる間と、ゲリラの結果を見せている間）。誰の手番でもない */
 export function inGuerrilla(s: GameState): boolean {
   const ph = s.phase;
-  return ph.kind === 'push' || ph.kind === 'vote' || ph.kind === 'newWorld' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
+  return ph.kind === 'push' || ph.kind === 'vote' || ph.kind === 'newWorld' || ph.kind === 'oath' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
 }
 
 /** 転校：めくった人から席順に、全クラスが1人ずつ外す */
@@ -1167,6 +1268,24 @@ function nextNewWorld(s: GameState, left: number[], items: string[], got: { play
   );
 }
 
+/** 桃園の誓い：ポイントが一番少ないクラス（同点なら席順で先のクラス）が劉備役になり、義兄弟になるクラスを選ぶ。もう誓いが結ばれていれば何も起こらない */
+function startOath(s: GameState, c: ContestCard, max: number) {
+  const n = s.players.length;
+  if (s.oath || n < 2) {
+    const say = s.oath ? 'もう義兄弟の誓いが結ばれている。' : '誓いを結ぶ相手がいない。';
+    log(s, say);
+    setResult(s, null, { ...eraResult(s, c, s.players.map((_, i) => ({ player: i, delta: 0 }))), say }, 'turn');
+    return;
+  }
+  const leader = s.players.map((_, i) => i).sort((x, y) => s.players[x].points - s.players[y].points || x - y)[0];
+  s.phase = { kind: 'oath', player: leader, max: Math.min(max, n - 1) };
+}
+
+/** 桃園の誓いで選べる相手（自分以外のクラス） */
+export function oathTargets(s: GameState, pi: number): number[] {
+  return s.players.filter((p) => p.id !== pi).map((p) => p.id);
+}
+
 function popCard(s: GameState): string | undefined {
   if (s.eventDeck.length === 0) {
     if (s.discard.length === 0) return undefined;
@@ -1242,6 +1361,7 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
     case 'contest':
       if (c.effect.type === 'ostracism') startVote(s, pi);
       else if (c.effect.type === 'newworld') startNewWorld(s, c);
+      else if (c.effect.type === 'oath') startOath(s, c, c.effect.max);
       else setResult(s, null, resolveContest(s, c), 'turn');
       return;
     case 'raid':
@@ -1371,6 +1491,9 @@ export function step(prev: GameState, a: Action): GameState {
         case 'final':
           s.phase = { kind: 'gameOver' };
           log(s, 'ゲーム終了！');
+          break;
+        case 'oath':
+          advanceMonth(s);
           break;
       }
       return s;
@@ -1530,6 +1653,20 @@ export function step(prev: GameState, a: Action): GameState {
       st.mvp++;
       log(s, `${p.name}のクラスの${st.name}に新大陸の${g.icon}${g.name}が届いた。`, ph.player);
       nextNewWorld(s, ph.left, ph.items.filter((x) => x !== a.item), [...ph.got, { player: ph.player, uid: st.uid, item: g.id }]);
+      return s;
+    }
+    case 'oath': {
+      if (ph.kind !== 'oath') return prev;
+      const targets = [...new Set(a.targets)];
+      if (!targets.length || targets.length > ph.max || targets.length !== a.targets.length || !targets.every((t) => oathTargets(s, ph.player).includes(t))) return prev;
+      const players = [ph.player, ...targets];
+      s.oath = { players, base: players.map((pi) => s.players[pi].points) };
+      const c = EVENT_MAP.taoyuan as ContestCard;
+      const names = players.map((pi) => s.players[pi].name).join('・');
+      const rows: ResultRow[] = s.players.map((_, i) => ({ player: i, delta: 0, note: i === ph.player ? '劉備役' : players.includes(i) ? '義兄弟' : undefined }));
+      const say = `${names}のクラスが義兄弟になった！学期の区切りまで、もうけも損も山分け。`;
+      log(s, say, ph.player);
+      setResult(s, null, { ...eraResult(s, c, rows), say }, 'turn');
       return s;
     }
     case 'equip': {

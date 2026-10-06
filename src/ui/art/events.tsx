@@ -334,23 +334,6 @@ const SCENES: Record<string, () => ReactNode> = {
   ),
 
   // ---------- 古代中国 ----------
-  keju: () => (
-    <g>
-      <Bg sky="#fbe9d2" ground="#b98a5a" y={56} />
-      <P d="M4 18 L50 4 L96 18Z" fill="#c0392b" />
-      <R x={8} y={18} w={84} h={38} fill="#e8d6a8" />
-      {[10, 30, 50, 70].map((x) => (
-        <g key={x}>
-          <R x={x + 1} y={24} w={18} h={28} fill="#7a5a3a" />
-          <R x={x + 4} y={30} w={12} h={10} fill="#ffd9b8" sw={1} />
-          <P d={`M${x + 5} 44 H${x + 15}`} sw={2.4} stroke="#fbfbf7" />
-        </g>
-      ))}
-      <R x={34} y={58} w={32} h={10} fill="#fbf4e2" rx={2} />
-      <P d="M38 61 V66 M42 61 V66 M46 61 V66 M50 61 V66" sw={0.8} />
-      <Stick x1={58} y1={60} x2={72} y2={52} w={2} color="#7a5a3a" />
-    </g>
-  ),
   chibi: () => (
     <g>
       <Bg sky="#5a3a5a" ground="#2f5f8a" y={46} />
@@ -365,6 +348,62 @@ const SCENES: Record<string, () => ReactNode> = {
       ))}
       <P d="M0 62 Q25 58 50 62 T100 62" stroke="#9be0ff" sw={1} />
       <P d="M10 6 C20 12 24 4 34 10" stroke="#ffb347" sw={1} op={0.6} />
+    </g>
+  ),
+
+  sangu: () => (
+    <g>
+      <Bg sky="#e3eef6" ground="#f4f6f8" y={50} />
+      <P d="M0 50 Q30 44 60 48 T100 46 V50 H0Z" fill="#cfe0c4" sw={1} />
+      <P d="M50 22 L80 34 L20 34Z" fill="#c9a86a" />
+      <P d="M28 31 l6 -3 M40 27 l6 -3 M58 27 l6 3 M68 31 l6 3" sw={0.8} />
+      <R x={26} y={34} w={48} h={20} fill="#e8d6a8" />
+      <R x={44} y={40} w={12} h={14} fill="#7a5a3a" />
+      <R x={30} y={38} w={9} h={7} fill="#fbf4e2" sw={1} />
+      {[10, 17, 24].map((x, i) => (
+        <g key={x}>
+          <Mini x={x - 4} y={56} c={['#3f7fd0', '#2f8a4c', '#3a3a44'][i]} s={0.8} />
+          <text x={x - 4} y={70} textAnchor="middle" fontSize={5} fontWeight={900} fill="#7a5a3a">
+            {i + 1}
+          </text>
+        </g>
+      ))}
+      <P d="M84 12 C88 8 94 10 92 16" sw={1} op={0.5} />
+    </g>
+  ),
+  himiko: () => (
+    <g>
+      <Bg sky="#ffe9c8" ground="#4f8fc8" y={44} />
+      <P d="M0 52 Q25 48 50 52 T100 52 M0 62 Q25 58 50 62 T100 62" stroke="#bfe6ff" sw={1} />
+      <P d="M14 46 L46 46 L40 54 L20 54Z" fill="#7a5a3a" />
+      <Stick x1={30} y1={46} x2={30} y2={22} w={1.2} color="#7a5a3a" />
+      <P d="M31 24 L44 30 L31 40Z" fill="#fbf4e2" sw={1.1} />
+      <Mini x={22} y={40} c="#d14b3c" s={0.7} />
+      <C x={74} y={24} r={15} fill="#b98a3a" />
+      <C x={74} y={24} r={11} fill="#e8c46a" sw={1} />
+      <C x={74} y={24} r={3} fill="#b98a3a" sw={1} />
+      <P d="M68 18 L71 15 M79 31 L82 28" stroke="#fffbe6" sw={1.6} />
+      <Star x={92} y={8} r={2.4} fill="#fffbe6" />
+    </g>
+  ),
+  taoyuan: () => (
+    <g>
+      <Bg sky="#fde4ec" ground="#a8d08d" y={54} />
+      {[16, 50, 84].map((x) => (
+        <g key={x}>
+          <Stick x1={x} y1={54} x2={x} y2={30} w={2.2} color="#7a5a3a" />
+          <C x={x} y={24} r={13} fill="#f7b6c8" />
+          {[-6, 0, 6].map((d) => (
+            <C key={d} x={x + d} y={22 + (d === 0 ? -4 : 2)} r={1.6} fill="#e5534b" sw={0.8} />
+          ))}
+        </g>
+      ))}
+      <Mini x={36} y={50} c="#3f7fd0" />
+      <Mini x={50} y={52} c="#2f8a4c" />
+      <Mini x={64} y={50} c="#3a3a44" />
+      <P d="M40 46 L46 42 M50 46 L50 41 M60 46 L54 42" sw={1.2} />
+      <C x={50} y={40} r={1.8} fill="#f2c94c" sw={1} />
+      <P d="M30 62 l1 -2 l1 2 M70 64 l1 -2 l1 2" stroke="#f7b6c8" sw={1} />
     </g>
   ),
 
