@@ -566,17 +566,19 @@ describe('engine', () => {
       expect(r2.delta).toEqual([12, 9, 0]);
     });
 
-    it('printing: the best reader\'s book gives one 📚 to the class member with the fewest icons and no 📚', () => {
-      const r = run('printing', [[mk('a', ['study', 'study']), mk('x', ['sports', 'sports']), mk('y', ['art'])], [mk('b', ['art'])], [mk('c', ['study']), mk('d', ['study', 'art'])]]);
+    it('printing: every student without 📚 gains one; a class where everyone has 📚 gets nothing', () => {
+      const r = run('printing', [[mk('a', ['study', 'study']), mk('x', ['sports', 'sports']), mk('y', ['art'])], [mk('b', ['art'])], [mk('c', ['study'])]]);
       expect(r.delta).toEqual([0, 0, 0]);
+      // 📚を持っていなかった子は全員📚が1つ増える（📚を持っていた子はそのまま）
+      r.after.players.forEach((p) => expect(p.students.every((x) => x.attrs.includes('study'))).toBe(true));
       const icons = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!.attrs;
-      // a 組：📚のない子のうちアイコンが一番少ないのは、詰め物のアイコンなしの子
-      expect(r.after.players[0].students.filter((x) => x.attrs.includes('study')).length).toBe(2);
-      expect(icons(0, '0-pad0')).toEqual(['study']);
-      expect(icons(0, 'y')).toEqual(['art']);
-      // 📚の子がいないクラスには本がない
-      expect(icons(1, 'b')).toEqual(['art']);
-      expect(r.after.players[1].students.every((x) => !x.attrs.includes('study'))).toBe(true);
+      expect(icons(0, 'a')).toEqual(['study', 'study']);
+      expect(icons(0, 'x')).toEqual(['sports', 'sports', 'study']);
+      expect(icons(1, 'b')).toEqual(['art', 'study']);
+      // 全員📚を持っていれば何も起こらない
+      const full = Array.from({ length: 5 }, (_, k) => mk(`s${k}`, ['study']));
+      const r2 = run('printing', [full, [], []]);
+      expect(r2.after.players[0].students.map((x) => x.attrs)).toEqual(full.map(() => ['study']));
     });
 
     it('plague: one random non-role student per class gets sick, and their 🏃 stops counting', () => {
@@ -610,26 +612,25 @@ describe('engine', () => {
       expect(t.players.flatMap((p) => p.students).some((x) => x.plague)).toBe(false);
     });
 
-    it('columbus: classes pick New World goods in 📚 order; taken goods are gone for the next class', () => {
-      let t = run('columbus', [[mk('a', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['study', 'study'])]], [10, 10, 10], [[{ role: 'pe', uid: 'a' }], [], []]).after;
+    it('columbus: classes pick a New World good and who wears it, in 📚 order; taken goods are gone for the next class', () => {
+      let t = run('columbus', [[mk('a', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['study', 'study'])]]).after;
       expect(t.phase).toMatchObject({ kind: 'newWorld', player: 1 });
       const ph = () => t.phase as Extract<GameState['phase'], { kind: 'newWorld' }>;
-      // 届くのは係でもグッズ持ちでもない子
-      expect(ph().uid).not.toBe('a');
-      const first = ph().uid;
-      t = step(t, { type: 'newWorld', item: 'g_newmap' });
+      t = step(t, { type: 'newWorld', item: 'g_newmap', uid: 'b' });
       expect(t.phase).toMatchObject({ kind: 'newWorld', player: 2 });
       expect(ph().items).not.toContain('g_newmap');
-      // 取られた品は選べない
-      expect(step(t, { type: 'newWorld', item: 'g_newmap' })).toBe(t);
-      t = step(t, { type: 'newWorld', item: 'g_tomato' });
+      // 取られた品は選べない。ほかのクラスの子にもつけられない
+      expect(step(t, { type: 'newWorld', item: 'g_newmap', uid: 'c' })).toBe(t);
+      expect(step(t, { type: 'newWorld', item: 'g_tomato', uid: 'a' })).toBe(t);
+      t = step(t, { type: 'newWorld', item: 'g_tomato', uid: 'c' });
       expect(t.phase).toMatchObject({ kind: 'newWorld', player: 0 });
-      expect(ph().uid).not.toBe('a');
       t = step(t, cpuAction(t)!);
       expect(t.phase).toMatchObject({ kind: 'result', player: null });
-      const got = t.players[1].students.find((x) => x.uid === first)!;
-      expect(got.goods?.id).toBe('g_newmap');
-      expect(got.attrs.at(-1)).toBe('study');
+      const b = t.players[1].students.find((x) => x.uid === 'b')!;
+      expect(b.goods?.id).toBe('g_newmap');
+      expect(b.attrs).toEqual(['study', 'study', 'study', 'study']);
+      // グッズを持っている子にはつけられない（2つ目は装備できない）
+      expect(t.players[0].students.filter((x) => x.goods)).toHaveLength(1);
       expect(t.players.map((p) => p.points)).toEqual([10, 10, 10]);
     });
 

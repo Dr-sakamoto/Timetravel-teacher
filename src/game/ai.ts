@@ -190,10 +190,17 @@ export function cpuAction(s: GameState): Action | null {
       return { type: 'equip', uid: st?.uid ?? null };
     }
     case 'newWorld': {
-      // 届く子に一番合う品（係ボーナスは乗らないので、その子がたくさん持っているアイコン）
-      const st = s.players[ph.player].students.find((x) => x.uid === ph.uid)!;
-      const item = [...ph.items].sort((x, y) => iconsOf(st, NEW_WORLD_MAP[y].attr) - iconsOf(st, NEW_WORLD_MAP[x].attr))[0];
-      return { type: 'newWorld', item };
+      // 品と子の組み合わせ：係ボーナスが乗る子＞そのアイコンをたくさん持つ子
+      const p = s.players[ph.player];
+      let best: { item: string; uid: string; score: number } | null = null;
+      for (const item of ph.items) {
+        const attr = NEW_WORLD_MAP[item].attr;
+        for (const st of equippable(p)) {
+          const score = (hasRoleBonus(p, st, attr) ? 10 : 0) + iconsOf(st, attr);
+          if (!best || score > best.score) best = { item, uid: st.uid, score };
+        }
+      }
+      return { type: 'newWorld', item: best!.item, uid: best!.uid };
     }
     case 'result':
       return { type: 'continue' };

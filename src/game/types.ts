@@ -143,8 +143,8 @@ export type Phase =
   | { kind: 'exchange'; player: number; slot: number }
   /** サイボーグ化：自分のクラスの生徒1人をサイボーグに作り替える */
   | { kind: 'cyborg'; player: number; slot: number }
-  /** 新大陸の品（コロンブスの新大陸到達・ゲリラ）：📚の多いクラスから順に、決まった子に装備させる品を選ぶ（取られた品は次のクラスは選べない） */
-  | { kind: 'newWorld'; player: number; uid: string; left: { player: number; uid: string }[]; items: string[]; got: { player: number; uid: string; item: string }[] }
+  /** 新大陸の品（コロンブスの新大陸到達・ゲリラ）：📚の多いクラスから順に、品と装備させる子を選ぶ（取られた品は次のクラスは選べない。left はこの後に選ぶクラス） */
+  | { kind: 'newWorld'; player: number; left: number[]; items: string[]; got: { player: number; uid: string; item: string }[] }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
@@ -200,5 +200,5 @@ export type Action =
   | { type: 'kachikomi'; target: number | null }
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
   | { type: 'equip'; uid: string | null }
-  | { type: 'newWorld'; item: string }
+  | { type: 'newWorld'; item: string; uid: string }
   | { type: 'cyborg'; uid: string | null };

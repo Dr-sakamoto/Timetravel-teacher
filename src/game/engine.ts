@@ -734,29 +734,25 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       }
       break;
     }
-    // 中世：各クラスの一番の物知りの本が刷られ、そのアイコンを持っていない子（アイコンが一番少ない子）のアイコンが1つ増える
+    // 中世：本が安く刷られ、そのアイコンを持っていない子全員のアイコンが1つ増える（全員持っていれば何も起こらない）
     case 'printing': {
       if (c.attr === 'all') break;
       const a = c.attr;
       ps.forEach((p, i) => {
-        const author = bestOf(p, p.students, a);
-        if (!author) {
-          rows[i].note = '本なし';
-          return;
-        }
-        rows[i].count = author.pts;
-        const reader = p.students.filter((x) => !x.attrs.includes(a) && baseIcons(x) < MAX_ICONS).sort((x, y) => x.attrs.length - y.attrs.length)[0];
-        if (!reader) {
+        const readers = p.students.filter((x) => !x.attrs.includes(a) && baseIcons(x) < MAX_ICONS);
+        rows[i].count = readers.length;
+        if (!readers.length) {
           rows[i].note = `全員${ATTR_ICON[a]}あり`;
-          rows[i].uids = [author.student.uid];
           return;
         }
-        reader.attrs = [...reader.attrs, a];
-        author.student.mvp++;
-        moved.push(reader);
-        rows[i].uids = [author.student.uid, reader.uid];
-        rows[i].note = `${reader.name} ${ATTR_ICON[a]}＋1`;
-        tell(`${p.name}のクラスの${name(reader)}が${name(author.student)}の本を読んで、${ATTR_ICON[a]}が1つ増えた。`, i);
+        for (const x of readers) {
+          x.attrs = [...x.attrs, a];
+          x.mvp++;
+          moved.push(x);
+        }
+        rows[i].uids = readers.map((x) => x.uid);
+        rows[i].note = `${readers.length}人 ${ATTR_ICON[a]}＋1`;
+        tell(`${p.name}のクラスの${readers.length}人が本を読んで、${ATTR_ICON[a]}が1つ増えた。`, i);
       });
       break;
     }
@@ -1045,34 +1041,23 @@ function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[])
   );
 }
 
-/** 新大陸の品を受け取れる子（係に就いていない・グッズを持っていない子） */
-export function newWorldReceivers(p: Player): Student[] {
-  return p.students.filter((x) => roleOf(p, x.uid) === null && !x.goods);
-}
-
-/** コロンブスの新大陸到達：アイコンの多いクラスから順に（同点ならポイントの少ないクラスが先）品を選ぶ。受け取る子はランダム。品がなくなったら終わり */
+/** コロンブスの新大陸到達：アイコンの多いクラスから順に（同点ならポイントの少ないクラスが先）、品と装備させる子（グッズを持っていない子）を選ぶ。品がなくなったら終わり */
 function startNewWorld(s: GameState, c: ContestCard) {
   const a = c.attr;
   const values = s.players.map((p) => attrScore(p, a).total);
   const order = s.players.map((_, i) => i).sort((x, y) => values[y] - values[x] || s.players[x].points - s.players[y].points || x - y);
-  const left: { player: number; uid: string }[] = [];
-  for (const pi of order) {
-    const cands = newWorldReceivers(s.players[pi]);
-    if (!cands.length) {
-      log(s, `${s.players[pi].name}のクラスには品を受け取れる子がいなかった。`, pi);
-      continue;
-    }
-    left.push({ player: pi, uid: pick(s, cands).uid });
-  }
-  nextNewWorld(s, left.slice(0, NEW_WORLD_GOODS.length), NEW_WORLD_GOODS.map((g) => g.id), []);
+  nextNewWorld(s, order, NEW_WORLD_GOODS.map((g) => g.id), []);
 }
 
 /** 新大陸の品の次の人へ。全員選び終わったら（品がなくなったら）結果を出す */
-function nextNewWorld(s: GameState, left: { player: number; uid: string }[], items: string[], got: { player: number; uid: string; item: string }[]) {
-  const [next, ...rest] = left;
-  if (next && items.length) {
-    s.phase = { kind: 'newWorld', player: next.player, uid: next.uid, left: rest, items, got };
-    return;
+function nextNewWorld(s: GameState, left: number[], items: string[], got: { player: number; uid: string; item: string }[]) {
+  for (let i = 0; i < left.length && items.length; i++) {
+    const pi = left[i];
+    if (equippable(s.players[pi]).length > 0) {
+      s.phase = { kind: 'newWorld', player: pi, left: left.slice(i + 1), items, got };
+      return;
+    }
+    log(s, `${s.players[pi].name}のクラスには品を受け取れる子がいなかった。`, pi);
   }
   const c = EVENT_MAP.columbus as ContestCard;
   const students = got.map((g) => s.players[g.player].students.find((x) => x.uid === g.uid)!);
@@ -1440,7 +1425,7 @@ export function step(prev: GameState, a: Action): GameState {
     case 'newWorld': {
       if (ph.kind !== 'newWorld' || !ph.items.includes(a.item)) return prev;
       const p = s.players[ph.player];
-      const st = p.students.find((x) => x.uid === ph.uid);
+      const st = equippable(p).find((x) => x.uid === a.uid);
       if (!st) return prev;
       const g = NEW_WORLD_MAP[a.item];
       st.goods = { id: g.id, name: g.name, icon: g.icon, attr: g.attr };
