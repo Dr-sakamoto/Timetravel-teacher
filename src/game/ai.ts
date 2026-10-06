@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, NEW_WORLD_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow, voteTargets } from './engine';
+import { MONTHS, canBuild, canTake, pyramidCard, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -131,6 +131,20 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
   }
 }
 
+/** ピラミッドに石を積む値打ち（完成すれば積んだ石×per と一番のボーナス。完成しなければ、学期の残りで完成しそうな分だけ） */
+export function buildValue(s: GameState, pi: number): number {
+  const c = pyramidCard(s);
+  const py = s.pyramid;
+  if (!c || !py || !canBuild(s, pi)) return -Infinity;
+  const t = attrScore(s.players[pi], c.attr).total;
+  const mine = py.stones[pi] + t;
+  const sum = py.stones.reduce((a, x) => a + x, 0) + t;
+  if (sum >= py.need) return mine * c.effect.per + (mine >= Math.max(...py.stones) ? c.effect.bonus : 0);
+  // 学期の最後の月（7・12・3月）は完成しないかもしれない
+  const lastMonth = [7, 12, 3].includes(MONTHS[s.monthIdx]);
+  return t * c.effect.per * (lastMonth ? 0.25 : 0.5);
+}
+
 /** 一番点の高い相手 */
 function leader(s: GameState, candidates: number[]): number {
   return [...candidates].sort((x, y) => s.players[y].points - s.players[x].points)[0];
@@ -149,6 +163,8 @@ export function cpuAction(s: GameState): Action | null {
     case 'draw': {
       const slots = s.market.map((_, i) => i);
       const best = slots.filter((i) => canTake(s, ph.player, i)).sort((x, y) => marketValue(s, ph.player, y) - marketValue(s, ph.player, x))[0];
+      const bv = buildValue(s, ph.player);
+      if (bv > 0 && (best === undefined || bv > marketValue(s, ph.player, best))) return { type: 'build' };
       if (best !== undefined && marketValue(s, ph.player, best) > 0) return { type: 'take', slot: best };
       // 取りたいものがなければ、一番高いカードを捨てて見送る
       return { type: 'pass', slot: slots.sort((x, y) => marketCost(s.market[y]) - marketCost(s.market[x]))[0] };

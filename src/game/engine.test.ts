@@ -5,7 +5,7 @@ import { CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
-import { MONTHS, canTake, currentEra, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
+import { MONTHS, canBuild, canTake, currentEra, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
@@ -473,6 +473,78 @@ describe('engine', () => {
     expect(new Set(kinds).size).toBe(kinds.length);
   });
 
+  describe('giza: the pyramid stays beside the market and every class builds it bit by bit', () => {
+    /** 古代エジプトの学期で、最初の手番まで進める */
+    const egyptTerm = () => {
+      let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 5);
+      s.yearEras[0] = ERAS.findIndex((e) => e.id === 'egypt');
+      while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+      return s;
+    };
+    const runners = (n: number) => Array.from({ length: n }, (_, k) => mk(`r${k}`, ['sports']));
+    const building = (s: GameState) => (s.phase.kind === 'draw' ? s.phase.player : -1);
+
+    it('is not in the deck; it waits beside the market for the whole term', () => {
+      const s = egyptTerm();
+      expect(s.pyramid).toEqual({ stones: [0, 0, 0], need: 18, done: false });
+      expect(s.eventDeck).not.toContain('giza');
+      expect(s.market).not.toContain('giza');
+    });
+
+    it('building stacks the class\'s 🏃 as stones without scoring; the market stays as it is', () => {
+      const t = egyptTerm();
+      const pi = building(t);
+      t.players[pi].students = runners(4);
+      const market = [...t.market];
+      const after = step(t, { type: 'build' });
+      expect(after.pyramid!.stones[pi]).toBe(4);
+      expect(after.players[pi].points).toBe(t.players[pi].points);
+      expect(after.market).toEqual(market);
+      // 次へで次の人の手番へ
+      const next = step(after, { type: 'continue' });
+      expect(next.phase.kind === 'draw' && next.phase.player).toBe(t.queue[t.queueIdx + 1]);
+    });
+
+    it('cannot build without 🏃', () => {
+      const t = egyptTerm();
+      t.players[building(t)].students = [mk('a', ['study'])];
+      expect(canBuild(t, building(t))).toBe(false);
+      expect(step(t, { type: 'build' })).toBe(t);
+    });
+
+    it('when it is finished, each class gets its stones ×2 and the class that built most gets +5', () => {
+      const t = egyptTerm();
+      const pi = building(t);
+      const others = [0, 1, 2].filter((i) => i !== pi);
+      t.pyramid!.stones[others[0]] = 9;
+      t.pyramid!.stones[others[1]] = 3;
+      t.players[pi].students = runners(6);
+      const before = t.players.map((p) => p.points);
+      const after = step(t, { type: 'build' });
+      expect(after.pyramid!.done).toBe(true);
+      const delta = after.players.map((p, i) => p.points - before[i]);
+      expect(delta[pi]).toBe(12);
+      expect(delta[others[0]]).toBe(18 + 5);
+      expect(delta[others[1]]).toBe(6);
+      // 完成したらもう積めない
+      expect(canBuild(after, pi)).toBe(false);
+    });
+
+    it('an unfinished pyramid is wasted when the term ends', () => {
+      let s = egyptTerm();
+      s.pyramid!.stones = [5, 0, 0];
+      const term = s.yearEras.indexOf(currentEra(s));
+      s.yearEras[term + 1] = ERAS.findIndex((e) => e.id === 'greece');
+      // CPUは積まないようにして、次の学期まで進める
+      while (currentEra(s) === ERAS.findIndex((e) => e.id === 'egypt')) {
+        if (s.phase.kind === 'draw') s.players[s.phase.player].students.forEach((x) => (x.attrs = x.attrs.filter((a) => a !== 'sports')));
+        s = step(s, cpuAction(s)!);
+      }
+      expect(s.pyramid).toBeUndefined();
+      expect(s.log.some((l) => l.text.includes('むだになった'))).toBe(true);
+    });
+  });
+
   describe('era special events', () => {
     let base = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (base.phase.kind !== 'draw') base = step(base, cpuAction(base)!);
@@ -526,14 +598,6 @@ describe('engine', () => {
       expect(hatched.attrs.length).toBeGreaterThan(0);
       t = step(t, { type: 'continue' });
       expect(t.phase).toEqual({ kind: 'draw', player: 0 });
-    });
-
-    it('giza: everyone builds one pyramid; the laziest class gets nothing', () => {
-      const s3 = (u: string) => mk(u, ['sports', 'sports', 'sports']);
-      // 合計 9+6+3 = 18 ≥ 6×3 → 完成。一番少ないクラスは0
-      expect(run('giza', [[s3('a'), s3('b'), s3('c')], [s3('d'), s3('e')], [s3('f')]]).delta).toEqual([6, 6, 0]);
-      // 合計 3+3+0 < 18 → 全クラス−3
-      expect(run('giza', [[s3('a')], [s3('b')], []]).delta).toEqual([-3, -3, -3]);
     });
 
     it('nile: every farmer (🏃) harvests, then the other classes pay tax to the pharaoh (most 👑)', () => {

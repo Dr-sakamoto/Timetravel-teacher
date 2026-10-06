@@ -159,6 +159,15 @@ export interface LogEntry {
   player?: number;
 }
 
+/** 建設中のピラミッド（古代エジプトの学期だけ場の横に残る。学期が変わると、完成していなくても消える） */
+export interface Pyramid {
+  /** クラスごとに積んだ石（🏃の数） */
+  stones: number[];
+  /** 完成に必要な石の合計 */
+  need: number;
+  done: boolean;
+}
+
 export interface GameState {
   version: 24;
   /** その年の3学期それぞれの時代（ERASのindex） */
@@ -185,6 +194,8 @@ export interface GameState {
   uidCounter: number;
   logCounter: number;
   log: LogEntry[];
+  /** 建設中のピラミッド（古代エジプトの学期だけ） */
+  pyramid?: Pyramid;
 }
 
 export type Action =
@@ -196,6 +207,8 @@ export type Action =
   | { type: 'take'; slot: number }
   /** 場のカードを1枚捨てて見送る */
   | { type: 'pass'; slot: number }
+  /** ピラミッドに石を積む（クラスの🏃の数だけ。場のカードは減らない） */
+  | { type: 'build' }
   /** 満席で人物を迎える時に、代わりに転校させる生徒（null でやめる） */
   | { type: 'makeRoom'; uid: string | null }
   | { type: 'push'; uid: string }

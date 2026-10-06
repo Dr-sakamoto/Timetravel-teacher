@@ -1,6 +1,6 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent, voteTargets } from '../game/engine';
+import { canBuild, canTake, currentEra, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, NEW_WORLD_MAP, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
@@ -52,6 +52,35 @@ function MarketCard({ id, selected, dim, onClick }: { id: string; selected: bool
     </button>
   );
 }
+
+/** 場の横に残るピラミッド（選ぶと🏃の数だけ石を積む）。積んだ石をクラスの色で積み上げて見せる */
+function PyramidCard({ state, selected, dim, onClick }: { state: GameState; selected: boolean; dim: boolean; onClick?: () => void }) {
+  const py = state.pyramid!;
+  const c = pyramidCard(state)!;
+  const sum = py.stones.reduce((a, x) => a + x, 0);
+  return (
+    <button
+      className={`mcard pyramid ${py.done ? 'done' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`}
+      onClick={onClick}
+      disabled={!onClick}
+      title={`${c.name}：${state.players.map((p, i) => `${p.name} ${py.stones[i]}`).join('・')}`}
+    >
+      <span className="mcard-icon">{c.icon}</span>
+      <span className="mcard-name">{py.done ? '完成！' : 'ピラミッド'}</span>
+      <span className="pyramid-bar">
+        {state.players.map((p, i) => (
+          <span key={i} style={{ width: `${(Math.min(py.stones[i], py.need) / py.need) * 100}%`, background: p.color }} />
+        ))}
+      </span>
+      <span className="mcard-name">
+        🧱{Math.min(sum, py.need)}/{py.need}
+      </span>
+    </button>
+  );
+}
+
+/** ピラミッドを選んでいるときの sel の値（場のカードの位置と重ならない） */
+const PYRAMID_SEL = -1;
 
 /** 卓の中央：山札・場のカード・捨て札・めくったカードと手番の操作 */
 export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, side }: Props) {
@@ -110,6 +139,14 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
                   {i === 0 && <span className="mcard-name">イベント</span>}
                 </div>
               ))}
+            {state.pyramid && (
+              <PyramidCard
+                state={state}
+                selected={selected === PYRAMID_SEL}
+                dim={!!canPick && ph.kind === 'draw' && !canBuild(state, ph.player)}
+                onClick={canPick ? () => setSel(PYRAMID_SEL) : undefined}
+              />
+            )}
           </div>
         )}
         <div className="piles">
@@ -344,6 +381,24 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       return <div className="say">{who} 🏷️ 係決め</div>;
     case 'draw': {
       if (sel === null) return <div className="say">{who} 👆 1枚えらぶ</div>;
+      if (sel === PYRAMID_SEL) {
+        const c = pyramidCard(state);
+        const ok = canBuild(state, ph.player);
+        const n = attrScore(state.players[ph.player], 'sports').total;
+        return (
+          <div className="say">
+            <div className="effect">
+              {c && cardGlyph(c)}
+              <div className="effect-say">{c && shortRule(c)}</div>
+            </div>
+            <div className="say-sub">
+              <button className="btn primary" disabled={!ok} onClick={() => dispatch({ type: 'build' })}>
+                {ok ? `🧱 石を${n}個積む` : state.pyramid?.done ? '🔺 完成ずみ' : '🙅 🏃がいない'}
+              </button>
+            </div>
+          </div>
+        );
+      }
       const id = state.market[sel];
       const cost = marketCost(id);
       const p = state.players[ph.player];
