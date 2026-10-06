@@ -471,21 +471,79 @@ const SCENES: Record<string, () => ReactNode> = {
       <Star x={50} y={46} r={5} fill="#fff3b0" />
     </g>
   ),
-  gekokujo: () => (
+  // 大雨の中、今川義元の本陣（陣幕）へ奇襲
+  okehazama: () => (
     <g>
-      <Bg sky="#ffd9a8" ground="#9fbf6a" y={54} />
-      <R x={56} y={30} w={30} h={24} fill="#fbfbf7" />
-      <P d="M50 30 L71 20 L92 30Z" fill="#3a3a44" />
-      <R x={64} y={10} w={14} h={10} fill="#fbfbf7" sw={1.1} />
-      <P d="M60 10 L71 3 L82 10Z" fill="#3a3a44" sw={1.1} />
-      <R x={68} y={42} w={6} h={12} fill="#7a5a3a" sw={1} />
-      <P d="M84 18 L92 20 L84 24Z" fill="#f2c94c" sw={0.9} />
-      <P d="M86 50 C90 46 96 48 96 54" fill="#c0392b" />
-      <Mini x={24} y={46} c="#d97ab0" s={1.3} />
-      <Stick x1={32} y1={40} x2={52} y2={24} w={1.4} color="#7a5a3a" />
-      <R x={52} y={18} w={9} h={10} fill="#c0392b" sw={1} />
-      <P d="M14 22 l3 -5 l3 3 l3 -5 l3 5 l3 -3 l3 5Z" fill="#f2c94c" sw={0.9} />
-      <P d="M36 60 h14 l-3 -3 M50 60 l-3 3" sw={1.2} />
+      <Bg sky="#7d8a9a" ground="#5f7a4a" y={52} />
+      <P d="M0 52 L20 36 L38 48 L60 30 L82 46 L100 36 V52Z" fill="#4f6a3e" />
+      <R x={46} y={30} w={50} h={22} fill="#fbf4e2" />
+      {[56, 71, 86].map((x) => (
+        <P key={x} d={`M${x} 30 V52`} stroke="#c9b98f" sw={1} />
+      ))}
+      <P d="M46 36 H96 M46 46 H96" stroke="#3a3a44" sw={2.2} />
+      <C x={71} y={41} r={4} fill="#c0392b" sw={1} />
+      <Stick x1={92} y1={52} x2={92} y2={14} w={1.2} color="#7a5a3a" />
+      <R x={83} y={14} w={8} h={14} fill="#c0392b" sw={1} />
+      <Mini x={14} y={52} c="#3a3a44" s={1.2} />
+      <Mini x={28} y={56} c="#3a3a44" s={1.2} />
+      <Stick x1={20} y1={50} x2={40} y2={36} w={1.2} color="#7a5a3a" />
+      <Stick x1={34} y1={54} x2={52} y2={42} w={1.2} color="#7a5a3a" />
+      {[6, 18, 30, 42, 54, 66, 78, 90].map((x, i) => (
+        <P key={x} d={`M${x + (i % 2) * 4} ${4 + (i % 3) * 6} l-4 9`} stroke="#d6e4f2" sw={1} />
+      ))}
+      {[12, 36, 60, 84].map((x) => (
+        <P key={x} d={`M${x} 60 l-4 9`} stroke="#d6e4f2" sw={1} />
+      ))}
+    </g>
+  ),
+  // 種子島に南蛮船が着き、鉄砲が伝わる
+  teppo: () => (
+    <g>
+      <Bg sky="#9fd3ff" ground="#e8d6a8" y={52} />
+      <rect x={0} y={40} width={100} height={12} fill="#2f6fa8" />
+      <P d="M0 44 Q12 42 25 44 T50 44 T75 44 T100 44" stroke="#cfeaff" sw={1} />
+      <P d="M56 40 L94 40 L88 48 L62 48Z" fill="#3a2a22" />
+      <Stick x1={74} y1={40} x2={74} y2={10} w={1.2} color="#6f4628" />
+      <P d="M64 14 H84 V30 H64Z" fill="#fbfbf7" sw={1.1} />
+      <P d="M74 17 V27 M70 22 H78" stroke="#d14b3c" sw={1.4} />
+      <P d="M10 60 L62 50" stroke={O} sw={5.4} />
+      <P d="M10 60 L62 50" stroke="#8a5a32" sw={3} />
+      <P d="M30 56 L62 50" stroke="#3a3a44" sw={2} />
+      <P d="M8 58 L16 57 L18 64 L10 66Z" fill="#6f4628" sw={1.1} />
+      <C x={68} y={48} r={4} fill="#eeeeee" sw={1} />
+      <C x={74} y={45} r={3} fill="#eeeeee" sw={1} />
+      <Star x={64} y={50} r={3} fill="#ffb84d" />
+    </g>
+  ),
+  // 城下町の市。だれでも自由に商売できる
+  rakuichi: () => (
+    <g>
+      <Bg sky="#ffe8c4" ground="#c9a97a" y={54} />
+      <P d="M60 22 L76 12 L92 22Z" fill="#3a3a44" />
+      <R x={64} y={22} w={24} h={12} fill="#fbfbf7" sw={1.1} />
+      {[[6, '#c0392b'], [38, '#3f7fd0']].map(([x, f]) => (
+        <g key={x as number}>
+          <P d={`M${x as number} 34 L${(x as number) + 4} 26 H${(x as number) + 26} L${(x as number) + 30} 34Z`} fill={f as string} />
+          <R x={(x as number) + 3} y={34} w={24} h={14} fill="#fbf4e2" sw={1.1} />
+          <R x={(x as number) + 1} y={46} w={28} h={6} fill="#8a5a32" sw={1.1} />
+        </g>
+      ))}
+      <C x={14} y={44} r={3} fill="#e5534b" sw={1} />
+      <C x={22} y={44} r={3} fill="#f2c94c" sw={1} />
+      <R x={44} y={40} w={6} h={6} fill="#6fb35a" sw={1} />
+      <R x={54} y={40} w={6} h={6} fill="#d97ab0" sw={1} />
+      <R x={68} y={34} w={14} h={20} fill="#fbfbf7" sw={1.1} />
+      <text x={75} y={43} textAnchor="middle" fontSize={6} fontWeight={900} fill="#c0392b">
+        楽市
+      </text>
+      <text x={75} y={51} textAnchor="middle" fontSize={6} fontWeight={900} fill="#c0392b">
+        楽座
+      </text>
+      <Mini x={18} y={58} c="#3f7fd0" />
+      <Mini x={50} y={58} c="#e5534b" />
+      <Mini x={88} y={58} c="#6fb35a" />
+      <C x={34} y={64} r={3} fill="#f2c94c" sw={1} />
+      <C x={40} y={66} r={3} fill="#f2c94c" sw={1} />
     </g>
   ),
 

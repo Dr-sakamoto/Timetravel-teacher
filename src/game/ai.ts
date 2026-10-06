@@ -1,5 +1,5 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
-import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, NEW_WORLD_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
+import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
 import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
@@ -106,7 +106,7 @@ function cyborged(st: Student): Student {
 export function marketValue(s: GameState, pi: number, slot: number): number {
   const p = s.players[pi];
   const id = s.market[slot];
-  const cost = marketCost(id);
+  const cost = marketCost(id, p);
   if (id.startsWith('person:')) {
     const out = p.students.length >= 9 ? leastWorth(p) : undefined;
     const kept = p.students.filter((x) => x.uid !== out?.uid);
@@ -189,18 +189,18 @@ export function cpuAction(s: GameState): Action | null {
       const st = equippable(p).sort((x, y) => score(y) - score(x))[0];
       return { type: 'equip', uid: st?.uid ?? null };
     }
-    case 'newWorld': {
-      // 品と子の組み合わせ：係ボーナスが乗る子＞そのアイコンをたくさん持つ子
+    case 'gift': {
+      // 品と子の組み合わせ：係ボーナスが乗る子＞そのアイコンをたくさん持つ子（鉄砲なら👊の多い子）
       const p = s.players[ph.player];
       let best: { item: string; uid: string; score: number } | null = null;
       for (const item of ph.items) {
-        const attr = NEW_WORLD_MAP[item].attr;
+        const attr = GIFT_MAP[item].attr;
         for (const st of equippable(p)) {
           const score = (hasRoleBonus(p, st, attr) ? 10 : 0) + iconsOf(st, attr);
           if (!best || score > best.score) best = { item, uid: st.uid, score };
         }
       }
-      return { type: 'newWorld', item: best!.item, uid: best!.uid };
+      return { type: 'gift', item: best!.item, uid: best!.uid };
     }
     case 'result':
       return { type: 'continue' };
