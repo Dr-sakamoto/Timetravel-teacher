@@ -1,7 +1,7 @@
 import { C, E, O, P } from './parts';
 
 /** 人の形をしていない生徒（恐竜・ロボ・宇宙人など）。100×100 の座標系 */
-export type Creature = 'trex' | 'triceratops' | 'brachio' | 'ptera' | 'raptor' | 'android' | 'alien' | 'robodog' | 'martian' | 'cyborg' | 'oracle';
+export type Creature = 'trex' | 'triceratops' | 'ptera' | 'raptor' | 'android' | 'alien' | 'robodog' | 'martian' | 'cyborg' | 'oracle' | 'egg' | 'oviraptor' | 'parasaur' | 'spino';
 
 const cheek = (x: number, y: number) => <E x={x} y={y} rx={3} ry={1.9} fill="#f59c9c" sw={0} />;
 const eye = (x: number, y: number, r = 2.3) => (
@@ -56,21 +56,71 @@ export function CreaturePart({ kind }: { kind: Creature }) {
           {cheek(62, 56)}
         </g>
       );
-    case 'brachio':
+    case 'egg':
+      // オヴィラプトルの卵泥棒で来る卵：ひびが入って、中からのぞいている
       return (
         <g>
-          <P d="M8 100 C8 82 22 74 38 76 C46 77 52 84 52 100Z" fill="#7fb2d9" />
-          <P d="M36 80 C40 60 46 42 56 32 L66 38 C58 48 52 64 50 86Z" fill="#7fb2d9" />
-          <P d="M52 32 C50 20 60 12 72 14 C84 16 90 24 86 32 C82 38 68 40 58 38 C54 37 52 35 52 32Z" fill="#7fb2d9" />
-          <C x={66} y={13} r={4} fill="#7fb2d9" />
-          <P d="M60 32 Q70 36 82 31" sw={1.3} />
-          {eye(70, 24)}
-          {cheek(78, 29)}
-          <C x={84} y={24} r={0.9} fill={O} sw={0} />
-          {[[44, 56], [48, 46], [24, 84], [32, 82]].map(([x, y]) => (
-            <C key={`${x}${y}`} x={x} y={y} r={2} fill="#5f95c0" sw={0} />
+          <E x={50} y={92} rx={30} ry={6} fill="#c9b48a" sw={0} />
+          <P d="M50 18 C30 18 20 46 20 64 C20 84 34 96 50 96 C66 96 80 84 80 64 C80 46 70 18 50 18Z" fill="#fbf4e2" />
+          {[[38, 40, 4], [62, 52, 5], [44, 74, 3.5], [66, 78, 3], [34, 60, 2.5]].map(([x, y, r]) => (
+            <C key={`${x}${y}`} x={x} y={y} r={r} fill="#a8d08d" sw={0} />
           ))}
-          <P d="M16 64 C16 58 22 56 24 60 M24 60 C26 54 32 56 30 62" stroke="#5aa04a" sw={2} />
+          <P d="M28 50 L36 46 L42 54 L50 46 L58 54 L64 46 L72 50" sw={1.6} />
+          <C x={44} y={40} r={2} fill={O} sw={0} />
+          <C x={56} y={40} r={2} fill={O} sw={0} />
+          <P d="M20 30 l-6 -4 M24 22 l-4 -6 M80 30 l6 -4 M76 22 l4 -6" sw={1.2} op={0.6} />
+        </g>
+      );
+    case 'oviraptor':
+      return (
+        <g>
+          <P d="M24 100 C22 82 32 70 48 68 C64 70 74 82 72 100Z" fill="#6aa6c9" />
+          <P d="M30 80 C20 78 12 70 10 62 C18 66 26 70 32 72Z" fill="#e8834a" />
+          <P d="M66 80 C76 78 84 70 86 62 C78 66 70 70 64 72Z" fill="#e8834a" />
+          <P d="M36 66 C36 56 42 50 50 50 C58 50 64 56 64 66Z" fill="#6aa6c9" />
+          <P d="M30 36 C28 22 38 14 50 14 C62 14 72 22 70 36 C68 46 60 52 50 52 C40 52 32 46 30 36Z" fill="#8cc2e0" />
+          <P d="M42 16 C42 6 58 6 58 16 C56 12 44 12 42 16Z" fill="#e5534b" />
+          <P d="M60 38 C68 38 76 40 80 44 C74 46 66 46 60 44Z" fill="#f2c94c" />
+          {eye(42, 30)}
+          {eye(58, 30)}
+          {cheek(38, 40)}
+          <E x={50} y={86} rx={8} ry={10} fill="#fbf4e2" />
+          <C x={47} y={83} r={1.6} fill="#a8d08d" sw={0} />
+          <C x={53} y={89} r={1.3} fill="#a8d08d" sw={0} />
+        </g>
+      );
+    case 'parasaur':
+      return (
+        <g>
+          <P d="M18 100 C16 80 30 68 50 68 C70 68 84 80 82 100Z" fill="#7fbf7a" />
+          <P d="M40 70 C40 60 44 52 50 50 C56 52 60 60 60 70Z" fill="#7fbf7a" />
+          <P d="M28 40 C26 26 38 18 52 20 C64 22 76 30 76 42 C76 52 66 56 54 56 C40 56 30 52 28 40Z" fill="#98d293" />
+          <P d="M40 22 C46 10 62 2 82 4 C84 8 80 12 74 12 C64 12 54 18 50 24Z" fill="#e8834a" />
+          <P d="M60 46 C68 48 74 46 78 42" sw={1.3} />
+          {eye(42, 36)}
+          {eye(58, 34)}
+          {cheek(38, 46)}
+          <P d="M86 10 C90 6 94 8 96 4 M88 16 C92 14 96 16 98 12" stroke="#f2c94c" sw={1.4} />
+          {[[30, 84], [64, 88], [44, 92]].map(([x, y]) => (
+            <C key={`${x}${y}`} x={x} y={y} r={2} fill="#5aa04a" sw={0} />
+          ))}
+        </g>
+      );
+    case 'spino':
+      return (
+        <g>
+          <P d="M40 46 C40 28 46 12 54 6 C58 16 62 20 68 10 C72 20 76 24 84 16 C88 28 86 40 82 48Z" fill="#e5534b" />
+          <P d="M46 44 L54 10 M58 44 L66 14 M70 44 L80 20" sw={0.9} op={0.5} />
+          <P d="M18 100 C16 80 30 66 50 66 C70 66 84 80 82 100Z" fill="#5f8fb0" />
+          <P d="M10 52 C8 40 18 34 32 36 C50 36 74 38 86 46 C92 50 88 58 80 58 L40 60 C26 62 12 60 10 52Z" fill="#7aaed0" />
+          <P d="M40 52 C54 54 70 54 84 50" sw={1.3} />
+          {[48, 56, 64, 72].map((x) => (
+            <P key={x} d={`M${x} 53 l2 3 l2 -3.4`} fill="#fff" sw={0.9} />
+          ))}
+          {eye(24, 44, 2.6)}
+          <C x={82} y={46} r={0.9} fill={O} sw={0} />
+          {cheek(32, 52)}
+          <P d="M24 84 Q32 80 40 84 Q48 88 56 84 Q64 80 72 84" stroke="#9be0ff" sw={1.6} />
         </g>
       );
     case 'ptera':

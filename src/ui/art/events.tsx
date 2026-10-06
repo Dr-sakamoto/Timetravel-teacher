@@ -117,7 +117,7 @@ const SCENES: Record<string, () => ReactNode> = {
   ),
 
   // ---------- 白亜紀 ----------
-  nawabari: () => (
+  trex_hunt: () => (
     <g>
       <Bg sky="#ffcf8a" ground="#9c7a4a" y={52} />
       <P d="M34 52 L46 22 L54 22 L66 52Z" fill="#7a5a3a" />
@@ -132,25 +132,53 @@ const SCENES: Record<string, () => ReactNode> = {
       <P d="M40 10 l3 4 M60 10 l-3 4" stroke="#e5534b" sw={1.2} />
     </g>
   ),
-  trex_sumo: () => (
+  meteor: () => (
     <g>
-      <Bg sky="#cfe8a8" ground="#d8c08a" y={50} />
-      <E x={50} y={60} rx={40} ry={8} fill="#e8d6a8" />
-      <E x={50} y={60} rx={34} ry={6} stroke="#fbfbf7" sw={1.6} />
-      <P d="M54 50 C52 30 60 16 76 14 C92 14 98 26 96 38 C94 48 84 52 74 50 L70 58 L58 58Z" fill="#6fb35a" />
-      <P d="M64 34 C74 40 88 40 96 34" sw={1.2} />
-      {[70, 76, 82, 88].map((x) => (
-        <P key={x} d={`M${x} 36.5 l2 3 l2 -3`} fill="#fff" sw={0.9} />
+      <Bg sky="#ffb36b" ground="#7a5a3a" y={56} />
+      <C x={84} y={12} r={8} fill="#fff3b0" sw={1} />
+      <P d="M70 8 L40 34" stroke="#ffd34d" sw={6} />
+      <P d="M70 8 L40 34" stroke="#ff8a3d" sw={3} />
+      <C x={36} y={38} r={7} fill="#8a6a4a" />
+      <C x={34} y={36} r={1.6} fill="#5a4a3a" sw={0} />
+      <P d="M0 56 L12 48 L22 54 L34 44 L48 52 L62 46 L76 54 L90 48 L100 54 V56Z" fill="#5a4a3a" />
+      <P d="M18 62 C18 58 22 56 26 58 L28 62Z M72 64 C72 60 76 58 80 60 L82 64Z" fill="#6fb35a" sw={1} />
+      <P d="M60 66 l4 -2 l2 2 M64 64 l1 -3" sw={1.2} />
+      <E x={62} y={66} rx={4} ry={2.4} fill="#c69c6d" sw={1} />
+    </g>
+  ),
+  migration: () => (
+    <g>
+      <Bg sky="#cfe8ff" ground="#c9b06a" y={50} />
+      <P d="M0 50 L20 36 L36 46 L58 30 L80 44 L100 34 V50Z" fill="#9fbf6a" />
+      {[[20, 52, 0.75], [46, 51, 0.9], [70, 55, 1]].map(([x, y, k]) => (
+        <g key={x} transform={`translate(${x} ${y}) scale(${k})`}>
+          <P d="M-12 8 C-12 0 -4 -4 4 -4 C12 -4 16 2 16 8Z" fill="#7fbf7a" />
+          <P d="M-12 4 C-18 4 -22 8 -24 12 C-18 10 -14 10 -10 8Z" fill="#7fbf7a" sw={1.1} />
+          <P d="M10 -2 C12 -10 16 -14 20 -14 C24 -14 26 -10 24 -6 C22 -2 16 0 12 0Z" fill="#98d293" sw={1.1} />
+          <P d="M18 -14 C20 -20 26 -24 32 -24 C30 -20 26 -16 22 -14Z" fill="#e8834a" sw={1} />
+          <C x={20} y={-9} r={0.9} fill={O} sw={0} />
+          <P d="M-6 8 V14 M8 8 V14" sw={1.6} />
+        </g>
       ))}
-      <C x={78} y={24} r={2.4} fill={O} sw={0} />
-      <P d="M72 20 L84 21" sw={1.6} />
-      <P d="M58 44 C52 44 48 46 46 48" sw={4} stroke="#6fb35a" />
-      <P d="M18 58 C18 46 24 40 32 40 C38 40 42 44 44 50 L40 58Z" fill="#3f7fd0" />
-      <C x={30} y={32} r={7} fill="#ffd9b8" />
-      <P d="M23 30 C24 24 36 24 37 30" fill="#2f2a2a" sw={1.1} />
-      <P d="M34 44 C40 44 44 46 46 48" sw={4} stroke="#ffd9b8" />
-      <C x={33} y={32} r={1} fill={O} sw={0} />
-      <P d="M46 40 l2 -4 M50 41 l3 -3" stroke="#e5534b" sw={1.2} />
+      <P d="M88 22 C92 18 96 20 98 16" stroke="#f2c94c" sw={1.2} />
+    </g>
+  ),
+
+  egg_theft: () => (
+    <g>
+      <Bg sky="#d9f0c0" ground="#b58a5a" y={52} />
+      <E x={30} y={56} rx={18} ry={6} fill="#8a6a3a" />
+      {[[22, 50], [30, 48], [38, 50]].map(([x, y]) => (
+        <E key={x} x={x} y={y} rx={4.5} ry={6} fill="#fbf4e2" sw={1.1} />
+      ))}
+      <P d="M56 66 C56 50 64 42 74 42 C84 42 90 50 88 66Z" fill="#6aa6c9" />
+      <P d="M64 44 C62 34 68 26 76 26 C84 26 88 32 86 40 C84 46 78 48 72 48Z" fill="#8cc2e0" />
+      <P d="M70 28 C70 20 82 20 82 28 C80 24 72 24 70 28Z" fill="#e5534b" />
+      <C x={75} y={35} r={1.4} fill={O} sw={0} />
+      <P d="M62 56 C56 54 52 52 50 48" sw={1.4} />
+      <E x={52} y={46} rx={5} ry={6.5} fill="#fbf4e2" sw={1.2} />
+      <C x={50} y={44} r={1} fill="#a8d08d" sw={0} />
+      <P d="M90 58 l6 -2 M90 62 l7 0 M90 66 l6 2" sw={1} />
     </g>
   ),
 

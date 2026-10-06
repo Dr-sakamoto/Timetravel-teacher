@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
-import { CARDS, parseAttrs, toIcons } from './data/cards';
+import { CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
@@ -153,14 +153,14 @@ describe('engine', () => {
       ...CARDS.map((c) => ({ name: c.name, attrs: c.attrs, tags: c.tags })),
       ...ARCHETYPES.map((a) => ({ name: a.title, attrs: parseAttrs(a.attrs), tags: a.tags })),
     ];
-    for (const x of all) {
+    for (const x of [...all, ...EGG_DINOS]) {
       if (x.attrs.includes('fight')) expect(x.tags, x.name).toContain('ヤンキー');
       else expect(x.tags, x.name).not.toContain('ヤンキー');
     }
     const yankees = all.filter((x) => x.tags.includes('ヤンキー'));
     const fightOnly = yankees.filter((x) => x.attrs.every((a) => a === 'fight'));
-    // アイコン構成を被らせないので、👊だけの子は少なめ（恐竜の一部は🏃も持つ）
-    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.3);
+    // アイコン構成を被らせないので、👊だけの子は少なめ（恐竜の一部は🏃も持つ。ブラキオサウルスを外して少し減った）
+    expect(fightOnly.length / yankees.length).toBeGreaterThanOrEqual(0.25);
     expect(fightOnly.length / yankees.length).toBeLessThanOrEqual(0.6);
   });
 
@@ -362,7 +362,7 @@ describe('engine', () => {
       else expect(used.has('all'), era.id).toBe(true);
     }
     expect(ERAS.find((e) => e.id === 'future')!.favor).toEqual(['study']);
-    expect(ERAS.find((e) => e.id === 'cretaceous')!.favor).toEqual(['fight']);
+    expect(ERAS.find((e) => e.id === 'cretaceous')!.favor).toEqual(['fight', 'sports']);
     expect(ERAS.find((e) => e.id === 'present')!.favor).toEqual([]);
   });
 
@@ -444,8 +444,8 @@ describe('engine', () => {
     const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
     const B = [mk('b1', ['sports', 'sports'])];
     const C = [mk('c1', ['study'])];
-    // ティラノサウルスと力くらべ：👊6以上で+6、足りなければ−3
-    expect(run('trex_sumo', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, -3, -3]);
+    // 大移動：👊6以上で+6、足りなければ−3
+    expect(run('migration', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, -3, -3]);
     // 古代オリンピック：🏃の数で勝負、1位+15・2位+5・最下位−10
     expect(run('olympia', [A, B, C])).toEqual([15, 5, -10]);
     // 関ヶ原の戦い：👊の数で勝負、1位+15・2位+5・最下位−10
@@ -493,14 +493,38 @@ describe('engine', () => {
       };
     };
 
-    it('nawabari: the strongest pack takes points from the weakest', () => {
-      const r = run('nawabari', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study', 'study', 'art'])]]);
+    it('trex_hunt: the strongest pack takes points from the weakest', () => {
+      const r = run('trex_hunt', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study', 'study', 'art'])]]);
       expect(r.delta).toEqual([8, 0, -8]);
       // 生徒は動かない
       expect(r.uids).toEqual([['y'], ['z'], ['c']]);
       // 一番が並んだら何も起こらない
-      const tie = run('nawabari', [[mk('y', ['fight'])], [mk('z', ['fight'])], [mk('c', ['study'])]]);
+      const tie = run('trex_hunt', [[mk('y', ['fight'])], [mk('z', ['fight'])], [mk('c', ['study'])]]);
       expect(tie.delta).toEqual([0, 0, 0]);
+    });
+
+    it('meteor: everyone loses points, and each runner wins some back', () => {
+      expect(run('meteor', [[mk('a', ['sports']), mk('b', ['sports', 'sports']), mk('c', ['sports']), mk('d', ['sports'])], [mk('e', ['sports'])], []]).delta).toEqual([0, -6, -8]);
+    });
+
+    it('egg_theft: the fastest class gets an egg that hatches into a dinosaur at the start of its next turn', () => {
+      const r = run('egg_theft', [[mk('a', ['sports', 'sports'])], [mk('b', ['sports'])], []]);
+      const eggs = (pi: number) => r.after.players[pi].students.filter((x) => x.art === 'egg');
+      expect(eggs(0)).toHaveLength(1);
+      expect(eggs(1)).toHaveLength(0);
+      // 一番が並んだら誰も盗めない
+      const tie = run('egg_theft', [[mk('a', ['sports'])], [mk('b', ['sports'])], []]);
+      expect(tie.after.players.flatMap((p) => p.students).some((x) => x.art === 'egg')).toBe(false);
+      // 手番が来ると孵る（係はそのまま）
+      let t = structuredClone(r.after);
+      while (!(t.phase.kind === 'result' && t.phase.ctx === 'hatch')) t = step(t, cpuAction(t)!);
+      const pi = t.phase.kind === 'result' ? t.phase.player! : -1;
+      expect(pi).toBe(0);
+      const hatched = t.players[0].students.find((x) => x.uid === eggs(0)[0].uid)!;
+      expect(['oviraptor', 'parasaur', 'spino']).toContain(hatched.cardId);
+      expect(hatched.attrs.length).toBeGreaterThan(0);
+      t = step(t, { type: 'continue' });
+      expect(t.phase).toEqual({ kind: 'draw', player: 0 });
     });
 
     it('giza: everyone builds one pyramid; the laziest class gets nothing', () => {

@@ -33,9 +33,13 @@ export const ART: Record<string, ArtSpec> = {
   // ---- 白亜紀 ----
   trex: { creature: 'trex' },
   triceratops: { creature: 'triceratops' },
-  brachio: { creature: 'brachio' },
   ptera: { creature: 'ptera' },
   raptor: { creature: 'raptor' },
+  // 卵泥棒で来る卵と、卵から孵る恐竜
+  egg: { creature: 'egg' },
+  oviraptor: { creature: 'oviraptor' },
+  parasaur: { creature: 'parasaur' },
+  spino: { creature: 'spino' },
 
   // ---- 古代エジプト ----
   cleopatra: { skin: SKIN.tan, back: 'egypt', hair: 'patsun', hairColor: black, outfit: 'egypt', c1: '#3f7fd0', hat: 'diadem', acc: ['earring'], expr: 'calm', liner: true },

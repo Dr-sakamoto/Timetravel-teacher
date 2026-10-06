@@ -123,7 +123,7 @@ export interface EventResult {
   outUids?: string[];
 }
 
-export type ResultCtx = 'turn' | 'monthEnd' | 'yearEnd' | 'final';
+export type ResultCtx = 'turn' | 'hatch' | 'monthEnd' | 'yearEnd' | 'final';
 
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
@@ -154,7 +154,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 21;
+  version: 22;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
