@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
-import { CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
+import { CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
@@ -260,7 +260,7 @@ describe('engine', () => {
     // 恐竜は👊（と🏃）の個数だけのキャラなので、ほかの子との重複は許す
     for (const d of CARDS.filter((c) => c.tags.includes('恐竜'))) expect(d.attrs.every((x) => x === 'fight' || x === 'sports'), d.name).toBe(true);
     const all = [
-      ...CARDS.filter((c) => !c.tags.includes('恐竜')).map((c) => ({ name: c.name, k: key(c.attrs) })),
+      ...[...CARDS, KONGMING].filter((c) => !c.tags.includes('恐竜')).map((c) => ({ name: c.name, k: key(c.attrs) })),
       ...ARCHETYPES.filter((a) => a.rarity !== 'N').map((a) => ({ name: a.title, k: key(toIcons(a.attrs, a.rarity, a.power)) })),
     ];
     for (const x of all) expect(all.filter((y) => y.k === x.k).map((y) => y.name), x.name).toEqual([x.name]);
@@ -619,24 +619,23 @@ describe('engine', () => {
       expect(run('chibi', [[mk('y', ['study'])], [], []]).delta).toEqual([0, 0, 0]);
     });
 
-    it('sangu: the best 📚 student without a role becomes a strategist, and their 📚 counts double until the term ends', () => {
-      const r = run('sangu', [[mk('a', ['study', 'study']), mk('a2', ['study', 'study', 'study'])], [mk('b', ['art'])], [mk('c', ['study'])]], [10, 10, 10], [[{ role: 'study', uid: 'a2' }], [], []]);
+    it('sangu: Zhuge Liang joins, for free, the class whose 👑 most outnumbers its 📚', () => {
+      // 👑−📚：A 3−0=3、B 1−0=1、C 0−2=−2 → A に孔明
+      const r = run('sangu', [[mk('a', ['charm', 'charm', 'charm'])], [mk('b', ['charm'])], [mk('c', ['study', 'study'])]]);
       expect(r.delta).toEqual([0, 0, 0]);
-      const st = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!;
-      // 係に就いている a2 ではなく、係のない a が軍師に
-      expect(st(0, 'a').gunshi).toBe('study');
-      expect(st(0, 'a2').gunshi).toBeUndefined();
-      expect(st(1, 'b').gunshi).toBeUndefined();
-      expect(st(2, 'c').gunshi).toBe('study');
-      // a2（学習係）3×2 ＋ a（軍師）2×2 ＝ 10。アイコンそのものは増えない
-      expect(attrScore(r.after.players[0], 'study').total).toBe(10);
-      expect(st(0, 'a').attrs).toEqual(['study', 'study']);
-      // 学期が変わると軍師でなくなる
-      let t = structuredClone(r.after);
-      const term = (x: GameState) => termOfMonth(MONTHS[x.monthIdx]);
-      const start = term(t);
-      while (term(t) === start) t = step(t, cpuAction(t)!);
-      expect(t.players.flatMap((p) => p.students).some((x) => x.gunshi)).toBe(false);
+      const kongming = (t: GameState) => t.players.map((p) => p.students.filter((x) => x.cardId === 'zhuge').length);
+      expect(kongming(r.after)).toEqual([1, 0, 0]);
+      expect(r.after.players[0].students.find((x) => x.cardId === 'zhuge')!.attrs).toEqual(['study', 'study', 'study', 'charm']);
+      // 孔明は人物カードのプールにはいない
+      expect(Object.values(r.after.pools).flat()).not.toContain('zhuge');
+      // もうどこかのクラスにいれば、もう1人は来ない
+      const again = structuredClone(r.after);
+      again.phase = base.phase;
+      again.eventDeck.push('sangu');
+      expect(kongming(step(again, pass))).toEqual([1, 0, 0]);
+      // 満席のクラスには来ない（次に差が大きいクラスへ）
+      const full = Array.from({ length: MAX_CLASS }, (_, k) => mk(`f${k}`, ['charm']));
+      expect(kongming(run('sangu', [full, [mk('b', ['charm'])], [mk('c', ['study'])]]).after)).toEqual([0, 1, 0]);
     });
 
     it('himiko: in each class, the student without goods who has the most icons receives a bronze mirror (👑+1)', () => {
@@ -950,9 +949,9 @@ describe('engine', () => {
         s = step(s, cpuAction(s)!);
         if (!s.log.some((l) => l.id >= before && l.text.startsWith('ゲリラ発生'))) continue;
         fired++;
-        // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところか、陶片追放の投票
+        // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところか、陶片追放の投票か、新大陸の品か、桃園の誓いの相手選び
         if (s.phase.kind === 'result') expect(s.phase.player).toBeNull();
-        else expect(['push', 'vote', 'newWorld']).toContain(s.phase.kind);
+        else expect(['push', 'vote', 'newWorld', 'oath']).toContain(s.phase.kind);
       }
       expect(fired).toBeGreaterThan(0);
     }

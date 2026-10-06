@@ -67,8 +67,6 @@ export interface Student {
   goods?: Goods;
   /** ペストにかかっている（🏃を数えない。学期の区切りで治る。グッズとは別なので装備もできる） */
   plague?: boolean;
-  /** 三顧の礼で軍師に迎えられた：このアイコンに係ボーナス（×2）が付く。学期の区切りで終わる */
-  gunshi?: Attr;
   /** 得点に貢献した回数 */
   mvp: number;
 }

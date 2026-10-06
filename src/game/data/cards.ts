@@ -80,7 +80,6 @@ export const CARDS: CardDef[] = [
     ['spartacus', 'スパルタクス', '剣闘士の反逆者', 'R', '⚔️', 6, '=ppf', ['ヤンキー'], '奴隷剣闘士から反乱軍のリーダーへ。'],
   ]),
   ...era('china', [
-    ['zhuge', '諸葛亮孔明', '臥龍', 'SSR', '🪶', 10, '=ssaac', ['学者'], '天下三分の計で定期テストの山も当てる。'],
     ['caocao', '曹操', '乱世の奸雄', 'SSR', '📜', 9, '=sspac', ['王族', '武将'], '『孫子』に解説を書き、詩も作る魏の王。馬に乗って弓を射るのも得意。'],
     ['liubei', '劉備', '仁徳の人', 'SR', '🤝', 7, '=fccc', ['王族', '武将', 'ヤンキー'], '本より仲間が好き。若いころは町のやんちゃな若者たちが争って子分になった。'],
     ['zhouyu', '周瑜', '赤壁の名将', 'SR', '🎼', 8, '=saac', ['武将', '芸術家'], '赤壁で火攻めを指揮した呉の大将。音楽にくわしく、演奏をまちがえると酔っていても必ず振り向いた。'],
@@ -142,4 +141,7 @@ export const EGG_DINOS: (CardDef & { weight: number })[] = [
   { ...era('cretaceous', [['spino', 'スピノサウルス', '川辺の王', 'SR', '🐊', 8, '=ffp', ['恐竜', 'ヤンキー'], '背中の帆が自慢。プールの授業だけは誰にも負けない。']])[0], weight: 1 },
 ];
 
-export const CARD_MAP: Record<string, CardDef> = Object.fromEntries([...CARDS, ...EGG_DINOS].map((c) => [c.id, c]));
+/** 諸葛亮孔明（三顧の礼でだけクラスに来る。人物カードのプールには入らず、1人しかいない） */
+export const KONGMING: CardDef = era('china', [['zhuge', '諸葛亮孔明', '臥龍', 'SSR', '🪶', 10, '=sssc', ['学者'], '劉備が3回たずねて、やっと軍師に迎えた。天下三分の計で定期テストの山も当てる。']])[0];
+
+export const CARD_MAP: Record<string, CardDef> = Object.fromEntries([...CARDS, ...EGG_DINOS, KONGMING].map((c) => [c.id, c]));

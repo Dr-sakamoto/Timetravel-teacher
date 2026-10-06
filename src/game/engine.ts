@@ -1,5 +1,5 @@
 import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, counted, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
-import { CARDS, CARD_MAP, EGG_DINOS, toIcons } from './data/cards';
+import { CARDS, CARD_MAP, EGG_DINOS, KONGMING, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
   ALL_EVENT_CARDS,
@@ -368,17 +368,8 @@ function advanceMonth(s: GameState) {
   const m = MONTHS[s.monthIdx];
   if (m === 9 || m === 1) {
     curePlague(s);
-    dismissGunshi(s);
     startTerm(s);
   } else startTurns(s);
-}
-
-/** 学期の区切り：三顧の礼の軍師の任期が終わる */
-function dismissGunshi(s: GameState) {
-  const ones = s.players.flatMap((p) => p.students.filter((x) => x.gunshi));
-  if (!ones.length) return;
-  for (const x of ones) delete x.gunshi;
-  log(s, `軍師の任期が終わった。${ones.map((x) => x.icon + x.name).join('・')}がふつうの生徒に戻った。`);
 }
 
 /** 次の月から新しい学期（または次の学年）になるか */
@@ -425,7 +416,6 @@ function curePlague(s: GameState) {
 
 function yearEnd(s: GameState) {
   curePlague(s);
-  dismissGunshi(s);
   s.monthIdx = MONTHS.length - 1;
   if (s.year < s.years) {
     log(s, `${s.year}年生が終わった。進級！`);
@@ -784,24 +774,29 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       }
       break;
     }
-    // 三国志：各クラスの係に就いていない子のうち一番の子が軍師に迎えられる。学期の区切りまで、そのアイコンに係ボーナスが付く
-    case 'gunshi': {
+    // 三国志：👑からXを引いた差が一番大きいクラス（満席は除く。同じならポイントが少ないクラス）に、諸葛亮孔明が無料で転入する。孔明は1人だけ
+    case 'kongming': {
       if (c.attr === 'all') break;
-      const a = c.attr;
-      ps.forEach((p, i) => {
-        const top = bestOf(p, p.students.filter((x) => roleOf(p, x.uid) === null && !x.gunshi), a);
-        if (!top) {
-          rows[i].note = '迎える子なし';
-          return;
-        }
-        top.student.gunshi = a;
-        top.student.mvp++;
-        moved.push(top.student);
-        rows[i].count = studentPts(p, top.student, a);
-        rows[i].uids = [top.student.uid];
-        rows[i].note = `軍師 ${ATTR_ICON[a]}×2`;
-        tell(`${p.name}のクラスの${name(top.student)}が軍師に迎えられた！`, i);
-      });
+      const gaps = ps.map((p, i) => attrScore(p, 'charm').total - values[i]);
+      rows.forEach((r, i) => (r.count = gaps[i]));
+      if (ps.some((p) => p.students.some((x) => x.cardId === KONGMING.id))) {
+        tell('孔明はもう、どこかのクラスで軍師をしている。');
+        break;
+      }
+      const to = ps
+        .map((_, i) => i)
+        .filter((i) => ps[i].students.length < MAX_CLASS)
+        .sort((x, y) => gaps[y] - gaps[x] || ps[x].points - ps[y].points || x - y)[0];
+      if (to === undefined) {
+        tell('どのクラスも満席で、孔明を迎えられなかった。');
+        break;
+      }
+      const st = fromPoolId(s, KONGMING.id, joinedLabel(s));
+      addStudent(s, ps[to], st);
+      moved.push(st);
+      rows[to].uids = [st.uid];
+      rows[to].note = '孔明が転入';
+      tell(`${ps[to].name}のクラスに、軍師の${name(st)}がやってきた！`, to);
       break;
     }
     // 三国志：各クラスのグッズを持っていない子のうちアイコンが一番多い子1人に、魏の銅鏡が届く（同じなら先に並んでいる子）
