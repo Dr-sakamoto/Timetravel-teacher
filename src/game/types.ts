@@ -17,7 +17,7 @@ export const ATTR_LABEL: Record<Attr, string> = {
 };
 
 export type Rarity = 'N' | 'R' | 'SR' | 'SSR';
-export type Tag = '現代' | 'ヤンキー' | '恐竜' | '武将' | '忍者' | '学者' | '芸術家' | '王族' | '未来' | '動物';
+export type Tag = '現代' | 'ヤンキー' | '恐竜' | '武将' | '忍者' | '学者' | '芸術家' | '王族' | '未来' | '動物' | '機械';
 
 export type RoleId = 'study' | 'pe' | 'culture' | 'leader';
 
@@ -48,7 +48,7 @@ export type EraId =
   | 'present'
   | 'future';
 
-/** 生徒カード：属性アイコンだけ。同じアイコンが重なるほど強い（1枚あたり最大5個） */
+/** 生徒カード：属性アイコンだけ。同じアイコンが重なるほど強い（印刷は1枚あたり最大5個。イベントで6個まで増える） */
 export interface Student {
   uid: string;
   /** カードプールのID（偉人のカードID、現代の生徒は 'm:<アーキタイプ>#<番号>'） */
@@ -154,7 +154,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 20;
+  version: 21;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
