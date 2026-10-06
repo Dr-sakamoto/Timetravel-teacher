@@ -249,6 +249,60 @@ const SCENES: Record<string, () => ReactNode> = {
       <Mini x={50} y={58} c="#e5534b" head="#f0c08f" />
     </g>
   ),
+  colosseum: () => (
+    <g>
+      <Bg sky="#ffd9a8" ground="#e2c48a" y={56} />
+      {/* 円形闘技場の外壁（アーチが3段） */}
+      <P d="M4 50 V18 C30 8 70 8 96 18 V50Z" fill="#e8c99a" />
+      {[0, 1, 2].map((row) =>
+        [12, 26, 40, 54, 68, 82].map((x) => (
+          <P key={`${row}-${x}`} d={`M${x} ${46 - row * 10} V${41 - row * 10} C${x} ${37 - row * 10} ${x + 7} ${37 - row * 10} ${x + 7} ${41 - row * 10} V${46 - row * 10}`} fill="#a8754a" sw={0.9} />
+        )),
+      )}
+      <P d="M4 26 C30 17 70 17 96 26 M4 36 C30 28 70 28 96 36" sw={1} />
+      {/* 剣闘士ふたり */}
+      <g>
+        <Mini x={36} y={58} c="#c0392b" head="#f0c08f" />
+        <P d="M41 58 L50 50" stroke="#cfd6dd" sw={2} />
+        <E x={30} y={62} rx={3.5} ry={5} fill="#d9a441" sw={1} />
+      </g>
+      <g>
+        <Mini x={64} y={58} c="#3f7fd0" head="#d39a68" />
+        <P d="M59 58 L51 49" stroke="#cfd6dd" sw={2} />
+        <E x={70} y={62} rx={3.5} ry={5} fill="#d9a441" sw={1} />
+      </g>
+      <Star x={50} y={46} r={3} />
+    </g>
+  ),
+  socratic: () => (
+    <g>
+      <Bg sky="#d6e6ff" ground="#e8dcc0" y={56} />
+      {[8, 22, 78, 92].map((x) => (
+        <R key={x} x={x - 3} y={12} w={6} h={44} fill="#f6f1e4" sw={1.1} />
+      ))}
+      <R x={2} y={8} w={96} h={5} fill="#e8e0cc" sw={1.1} />
+      {/* 問いかける老人（白いひげ・トーガ） */}
+      <P d="M28 66 C28 50 32 44 40 44 C48 44 52 50 52 66Z" fill="#fbfbf7" />
+      <C x={40} y={36} r={8} fill="#f0c08f" />
+      <P d="M33 38 C33 48 47 48 47 38 C44 42 36 42 33 38Z" fill="#e8e8e8" sw={1} />
+      <P d="M37 34 h1.5 M42 34 h1.5" sw={1.4} />
+      <P d="M50 50 L58 42" sw={1.6} />
+      {/* 考えこむ子 */}
+      <P d="M62 66 C62 54 65 50 71 50 C77 50 80 54 80 66Z" fill="#6fb35a" />
+      <C x={71} y={43} r={6.5} fill="#ffd9b8" />
+      <P d="M68 42 h1 M73 42 h1" sw={1.3} />
+      <P d="M76 50 C78 48 78 46 76 45" sw={1.1} />
+      {/* ふきだし：？と！ */}
+      <C x={56} y={24} r={8} fill="#fff" sw={1.2} />
+      <text x={56} y={28} textAnchor="middle" fontSize={11} fontWeight={900} fill="#3f7fd0">
+        ?
+      </text>
+      <C x={82} y={28} r={6} fill="#fff8c4" sw={1.1} />
+      <text x={82} y={31.5} textAnchor="middle" fontSize={9} fontWeight={900} fill="#e5534b">
+        !
+      </text>
+    </g>
+  ),
   ostracism: () => (
     <g>
       <Bg sky="#e9e2f5" ground="#cdbf9e" y={54} />

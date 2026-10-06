@@ -112,7 +112,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 24,
+    version: 25,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -453,6 +453,9 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
   switch (e.type) {
     case 'alien':
       return resolveInvasion(s, c);
+    case 'ostracism':
+      // 陶片追放は投票の場面を挟むので fireGuerrilla で始める（ここには来ない）
+      throw new Error('ostracism starts a vote');
     case 'newworld':
     case 'teppo':
       // 品を選ぶ番が順に回るので、ゲリラの側で始める（fireGuerrilla → startGift）
@@ -559,7 +562,7 @@ function bestOf(p: Player, cands: Student[], a: Attr | 'all'): { student: Studen
 }
 
 /** その時代だけの仕組みのイベント（点の数え方ではなく、起こることそのものが違う） */
-function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, { type: 'heads' | 'tiers' | 'disaster' | 'threshold' | 'battle' | 'alien' | 'newworld' | 'teppo' }>): EventResult {
+function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, { type: 'heads' | 'tiers' | 'disaster' | 'threshold' | 'battle' | 'alien' | 'ostracism' | 'newworld' | 'teppo' }>): EventResult {
   const ps = s.players;
   const n = ps.length;
   const rows: ResultRow[] = ps.map((_, i) => ({ player: i, delta: 0 }));
@@ -651,25 +654,59 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // ギリシャ：全校でアイコンが一番多い子のクラスが減点（同点ならポイントの多いクラスの子）
-    case 'ostracism': {
-      let pick: { pi: number; st: Student } | null = null;
-      ps.forEach((p, pi) => {
-        for (const st of p.students) {
-          const n = counted(st).length;
-          const top = pick ? counted(pick.st).length : -1;
-          const better = !pick || n > top || (n === top && p.points > ps[pick.pi].points);
-          if (better) pick = { pi, st };
+    // ギリシャ：各クラスの、Xと also の合計が一番多い子が闘技場へ。1位（同点なら全員）は+win、負けたクラスと出せる子がいないクラスは−lose
+    case 'arena': {
+      const power = (p: Player, x: Student) => studentPts(p, x, c.attr) + studentPts(p, x, e.also);
+      const champs = ps.map((p) => {
+        let out: { student: Student; pts: number } | null = null;
+        for (const x of p.students) {
+          const pts = power(p, x);
+          if (pts > 0 && (!out || pts > out.pts)) out = { student: x, pts };
+        }
+        return out;
+      });
+      const vs = champs.map((x) => x?.pts ?? 0);
+      const hi = Math.max(...vs);
+      champs.forEach((x, i) => {
+        rows[i].count = vs[i];
+        rows[i].uids = x ? [x.student.uid] : [];
+      });
+      // 全員同じ（だれも出せない場合も）なら引き分け
+      if (hi === Math.min(...vs)) {
+        rows.forEach((r) => (r.note = '引き分け'));
+        break;
+      }
+      champs.forEach((x, i) => {
+        if (x && x.pts === hi) {
+          add(i, e.win);
+          x.student.mvp++;
+          moved.push(x.student);
+          rows[i].note = '勝利';
+          tell(`${ps[i].name}のクラスの${name(x.student)}が闘技場を制した！`, i);
+        } else {
+          add(i, -e.lose);
+          rows[i].note = x ? '敗北' : '不戦敗';
         }
       });
-      if (!pick) break;
-      const { pi, st } = pick as { pi: number; st: Student };
-      add(pi, -e.lose);
-      moved.push(st);
-      rows[pi].count = counted(st).length;
-      rows[pi].note = '追放の票';
-      rows[pi].uids = [st.uid];
-      tell(`${ps[pi].name}のクラスの${name(st)}に陶片の票が集まった。（−${e.lose}）`, pi);
+      break;
+    }
+    // ギリシャ：各クラスのXが一番多い子が代表でソクラテスと対話。need 以上なら+win、届かない（代表がいない）と論破されて−lose
+    case 'dialogue': {
+      ps.forEach((p, i) => {
+        const rep = bestOf(p, p.students, c.attr);
+        rows[i].count = rep?.pts ?? 0;
+        rows[i].uids = rep ? [rep.student.uid] : [];
+        if (rep && rep.pts >= e.need) {
+          add(i, e.win);
+          rep.student.mvp++;
+          moved.push(rep.student);
+          rows[i].note = '対話成立';
+          tell(`${p.name}のクラスの${name(rep.student)}が、ソクラテスと語り合った！`, i);
+        } else {
+          add(i, -e.lose);
+          rows[i].note = rep ? '論破された' : '代表なし';
+        }
+      });
       break;
     }
     // 中国：各クラスの一番の子が受験。合格した子はアイコンが1つ増える（MAX_ICONS まで）
@@ -1033,7 +1070,7 @@ export function nextTurnPlayer(s: GameState): number | null {
 /** いまゲリラの最中か（転校で出ていく子を選んでいる間と、ゲリラの結果を見せている間）。誰の手番でもない */
 export function inGuerrilla(s: GameState): boolean {
   const ph = s.phase;
-  return ph.kind === 'push' || ph.kind === 'gift' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
+  return ph.kind === 'push' || ph.kind === 'vote' || ph.kind === 'gift' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
 }
 
 /** 転校：めくった人から席順に、全クラスが1人ずつ外す */
@@ -1042,15 +1079,19 @@ function startDrop(s: GameState, drawer: number) {
   nextDrop(s, drawer, Array.from({ length: n }, (_, i) => (drawer + i) % n), []);
 }
 
-/** 転校の次の人へ（left はまだ外していないクラス。外せる子がいないクラスは飛ばす）。全員終わったら結果を出す */
-function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[]) {
+/** 転校の次の人へ（left はまだ外していないクラス。外せる子がいないクラスは飛ばす）。全員終わったら結果を出す。votes があれば陶片追放の転校 */
+function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[], votes?: number[]) {
   for (let i = 0; i < left.length; i++) {
     const pi = left[i];
     if (droppable(s.players[pi]).length > 0) {
-      s.phase = { kind: 'push', player: pi, drawer, left: left.slice(i + 1), gone };
+      s.phase = { kind: 'push', player: pi, drawer, left: left.slice(i + 1), gone, votes };
       return;
     }
     log(s, `${s.players[pi].name}のクラスは転校させられる子がいなかった。`, pi);
+  }
+  if (votes) {
+    setResult(s, null, ostracismResult(s, drawer, votes, gone), 'turn');
+    return;
   }
   // ゲリラの結果は誰の手番のものでもない
   setResult(
@@ -1068,6 +1109,52 @@ function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[])
     },
     'turn',
   );
+}
+
+/** 陶片追放で投票できる相手（自分以外のクラス） */
+export function voteTargets(s: GameState, pi: number): number[] {
+  return s.players.filter((p) => p.id !== pi).map((p) => p.id);
+}
+
+/** 陶片追放：めくった人から席順に、全クラスが秘密で1票ずつ入れる */
+function startVote(s: GameState, drawer: number) {
+  const n = s.players.length;
+  const order = Array.from({ length: n }, (_, i) => (drawer + i) % n);
+  s.phase = { kind: 'vote', player: order[0], drawer, left: order.slice(1), ballots: [] };
+}
+
+/** 票を数えて追放するクラスを決める（同票ならポイントが多いクラス、それも同じならめくった人から席順で先のクラス） */
+export function ostracized(s: GameState, drawer: number, votes: number[]): number {
+  const n = s.players.length;
+  const seat = (i: number) => (i - drawer + n) % n;
+  return votes
+    .map((_, i) => i)
+    .sort((x, y) => votes[y] - votes[x] || s.players[y].points - s.players[x].points || seat(x) - seat(y))[0];
+}
+
+/** 全員が投票したら開票。追放されたクラスは、係に就いていない子を1人転校させる（させられる子がいなければそのまま） */
+function tallyVotes(s: GameState, drawer: number, ballots: number[]) {
+  const votes = s.players.map((_, i) => ballots.filter((b) => b === i).length);
+  const out = ostracized(s, drawer, votes);
+  log(s, `陶片追放の開票：${s.players.map((p, i) => `${p.name} ${votes[i]}票`).join(' / ')}`);
+  if (droppable(s.players[out]).length > 0) s.phase = { kind: 'push', player: out, drawer, left: [], gone: [], votes };
+  else {
+    log(s, `${s.players[out].name}のクラスは転校させられる子がいなかった。`, out);
+    setResult(s, null, ostracismResult(s, drawer, votes, []), 'turn');
+  }
+}
+
+/** 陶片追放の結果（票の数と、アテネを去った子） */
+function ostracismResult(s: GameState, drawer: number, votes: number[], gone: Student[]): EventResult {
+  const c = EVENT_MAP.ostracism as ContestCard;
+  const out = ostracized(s, drawer, votes);
+  const rows: ResultRow[] = s.players.map((_, i) => ({ player: i, count: votes[i], delta: 0, note: `${votes[i]}票` }));
+  rows[out].note = gone.length ? `${votes[out]}票 追放` : `${votes[out]}票（転校できる子なし）`;
+  rows[out].uids = gone.map((x) => x.uid);
+  const who = s.players[out].name;
+  const say = gone.length ? `${who}のクラスに陶片の票が集まり、${gone.map((x) => `${x.icon}${x.name}`).join('・')}がアテネを去った。` : `${who}のクラスに陶片の票が集まったが、去れる子がいなかった。`;
+  log(s, say, out);
+  return { ...eraResult(s, c, rows, { students: gone, outUids: gone.map((x) => x.uid) }), say };
 }
 
 /**
@@ -1190,7 +1277,8 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
       setResult(s, null, resolveSwing(s, c), 'turn');
       return;
     case 'contest':
-      if (c.effect.type === 'newworld' || c.effect.type === 'teppo') startGift(s, c, pi);
+      if (c.effect.type === 'ostracism') startVote(s, pi);
+      else if (c.effect.type === 'newworld' || c.effect.type === 'teppo') startGift(s, c, pi);
       else setResult(s, null, resolveContest(s, c), 'turn');
       return;
     case 'raid':
@@ -1373,7 +1461,16 @@ export function step(prev: GameState, a: Action): GameState {
       if (!droppable(p).some((x) => x.uid === a.uid)) return prev;
       const st = removeStudent(s, p, a.uid, false)!;
       log(s, `${p.name}のクラスの${st.name}が転校していった。`, ph.player);
-      nextDrop(s, ph.drawer, ph.left, [...ph.gone, st]);
+      nextDrop(s, ph.drawer, ph.left, [...ph.gone, st], ph.votes);
+      return s;
+    }
+    case 'vote': {
+      if (ph.kind !== 'vote' || !voteTargets(s, ph.player).includes(a.target)) return prev;
+      // 誰に入れたかはログにも残さない（秘密投票）
+      log(s, `${s.players[ph.player].name}が陶片に名前を書いた。`, ph.player);
+      const ballots = [...ph.ballots, a.target];
+      if (ph.left.length) s.phase = { kind: 'vote', player: ph.left[0], drawer: ph.drawer, left: ph.left.slice(1), ballots };
+      else tallyVotes(s, ph.drawer, ballots);
       return s;
     }
     case 'kachikomi': {

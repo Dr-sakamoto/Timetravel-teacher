@@ -448,8 +448,8 @@ describe('engine', () => {
     const C = [mk('c1', ['study'])];
     // 大移動：👊6以上で+6、足りなければ−3
     expect(run('migration', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, -3, -3]);
-    // 古代オリンピック：🏃の数で勝負、1位+15・2位+5・最下位−10
-    expect(run('olympia', [A, B, C])).toEqual([15, 5, -10]);
+    // 古代オリンピック：🏃の数で勝負、1位+12・2位+5、負けても減点なし
+    expect(run('olympia', [A, B, C])).toEqual([12, 5, 0]);
     // 関ヶ原の戦い：👑＋👊の数で勝負、1位+15・2位+5・最下位−10
     expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 5, -10]);
     expect(run('sekigahara', [[mk('y', ['fight']), mk('x', ['charm', 'charm'])], [mk('z', ['charm', 'fight'])], C])).toEqual([15, 5, -10]);
@@ -538,11 +538,75 @@ describe('engine', () => {
       expect(run('giza', [[s3('a')], [s3('b')], []]).delta).toEqual([-3, -3, -3]);
     });
 
-    it('ostracism: the class of the student with the most icons in the whole school loses points', () => {
-      const r = run('ostracism', [[mk('a', ['study', 'study'])], [mk('b', ['art', 'art', 'art', 'charm'])], [mk('c', ['sports'])]]);
-      expect(r.delta).toEqual([0, -8, 0]);
-      // だれもいなくならない
-      expect(r.uids).toEqual([['a'], ['b'], ['c']]);
+    it('colosseum: each class\'s best fighter (🏃+👊) enters the arena; the winner scores and every other class loses points', () => {
+      expect(run('colosseum', [[mk('a', ['sports', 'fight', 'fight'])], [mk('b', ['sports', 'sports'])], []]).delta).toEqual([12, -4, -4]);
+      // 1位が並べば両方+12
+      expect(run('colosseum', [[mk('a', ['fight', 'fight'])], [mk('b', ['sports', 'sports'])], [mk('c', ['sports'])]]).delta).toEqual([12, 12, -4]);
+      // だれも出せなければ引き分け
+      expect(run('colosseum', [[mk('a', ['study'])], [mk('b', ['art'])], []]).delta).toEqual([0, 0, 0]);
+    });
+
+    it('socratic: each class\'s best scholar talks with Socrates; 📚4 or more scores, less is refuted', () => {
+      // 代表の📚：4（+8）／3（−3）／代表なし（−3）
+      const r = run('socratic', [[mk('a', ['study', 'study', 'study', 'study']), mk('a2', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['art'])]]);
+      expect(r.delta).toEqual([8, -3, -3]);
+      // 学習係の係ボーナスも乗る（📚📚×2＝4）
+      const roles = run('socratic', [[mk('a', ['study', 'study'])], [], []], [10, 10, 10], [[{ role: 'study', uid: 'a' }], [], []]);
+      expect(roles.delta[0]).toBe(8);
+      // アイコンは増えない
+      expect(r.after.players[0].students.find((x) => x.uid === 'a')!.attrs).toHaveLength(4);
+    });
+
+    describe('ostracism: a secret vote; the class with the most votes sends one child away', () => {
+      const drawer = base.phase.kind === 'draw' ? base.phase.player : 0;
+      /** 投票を順に入れる（choose は投票する人ごとの入れ先） */
+      const vote = (s: GameState, choose: (pi: number) => number) => {
+        let t = s;
+        while (t.phase.kind === 'vote') t = step(t, { type: 'vote', target: choose(t.phase.player) });
+        return t;
+      };
+
+      it('everyone votes in seat order from the drawer, and nobody can vote for their own class', () => {
+        const t = run('ostracism', [[mk('a', ['study'])], [mk('b', ['art'])], [mk('c', ['sports'])]]).after;
+        expect(t.phase.kind).toBe('vote');
+        if (t.phase.kind !== 'vote') return;
+        expect(t.phase.player).toBe(drawer);
+        expect(step(t, { type: 'vote', target: drawer })).toBe(t);
+        const next = step(t, { type: 'vote', target: (drawer + 1) % 3 });
+        expect(next.phase.kind === 'vote' && next.phase.player).toBe((drawer + 1) % 3);
+        // 誰に入れたかはログに残らない
+        expect(next.log.at(-1)!.text).not.toContain(next.players[(drawer + 1) % 3].name);
+      });
+
+      it('the class with the most votes chooses one child to leave', () => {
+        const r = run('ostracism', [[mk('a', ['study'])], [mk('b', ['art'])], [mk('c', ['sports'])]]);
+        let t = vote(r.after, (pi) => (pi === 1 ? 0 : 1));
+        expect(t.phase.kind === 'push' && t.phase.player).toBe(1);
+        t = step(t, { type: 'push', uid: 'b' });
+        expect(t.phase.kind).toBe('result');
+        if (t.phase.kind !== 'result') return;
+        expect(t.phase.result.title).toBe('陶片追放');
+        expect(t.phase.result.outUids).toEqual(['b']);
+        expect(t.players[1].students.some((x) => x.uid === 'b')).toBe(false);
+        expect(t.players.map((p) => p.students.length)).toEqual([5, 4, 5]);
+        // 点は動かない
+        expect(t.players.map((p) => p.points)).toEqual([10, 10, 10]);
+      });
+
+      it('on a tie, the class with more points is ostracized', () => {
+        const r = run('ostracism', [[mk('a', ['study'])], [mk('b', ['art'])], [mk('c', ['sports'])]], [10, 20, 5]);
+        const t = vote(r.after, (pi) => (pi + 1) % 3);
+        expect(t.phase.kind === 'push' && t.phase.player).toBe(1);
+      });
+
+      it('a class that cannot let anyone go keeps its children', () => {
+        const r = run('ostracism', [[mk('a', ['study'])], [mk('b', ['art'])], [mk('c', ['sports'])]]);
+        const t0 = structuredClone(r.after);
+        t0.players[1].students = t0.players[1].students.slice(0, 4);
+        const t = vote(t0, (pi) => (pi === 1 ? 0 : 1));
+        expect(t.phase.kind).toBe('result');
+        expect(t.players[1].students).toHaveLength(4);
+      });
     });
 
     it('keju: each class\'s best scholar takes the exam and gains a 📚 on passing', () => {
@@ -856,9 +920,9 @@ describe('engine', () => {
         s = step(s, cpuAction(s)!);
         if (!s.log.some((l) => l.id >= before && l.text.startsWith('ゲリラ発生'))) continue;
         fired++;
-        // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところ
+        // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところか、陶片追放の投票
         if (s.phase.kind === 'result') expect(s.phase.player).toBeNull();
-        else expect(['push', 'gift']).toContain(s.phase.kind);
+        else expect(['push', 'vote', 'gift']).toContain(s.phase.kind);
       }
       expect(fired).toBeGreaterThan(0);
     }

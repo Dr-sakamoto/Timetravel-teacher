@@ -48,7 +48,9 @@ export interface SwingCard {
  *   disaster  … 白亜紀「全クラス −lose。Xを持つ子1人につき +per」
  *   egg       … 白亜紀「Xが一番多いクラス（1クラスだけ）の空いた席に卵が置かれ、そのクラスの次の手番の始めに恐竜が孵る」
  *   together  … エジプト「全クラスのXの合計が need×クラス数 以上なら全クラス +win（Xが一番少ないクラスだけ0）、届かなければ全クラス −lose」
- *   ostracism … ギリシャ「全校でアイコンが一番多い子のクラスが −lose」
+ *   arena     … ギリシャ「各クラスの、Xと also の合計が一番多い子が闘技場で戦う：1位 +win、負けたクラス（出せる子がいないクラスも）−lose」
+ *   dialogue  … ギリシャ「各クラスのXが一番多い子が代表になってソクラテス（強さ need）と対話：代表のXが need 以上なら +win、届かない（代表がいない）と論破されて −lose」
+ *   ostracism … ギリシャ「全クラスが自分以外のクラスに秘密で投票し、票が一番多いクラスが、係に就いていない子を1人転校させる」
  *   upgrade   … 中国「各クラスのXが一番多い子が受験。need 以上なら合格して、Xが1つ増える」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
  *   masterpiece … 中世「各クラスのXが一番多い子1人の、Xの数 × per」
@@ -77,7 +79,9 @@ export type EraEffect =
   | { type: 'disaster'; lose: number; per: number }
   | { type: 'egg' }
   | { type: 'together'; need: number; win: number; lose: number }
-  | { type: 'ostracism'; lose: number }
+  | { type: 'arena'; also: Attr; win: number; lose: number }
+  | { type: 'dialogue'; need: number; win: number; lose: number }
+  | { type: 'ostracism' }
   | { type: 'upgrade'; need: number }
   | { type: 'tribute'; per: number }
   | { type: 'masterpiece'; per: number }
@@ -308,9 +312,11 @@ export const ERA_CARDS: ContestCard[] = [
   // 古代エジプト：🏃👑。全クラスで1つのピラミッドを積む（サボったクラスは分け前なし）
   C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'together', need: 6, win: 6, lose: 3 }, '全クラス総出で石を積む。完成すれば全員にほうび、サボったクラスは分け前なし。', 'egypt'),
   C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'heads', per: 2 }, 'ファラオに気に入られる子が多いほど、クラスの株が上がる。', 'egypt'),
-  // ギリシャ・ローマ：🏃📚。目立ちすぎた子のクラスはにらまれる
-  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 15, second: 5, lose: 10 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。', 'greece'),
-  C('ostracism', '陶片追放', '🏺', 'all', { type: 'ostracism', lose: 8 }, '陶器のかけらに名前を書いて投票。力を持ちすぎた者は、クラスごとにらまれる。', 'greece'),
+  // ギリシャ・ローマ：🏃📚。オリンピックは負けても減点なし、剣闘は負けると減点。陶片追放は秘密投票で1クラスだけ転校
+  C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 12, second: 5, lose: 0 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。参加することに意義がある。', 'greece', 1),
+  C('colosseum', 'コロッセオの剣闘', '⚔️', 'sports', { type: 'arena', also: 'fight', win: 12, lose: 4 }, '各クラスの一番の剣闘士が闘技場へ。勝てば喝采、負ければ大恥。', 'greece', 1),
+  C('socratic', 'ソクラテスの問答', '🧔', 'study', { type: 'dialogue', need: 4, win: 8, lose: 3 }, '「きみは何を知っている？」 クラスの代表がソクラテスと対話する。答えに詰まれば論破される。', 'greece', 1),
+  C('ostracism', '陶片追放', '🏺', 'all', { type: 'ostracism' }, '陶器のかけらに名前を書いて、こっそり投票。票が一番集まったクラスから、1人がアテネを去る。', 'greece', 1),
   // 古代中国：📚👊。科挙に受かった子はずっと強くなる
   C('keju', '科挙', '📜', 'study', { type: 'upgrade', need: 3 }, '超難関の官僚登用試験。合格すれば一生の箔がつく。', 'china'),
   C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
@@ -429,13 +435,17 @@ export function eraEffectRule(c: ContestCard): string {
     case 'threshold':
       return `${a}が${e.need}以上なら+${e.win}、足りないと−${e.lose}`;
     case 'battle':
-      return `${a}の数で勝負：1位+${e.win}、2位+${e.second}、最下位−${e.lose}`;
+      return `${a}の数で勝負：1位+${e.win}、2位+${e.second}${e.lose ? `、最下位−${e.lose}` : '（負けても減点なし）'}`;
+    case 'arena':
+      return `各クラスの${a}${ATTR_ICON[e.also]}の合計が一番多い子が戦う：1位+${e.win}、負けたクラスは−${e.lose}`;
+    case 'dialogue':
+      return `各クラスの${a}が一番多い子が代表でソクラテスと対話：${a}${e.need}以上なら+${e.win}、足りないと論破されて−${e.lose}`;
     case 'plunder':
       return `${a}が一番多いクラスが、一番少ないクラスから${e.amount}点奪う`;
     case 'together':
       return `全クラスの${a}の合計が${e.need}×クラス数以上なら全クラス+${e.win}（${a}が一番少ないクラスは0）、届かなければ全クラス−${e.lose}`;
     case 'ostracism':
-      return `全校でアイコンが一番多い子のクラスが−${e.lose}`;
+      return '全クラスがほかのクラスに秘密で投票し、票が一番多いクラスが1人転校させる';
     case 'upgrade':
       return `各クラスの${a}が一番多い子が受験：${a}${e.need}以上で合格し、${a}が1つ増える`;
     case 'tribute':
@@ -518,13 +528,17 @@ function contestGlyph(c: ContestCard): string {
     case 'threshold':
       return `${a}${e.need}↑ +${e.win}／−${e.lose}`;
     case 'battle':
-      return `${a}で勝負 🥇+${e.win} 🥈+${e.second} 最下位−${e.lose}`;
+      return `${a}で勝負 🥇+${e.win} 🥈+${e.second}${e.lose ? ` 最下位−${e.lose}` : ''}`;
+    case 'arena':
+      return `🧑${a}${ATTR_ICON[e.also]} 剣闘 🥇+${e.win} 負け−${e.lose}`;
+    case 'dialogue':
+      return `🧑${a}🥇 vs 🧔${e.need}　+${e.win}／−${e.lose}`;
     case 'plunder':
       return `${a}🥇 ⟵${e.amount}点 ${a}最下位`;
     case 'together':
       return `みんなの${a} ${e.need}×クラス数↑ +${e.win}／−${e.lose}`;
     case 'ostracism':
-      return `全校のアイコン🥇の子 → −${e.lose}`;
+      return '🗳️ 票🥇のクラス → 👋🧑';
     case 'upgrade':
       return `🧑${a}${e.need}↑ → ${a}＋1`;
     case 'tribute':
