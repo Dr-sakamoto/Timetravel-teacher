@@ -779,6 +779,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       if (c.attr === 'all') break;
       const gaps = ps.map((p, i) => attrScore(p, 'charm').total - values[i]);
       rows.forEach((r, i) => (r.count = gaps[i]));
+      // 孔明は1人だけ（捨て札を混ぜ直して同じ学期にもう一度めくられたときだけ、ここに来る）
       if (ps.some((p) => p.students.some((x) => x.cardId === KONGMING.id))) {
         tell('孔明はもう、どこかのクラスで軍師をしている。');
         break;
