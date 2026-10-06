@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cpuAction } from '../game/ai';
-import { MONTHS, actingPlayer, cyborgable, droppable, equippable, exchangePairs, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth } from '../game/engine';
+import { MONTHS, actingPlayer, cyborgable, inGuerrilla, nextTurnPlayer, droppable, equippable, exchangePairs, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 import type { Pick } from './Center';
 import { Center } from './Center';
@@ -41,6 +41,9 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   // どのカードから何点入ったかの演出（CPUの「速い」設定では早送り）
   const fx = useGameFx(state, feltRef, speed === 'fast' ? 0.35 : 1, focus);
   const fxLength = fx?.length ?? 0;
+  /** ゲリラの最中（誰の手番でもない。転校で選んでいる人も手番の光り方にしない） */
+  const guerrilla = inGuerrilla(state);
+  const upNext = guerrilla ? nextTurnPlayer(state) : null;
   const cpuTurn = actor !== null && state.players[actor].isCpu && ph.kind !== 'result';
   /** 通信対戦で、ほかの人の番（自分は見ているだけ） */
   const othersTurn = online && actor !== mySeat && ph.kind !== 'result';
@@ -168,14 +171,16 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
 
       {banner}
 
-      <div className="felt" ref={feltRef}>
+      <div className={`felt ${guerrilla ? 'in-guerrilla' : ''}`} ref={feltRef}>
         <div className="opponents">
           {others.map((pi) => (
             <OpponentSeat
               key={pi}
               player={shown(pi)}
               year={state.year}
-              acting={actor === pi}
+              acting={!guerrilla && actor === pi}
+              picking={guerrilla && actor === pi}
+              upNext={upNext === pi}
               offline={offline?.(pi)}
               delta={deltas.get(pi)}
               rank={ranks.get(pi)}
@@ -205,7 +210,9 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               year={state.year}
               slots={slots}
               variant="near"
-              acting={actor === focus}
+              acting={!guerrilla && actor === focus}
+              picking={guerrilla && actor === focus}
+              upNext={upNext === focus}
               delta={deltas.get(focus)}
               rank={ranks.get(focus)}
               lit={matLit(focus)}

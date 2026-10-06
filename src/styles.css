@@ -3119,3 +3119,118 @@ body:has(.title-screen) {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- ゲリラ（誰の手番でもない学校全体のできごと） ---------- */
+/* 卓全体を紫がかった色にして、手番とは別のできごとだと分かるようにする */
+.felt.in-guerrilla {
+  box-shadow: inset 0 0 0 4px #b57cff, inset 0 0 60px rgba(181, 124, 255, 0.35);
+}
+.cutin {
+  padding: 0.2rem 1.4rem;
+  border-radius: 6px;
+  background: linear-gradient(90deg, transparent, #6a2fbf 12%, #8a3fd1 50%, #6a2fbf 88%, transparent);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  animation: cutin 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+@keyframes cutin {
+  from {
+    opacity: 0;
+    transform: translateX(-40%) skewX(-12deg);
+  }
+}
+@keyframes guerrilla-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+.say.guerrilla-say {
+  border: 2px solid #b57cff;
+}
+.say.guerrilla-say .say-sub {
+  margin-top: 0.3rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+.say.guerrilla-say small {
+  margin-left: 0.3em;
+  color: var(--chalk-dim);
+}
+/* 補充しようとした場所（ゲリラがめくれた所） */
+.mcard.gap {
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  box-shadow: none;
+  color: var(--chalk-dim);
+}
+.mcard.gap::before {
+  display: none;
+}
+.mcard.gap.bolt {
+  border-color: #b57cff;
+  color: #fff;
+  background: rgba(138, 63, 209, 0.45);
+  animation: guerrilla-in 0.4s ease-out;
+}
+/* 転校で選んでいる人：手番の黄色ではなく紫の点線 */
+.opp.picking,
+.playmat.picking {
+  animation: none;
+  box-shadow:
+    0 0 0 3px #b57cff,
+    0 4px 0 rgba(0, 0, 0, 0.35);
+}
+.opp.picking::after,
+.playmat.picking::after {
+  content: '📦 選んでいる';
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 0.5em;
+  border-radius: 999px;
+  background: #8a3fd1;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 900;
+  white-space: nowrap;
+  z-index: 2;
+  pointer-events: none;
+}
+/* ゲリラのあと次に手番をする人 */
+.opp.up-next:not(.picking)::after,
+.playmat.up-next:not(.picking)::after {
+  content: '▶ 次の番';
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 0.5em;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 0.65rem;
+  font-weight: 900;
+  white-space: nowrap;
+  z-index: 2;
+  pointer-events: none;
+}
+.reveal-card {
+  position: relative;
+}
+/* ゲリラの結果：カードの上にカットインをかける */
+.reveal-card .cutin {
+  position: absolute;
+  bottom: calc(100% - 0.35rem);
+  font-size: 0.9rem;
+  padding: 0.1rem 1.2rem;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 3;
+}

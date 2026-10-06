@@ -32,6 +32,10 @@ interface Props {
   /** near＝手前の自分の教室／stage＝手番の人の教室（卓の中央）／peek＝タップで開いた教室 */
   variant: 'near' | 'stage' | 'peek';
   acting?: boolean;
+  /** ゲリラ（転校）で出ていく子を選んでいる（手番ではない） */
+  picking?: boolean;
+  /** ゲリラのあと次に手番をする */
+  upNext?: boolean;
   /** 直前のイベントでの得点 */
   delta?: number;
   /** 直前のイベントでの順位（0が1位） */
@@ -57,7 +61,7 @@ function parseDrop(v: string): DropTo {
 
 /** 教室プレイマット：名札・係の場（そこに置いたカードがその係）・座席 */
 export function Playmat(props: Props) {
-  const { player, year, variant, acting, delta, arrange } = props;
+  const { player, year, variant, acting, picking, upNext, delta, arrange } = props;
   const view: Player = { ...player, roles: props.roles ?? player.roles, unlocked: props.unlocked ?? player.unlocked };
   const { drag, grab, wasDrag } = useCardDrag((uid, to) => arrange?.onPlace(uid, parseDrop(to)));
   const held = drag?.uid ?? arrange?.held ?? null;
@@ -96,7 +100,7 @@ export function Playmat(props: Props) {
     <div
       data-pid={player.id}
       data-drop={arrange ? 'seats' : undefined}
-      className={`playmat near pm-${variant} ${acting ? 'acting' : ''} ${arrange ? 'arranging' : ''} ${held ? 'holding' : ''}`}
+      className={`playmat near pm-${variant} ${acting ? 'acting' : ''} ${picking ? 'picking' : ''} ${upNext ? 'up-next' : ''} ${arrange ? 'arranging' : ''} ${held ? 'holding' : ''}`}
       style={
         {
           '--pc': player.color,
@@ -182,6 +186,8 @@ interface SeatProps {
   player: Player;
   year: number;
   acting: boolean;
+  picking?: boolean;
+  upNext?: boolean;
   /** 通信対戦で、この人の通信が切れている */
   offline?: boolean;
   delta?: number;
@@ -194,11 +200,11 @@ interface SeatProps {
 }
 
 /** 相手の席：小さく畳んだ教室（名札と12席の埋まり具合）。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
-export function OpponentSeat({ player, year, acting, offline, delta, rank, litIcons, targetable, targeted, onClick }: SeatProps) {
+export function OpponentSeat({ player, year, acting, picking, upNext, offline, delta, rank, litIcons, targetable, targeted, onClick }: SeatProps) {
   return (
     <button
       data-pid={player.id}
-      className={`opp ${acting ? 'acting' : ''} ${targetable ? 'targetable' : ''} ${targeted ? 'targeted' : ''}`}
+      className={`opp ${acting ? 'acting' : ''} ${picking ? 'picking' : ''} ${upNext ? 'up-next' : ''} ${targetable ? 'targetable' : ''} ${targeted ? 'targeted' : ''}`}
       style={{ '--pc': player.color } as CSSProperties}
       onClick={onClick}
       title={targetable ? `${player.name}に押しつける` : `${player.name}の教室を見る`}

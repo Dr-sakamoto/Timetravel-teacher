@@ -1,7 +1,7 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { canTake, currentEra, marketCost, nextTurnPlayer, previewStudent } from '../game/engine';
-import { EVENT_MAP, KACHIKOMI_CARDS, cardGlyph, shortRule } from '../game/data/events';
+import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent } from '../game/engine';
+import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import { ATTR_ICON, type Action, type GameState, type Student } from '../game/types';
@@ -65,9 +65,10 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
   /** 手番の人が選んでいる場のカード */
   const [sel, setSel] = useState<number | null>(null);
   const selected = canPick && sel !== null && sel < state.market.length ? sel : null;
+  const guerrilla = inGuerrilla(state);
 
   return (
-    <div className={`center ph-${ph.kind}`}>
+    <div className={`center ph-${ph.kind} ${guerrilla ? 'in-guerrilla' : ''}`}>
       {/* 山札（左）・場のカード（中央）・捨て札（右）を1列に */}
       <div className="board">
         <div className="piles">
@@ -101,6 +102,14 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
                 onClick={canPick ? () => setSel(i) : undefined}
               />
             ))}
+            {/* ゲリラ中：補充しようとした場所に、山札からめくれたゲリラを示す */}
+            {guerrilla &&
+              Array.from({ length: MARKET_SIZE - state.market.length }, (_, i) => (
+                <div key={`gap-${i}`} className={`mcard gap ${i === 0 ? 'bolt' : ''}`}>
+                  {i === 0 ? <span className="mcard-icon">⚡</span> : null}
+                  {i === 0 && <span className="mcard-name">イベント</span>}
+                </div>
+              ))}
           </div>
         )}
         <div className="piles">
@@ -140,11 +149,11 @@ function Who({ state }: { state: GameState }) {
 }
 
 /** ゲリラの途中で、このあと誰の手番かを出す（ゲリラが誰かの手番に見えないように） */
-function NextTurn({ state }: { state: GameState }) {
+function NextTurn({ state, inline }: { state: GameState; inline?: boolean }) {
   const next = nextTurnPlayer(state);
   const p = next !== null ? state.players[next] : null;
   return (
-    <div className="say-sub next-turn">
+    <div className={inline ? 'next-turn' : 'say-sub next-turn'}>
       {p ? (
         <>
           ▶ このあと <b style={{ color: p.color }}>{p.name}</b> の番
@@ -154,6 +163,11 @@ function NextTurn({ state }: { state: GameState }) {
       )}
     </div>
   );
+}
+
+/** ゲリラのカットイン（紫の帯で「イベント発生！」。手番と取り違えないように） */
+function CutIn() {
+  return <div className="cutin">⚡ イベント発生！</div>;
 }
 
 /** 場のカードを取るとどうなるかを、絵文字の式で（文章にしない） */
@@ -185,6 +199,29 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
   if (ph.kind === 'gameOver') return null;
   const actor = ph.player !== null ? state.players[ph.player] : null;
   const who = <Who state={state} />;
+
+  // 転校はゲリラ：選んでいる人の手番ではないので、手番の「⏳ 〇〇」とは違う見せ方にする
+  if (ph.kind === 'push') {
+    const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+    const done = ph.gone.length;
+    return (
+      <div className="say guerrilla-say">
+        <CutIn />
+        <div className="say-sub">
+          📦 全クラス転校：{who} のクラスが出ていく子を{cpuBusy ? '選んでいます…' : <>タップ {chosen(st)}</>}
+          {done > 0 && <small>（{done}人 転校ずみ）</small>}
+        </div>
+        <div className="say-sub">
+          {!cpuBusy && (
+            <button className="btn primary" disabled={!pick.uid} onClick={() => pick.uid && dispatch({ type: 'push', uid: pick.uid })}>
+              👋 転校
+            </button>
+          )}
+          <NextTurn state={state} inline />
+        </div>
+      </div>
+    );
+  }
 
   if (cpuBusy && ph.kind !== 'result')
     return (
@@ -264,19 +301,6 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         </div>
       );
     }
-    case 'push': {
-      const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
-      return (
-        <div className="say">
-          📦 全クラス転校（手番ではありません）
-          <div className="say-sub">
-            {who}：出ていく子をタップ {chosen(st)}
-          </div>
-          {pair(null, '👋 転校', !!pick.uid, () => pick.uid && dispatch({ type: 'push', uid: pick.uid }))}
-          <NextTurn state={state} />
-        </div>
-      );
-    }
     case 'kachikomi': {
       const power = attrScore(state.players[ph.player], 'fight').total * KACHIKOMI_CARDS[0].mult;
       const target = pick.target !== null ? state.players[pick.target] : null;
@@ -336,7 +360,10 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       const out = new Set(r.outUids ?? []);
       return (
         <div className="reveal">
-          <EventCardView result={r} />
+          <div className="reveal-card">
+            {inGuerrilla(state) && <CutIn />}
+            <EventCardView result={r} />
+          </div>
           <div className="reveal-side">
             {/* 何が起きたかを一言で（取った人だけのカードは結果、全員のイベントは効果） */}
             {r.tone === 'personal' && r.desc ? (
@@ -364,7 +391,8 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             {ph.ctx === 'turn' && ph.player === null && <NextTurn state={state} />}
             {canContinue ? (
               <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
-                次へ ▶
+                {/* 手番の終わりに場を補充する（ここでゲリラがめくれることがある）と分かるように */}
+                {ph.ctx === 'turn' && ph.player !== null ? '🃏 場を補充 ▶' : '次へ ▶'}
               </button>
             ) : (
               <div className="say-sub">⏳ {who}</div>

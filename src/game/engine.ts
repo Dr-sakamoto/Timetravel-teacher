@@ -885,6 +885,12 @@ export function nextTurnPlayer(s: GameState): number | null {
   return s.queueIdx + 1 < s.queue.length ? s.queue[s.queueIdx + 1] : null;
 }
 
+/** いまゲリラの最中か（転校で出ていく子を選んでいる間と、ゲリラの結果を見せている間）。誰の手番でもない */
+export function inGuerrilla(s: GameState): boolean {
+  const ph = s.phase;
+  return ph.kind === 'push' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
+}
+
 /** 転校：めくった人から席順に、全クラスが1人ずつ外す */
 function startDrop(s: GameState, drawer: number) {
   const n = s.players.length;
