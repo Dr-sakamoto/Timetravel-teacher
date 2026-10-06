@@ -544,12 +544,12 @@ describe('engine', () => {
       expect(run('colosseum', [[mk('a', ['study'])], [mk('b', ['art'])], []]).delta).toEqual([0, 0, 0]);
     });
 
-    it('socrates: each class\'s best scholar talks with Socrates; 📚4 or more scores, less is refuted', () => {
+    it('socratic: each class\'s best scholar talks with Socrates; 📚4 or more scores, less is refuted', () => {
       // 代表の📚：4（+8）／3（−3）／代表なし（−3）
-      const r = run('socrates', [[mk('a', ['study', 'study', 'study', 'study']), mk('a2', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['art'])]]);
+      const r = run('socratic', [[mk('a', ['study', 'study', 'study', 'study']), mk('a2', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['art'])]]);
       expect(r.delta).toEqual([8, -3, -3]);
       // 学習係の係ボーナスも乗る（📚📚×2＝4）
-      const roles = run('socrates', [[mk('a', ['study', 'study'])], [], []], [10, 10, 10], [[{ role: 'study', uid: 'a' }], [], []]);
+      const roles = run('socratic', [[mk('a', ['study', 'study'])], [], []], [10, 10, 10], [[{ role: 'study', uid: 'a' }], [], []]);
       expect(roles.delta[0]).toBe(8);
       // アイコンは増えない
       expect(r.after.players[0].students.find((x) => x.uid === 'a')!.attrs).toHaveLength(4);

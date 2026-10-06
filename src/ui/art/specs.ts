@@ -51,7 +51,7 @@ export const ART: Record<string, ArtSpec> = {
   // ---- ギリシャ・ローマ ----
   alexander: { skin: SKIN.fair, hair: 'curly', hairColor: blond, outfit: 'cuirass', c1: '#d9a441', c2: '#c0392b', expr: 'cool', prop: 'sword' },
   caesar: { skin: SKIN.fair, hair: 'short', hairColor: brown, outfit: 'toga', c1: '#8e3fa5', hat: 'laurel', expr: 'cool' },
-  hippocrates: { skin: SKIN.fair, hair: 'sides', hairColor: grey, outfit: 'toga', c1: '#f4f2ea', beard: 'full', beardColor: grey, expr: 'smile', prop: 'scroll' },
+  socrates: { skin: SKIN.fair, hair: 'sides', hairColor: grey, outfit: 'toga', c1: '#3f7fd0', beard: 'full', beardColor: grey, expr: 'calm', prop: 'scroll' },
   archimedes: { skin: SKIN.fair, hair: 'curly', hairColor: grey, outfit: 'bare', c1: '#fbfbf7', beard: 'full', beardColor: grey, expr: 'surprised', prop: 'bubbles' },
   spartacus: { skin: SKIN.tan, hair: 'messy', hairColor: dark, outfit: 'bare', c1: '#8a5a32', expr: 'angry', acc: ['scar'], prop: 'sword' },
 

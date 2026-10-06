@@ -274,7 +274,7 @@ const SCENES: Record<string, () => ReactNode> = {
       <Star x={50} y={46} r={3} />
     </g>
   ),
-  socrates: () => (
+  socratic: () => (
     <g>
       <Bg sky="#d6e6ff" ground="#e8dcc0" y={56} />
       {[8, 22, 78, 92].map((x) => (
