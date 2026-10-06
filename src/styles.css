@@ -2707,6 +2707,24 @@ body:has(.title-screen) {
 }
 
 /* 装備しているグッズ */
+/* ペストにかかった子：🏃は数えない（学期の区切りで治る） */
+.tcg-plague {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 2;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 2px;
+  border-radius: 50%;
+  background: #5b4a6b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.tcg-attr.sick {
+  opacity: 0.35;
+  filter: grayscale(1);
+  text-decoration: line-through;
+}
 .tcg-goods {
   position: absolute;
   top: -6px;
@@ -3202,6 +3220,11 @@ body:has(.title-screen) {
   white-space: nowrap;
   z-index: 2;
   pointer-events: none;
+}
+/* 新大陸の品を選んでいる人 */
+.new-world .opp.picking::after,
+.new-world .playmat.picking::after {
+  content: '🌎 選んでいる';
 }
 /* ゲリラのあと次に手番をする人 */
 .opp.up-next:not(.picking)::after,

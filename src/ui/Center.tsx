@@ -1,7 +1,7 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
 import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent } from '../game/engine';
-import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
+import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, NEW_WORLD_MAP, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import { ATTR_ICON, type Action, type GameState, type Student } from '../game/types';
@@ -217,6 +217,32 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
               👋 転校
             </button>
           )}
+          <NextTurn state={state} inline />
+        </div>
+      </div>
+    );
+  }
+
+  // 新大陸の品もゲリラ：届く子は決まっていて、選ぶのは品だけ
+  if (ph.kind === 'newWorld') {
+    const st = state.players[ph.player].students.find((x) => x.uid === ph.uid);
+    return (
+      <div className="say guerrilla-say">
+        <CutIn />
+        <div className="say-sub">
+          🌎 新大陸の品：{who} のクラスの {chosen(st)} に届く品を{cpuBusy ? '選んでいます…' : '選ぶ'}
+          {ph.got.length > 0 && <small>（{ph.got.map((g) => NEW_WORLD_MAP[g.item].icon).join('')} 受け取りずみ）</small>}
+        </div>
+        <div className="say-sub">
+          {!cpuBusy &&
+            ph.items.map((id) => {
+              const g = NEW_WORLD_MAP[id];
+              return (
+                <button key={id} className="btn primary" onClick={() => dispatch({ type: 'newWorld', item: id })} title={`${g.name}（${ATTR_ICON[g.attr]}＋1）`}>
+                  {g.icon} {g.name} {ATTR_ICON[g.attr]}＋1
+                </button>
+              );
+            })}
           <NextTurn state={state} inline />
         </div>
       </div>

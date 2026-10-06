@@ -1,5 +1,5 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
-import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
+import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, NEW_WORLD_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
 import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
@@ -188,6 +188,12 @@ export function cpuAction(s: GameState): Action | null {
       const score = (st: Student) => (hasRoleBonus(p, st, c.attr) ? 10 : 0) + iconsOf(st, c.attr);
       const st = equippable(p).sort((x, y) => score(y) - score(x))[0];
       return { type: 'equip', uid: st?.uid ?? null };
+    }
+    case 'newWorld': {
+      // 届く子に一番合う品（係ボーナスは乗らないので、その子がたくさん持っているアイコン）
+      const st = s.players[ph.player].students.find((x) => x.uid === ph.uid)!;
+      const item = [...ph.items].sort((x, y) => iconsOf(st, NEW_WORLD_MAP[y].attr) - iconsOf(st, NEW_WORLD_MAP[x].attr))[0];
+      return { type: 'newWorld', item };
     }
     case 'result':
       return { type: 'continue' };

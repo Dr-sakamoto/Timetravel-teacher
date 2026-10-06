@@ -65,6 +65,8 @@ export interface Student {
   joined: string;
   /** 装備しているグッズ（1人1つまで。そのアイコンは attrs にも足してある） */
   goods?: Goods;
+  /** ペストにかかっている（🏃を数えない。学期の区切りで治る。グッズとは別なので装備もできる） */
+  plague?: boolean;
   /** 得点に貢献した回数 */
   mvp: number;
 }
@@ -141,6 +143,8 @@ export type Phase =
   | { kind: 'exchange'; player: number; slot: number }
   /** サイボーグ化：自分のクラスの生徒1人をサイボーグに作り替える */
   | { kind: 'cyborg'; player: number; slot: number }
+  /** 新大陸の品（コロンブスの新大陸到達・ゲリラ）：📚の多いクラスから順に、決まった子に装備させる品を選ぶ（取られた品は次のクラスは選べない） */
+  | { kind: 'newWorld'; player: number; uid: string; left: { player: number; uid: string }[]; items: string[]; got: { player: number; uid: string; item: string }[] }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
@@ -154,7 +158,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 22;
+  version: 23;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -196,4 +200,5 @@ export type Action =
   | { type: 'kachikomi'; target: number | null }
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
   | { type: 'equip'; uid: string | null }
+  | { type: 'newWorld'; item: string }
   | { type: 'cyborg'; uid: string | null };

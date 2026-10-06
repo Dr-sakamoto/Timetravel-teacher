@@ -19,7 +19,7 @@ export const ERAS: EraDef[] = [
   { id: 'greece', name: 'ギリシャ・ローマ', when: '前500年頃〜', icon: '🏛️', color: '#90a4d4', favor: ['sports', 'study'], motto: '鍛えた肉体と、問い続ける頭脳が市民の誇りだった時代' },
   { id: 'china', name: '古代中国', when: '春秋〜三国', icon: '🐉', color: '#e57373', favor: ['study', 'fight'], motto: '筆で国を治め、剣で天下を争った時代' },
   { id: 'heian', name: '平安', when: '1000年頃', icon: '🌸', color: '#f48fb1', favor: ['art', 'charm'], motto: '歌と装いの美しさが、人の値打ちを決めた時代' },
-  { id: 'europe', name: '中世・ルネサンス', when: '1200〜1500年頃', icon: '🏰', color: '#ba68c8', favor: ['art', 'fight'], motto: '芸術家が神を描き、騎士が槍を交えた時代' },
+  { id: 'europe', name: '中世・ルネサンス', when: '1200〜1500年頃', icon: '🏰', color: '#ba68c8', favor: ['art', 'study'], motto: '芸術家が神を描き、科学者が星を見上げた時代' },
   { id: 'sengoku', name: '戦国', when: '1550年頃', icon: '⚔️', color: '#ff8a3d', favor: ['fight', 'charm'], motto: '力ある者が城を奪い、人を惹きつける者が天下を取る時代' },
   { id: 'edo', name: '江戸・幕末', when: '1600〜1860年代', icon: '🗾', color: '#4db6ac', favor: ['art', 'sports'], motto: '芝居と浮世絵に町じゅうが熱狂し、旅人が日本中を歩いた時代' },
   { id: 'modern', name: '近代', when: '1700〜1900年代', icon: '🎩', color: '#bcaaa4', favor: ['study', 'charm'], motto: '発明と知性が世界を変え、社交界で名声が生まれた時代' },

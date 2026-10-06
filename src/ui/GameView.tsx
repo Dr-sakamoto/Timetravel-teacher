@@ -99,6 +99,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
     }
     ph.result.students?.forEach((st) => lit.add(st.uid));
   }
+  // 新大陸の品が届く子
+  if (ph.kind === 'newWorld') lit.add(ph.uid);
   const month = MONTHS[Math.min(state.monthIdx, MONTHS.length - 1)];
   const term = termOfMonth(month);
   const slots = slotsNow(state);
@@ -171,7 +173,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
 
       {banner}
 
-      <div className={`felt ${guerrilla ? 'in-guerrilla' : ''}`} ref={feltRef}>
+      <div className={`felt ${guerrilla ? 'in-guerrilla' : ''} ${ph.kind === 'newWorld' ? 'new-world' : ''}`} ref={feltRef}>
         <div className="opponents">
           {others.map((pi) => (
             <OpponentSeat
