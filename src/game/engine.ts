@@ -663,31 +663,22 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // ギリシャ：各クラスのXが一番多い子が問答の相手になり、Xを持たない子のうちアイコンが一番少ない子にXが1つ増える（点は動かない）
+    // ギリシャ：各クラスのXが一番多い子が代表でソクラテスと対話。need 以上なら+win、届かない（代表がいない）と論破されて−lose
     case 'dialogue': {
-      if (c.attr === 'all') break;
-      const a = c.attr;
       ps.forEach((p, i) => {
-        const teacher = bestOf(p, p.students, a);
-        if (!teacher) {
-          rows[i].note = '問答できる子なし';
-          return;
+        const rep = bestOf(p, p.students, c.attr);
+        rows[i].count = rep?.pts ?? 0;
+        rows[i].uids = rep ? [rep.student.uid] : [];
+        if (rep && rep.pts >= e.need) {
+          add(i, e.win);
+          rep.student.mvp++;
+          moved.push(rep.student);
+          rows[i].note = '対話成立';
+          tell(`${p.name}のクラスの${name(rep.student)}が、ソクラテスと語り合った！`, i);
+        } else {
+          add(i, -e.lose);
+          rows[i].note = rep ? '論破された' : '代表なし';
         }
-        // 卵はまだ生き物ではないので教われない
-        const pupils = p.students.filter((x) => !x.attrs.includes(a) && !isEgg(x) && baseIcons(x) < MAX_ICONS);
-        const pupil = pupils.reduce<Student | null>((m, x) => (!m || x.attrs.length < m.attrs.length ? x : m), null);
-        rows[i].uids = [teacher.student.uid];
-        if (!pupil) {
-          rows[i].note = 'みんな物知り';
-          return;
-        }
-        pupil.attrs = [...pupil.attrs, a];
-        pupil.mvp++;
-        teacher.student.mvp++;
-        moved.push(pupil);
-        rows[i].uids = [teacher.student.uid, pupil.uid];
-        rows[i].note = `${ATTR_ICON[a]}＋1`;
-        tell(`${p.name}のクラスの${name(pupil)}が問答で学んだ！${ATTR_ICON[a]}が1つ増えた。`, i);
       });
       break;
     }

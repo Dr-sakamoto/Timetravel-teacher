@@ -49,7 +49,7 @@ export interface SwingCard {
  *   egg       … 白亜紀「Xが一番多いクラス（1クラスだけ）の空いた席に卵が置かれ、そのクラスの次の手番の始めに恐竜が孵る」
  *   together  … エジプト「全クラスのXの合計が need×クラス数 以上なら全クラス +win（Xが一番少ないクラスだけ0）、届かなければ全クラス −lose」
  *   arena     … ギリシャ「各クラスの、Xと also の合計が一番多い子が闘技場で戦う：1位 +win、負けたクラス（出せる子がいないクラスも）−lose」
- *   dialogue  … ギリシャ「各クラスのXが一番多い子が、Xを持たない子のうちアイコンが一番少ない子にXを1つ教える」
+ *   dialogue  … ギリシャ「各クラスのXが一番多い子が代表になってソクラテス（強さ need）と対話：代表のXが need 以上なら +win、届かない（代表がいない）と論破されて −lose」
  *   ostracism … ギリシャ「全クラスが自分以外のクラスに秘密で投票し、票が一番多いクラスが、係に就いていない子を1人転校させる」
  *   upgrade   … 中国「各クラスのXが一番多い子が受験。need 以上なら合格して、Xが1つ増える」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
@@ -75,7 +75,7 @@ export type EraEffect =
   | { type: 'egg' }
   | { type: 'together'; need: number; win: number; lose: number }
   | { type: 'arena'; also: Attr; win: number; lose: number }
-  | { type: 'dialogue' }
+  | { type: 'dialogue'; need: number; win: number; lose: number }
   | { type: 'ostracism' }
   | { type: 'upgrade'; need: number }
   | { type: 'tribute'; per: number }
@@ -287,7 +287,7 @@ export const ERA_CARDS: ContestCard[] = [
   // ギリシャ・ローマ：🏃📚。オリンピックは負けても減点なし、剣闘は負けると減点。陶片追放は秘密投票で1クラスだけ転校
   C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 12, second: 5, lose: 0 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。参加することに意義がある。', 'greece', 1),
   C('colosseum', 'コロッセオの剣闘', '⚔️', 'sports', { type: 'arena', also: 'fight', win: 12, lose: 4 }, '各クラスの一番の剣闘士が闘技場へ。勝てば喝采、負ければ大恥。', 'greece', 1),
-  C('socrates', 'ソクラテスの問答', '🧔', 'study', { type: 'dialogue' }, '「きみは何を知っている？」 問いかけられた子が、少しだけ賢くなる。', 'greece', 1),
+  C('socrates', 'ソクラテスの問答', '🧔', 'study', { type: 'dialogue', need: 4, win: 8, lose: 3 }, '「きみは何を知っている？」 クラスの代表がソクラテスと対話する。答えに詰まれば論破される。', 'greece', 1),
   C('ostracism', '陶片追放', '🏺', 'all', { type: 'ostracism' }, '陶器のかけらに名前を書いて、こっそり投票。票が一番集まったクラスから、1人がアテネを去る。', 'greece', 1),
   // 古代中国：📚👊。科挙に受かった子はずっと強くなる
   C('keju', '科挙', '📜', 'study', { type: 'upgrade', need: 3 }, '超難関の官僚登用試験。合格すれば一生の箔がつく。', 'china'),
@@ -401,7 +401,7 @@ export function eraEffectRule(c: ContestCard): string {
     case 'arena':
       return `各クラスの${a}${ATTR_ICON[e.also]}の合計が一番多い子が戦う：1位+${e.win}、負けたクラスは−${e.lose}`;
     case 'dialogue':
-      return `各クラスの${a}が一番多い子が、${a}を持たない子のうちアイコンが一番少ない子に${a}を1つ教える`;
+      return `各クラスの${a}が一番多い子が代表でソクラテスと対話：${a}${e.need}以上なら+${e.win}、足りないと論破されて−${e.lose}`;
     case 'plunder':
       return `${a}が一番多いクラスが、一番少ないクラスから${e.amount}点奪う`;
     case 'together':
@@ -484,7 +484,7 @@ function contestGlyph(c: ContestCard): string {
     case 'arena':
       return `🧑${a}${ATTR_ICON[e.also]} 剣闘 🥇+${e.win} 負け−${e.lose}`;
     case 'dialogue':
-      return `🧑${a}🥇 → 🧑 ${a}＋1`;
+      return `🧑${a}🥇 vs 🧔${e.need}　+${e.win}／−${e.lose}`;
     case 'plunder':
       return `${a}🥇 ⟵${e.amount}点 ${a}最下位`;
     case 'together':

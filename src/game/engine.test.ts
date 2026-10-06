@@ -543,20 +543,15 @@ describe('engine', () => {
       expect(run('colosseum', [[mk('a', ['study'])], [mk('b', ['art'])], []]).delta).toEqual([0, 0, 0]);
     });
 
-    it('socrates: each class\'s best scholar teaches 📚 to the child with the fewest icons among those without 📚', () => {
-      const r = run('socrates', [
-        [mk('t', ['study', 'study']), mk('p1', ['art', 'art']), mk('p2', ['sports']), mk('q1', ['study']), mk('q2', ['charm', 'charm', 'charm'])],
-        [mk('n1', ['art']), mk('n2', ['sports']), mk('n3', ['charm']), mk('n4', ['art']), mk('n5', ['sports'])],
-        [mk('s1', ['study']), mk('s2', ['study']), mk('s3', ['study']), mk('s4', ['study']), mk('s5', ['study'])],
-      ]);
-      const attrs = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!.attrs;
-      expect(attrs(0, 'p2')).toEqual(['sports', 'study']);
-      expect(attrs(0, 'p1')).toEqual(['art', 'art']);
-      expect(attrs(0, 't')).toEqual(['study', 'study']);
-      // 📚の子がいないクラス・みんな📚を持っているクラスは何も起こらない
-      expect(attrs(1, 'n2')).toEqual(['sports']);
-      expect(r.after.players[2].students.every((x) => x.attrs.length === 1)).toBe(true);
-      expect(r.delta).toEqual([0, 0, 0]);
+    it('socrates: each class\'s best scholar talks with Socrates; 📚4 or more scores, less is refuted', () => {
+      // 代表の📚：4（+8）／3（−3）／代表なし（−3）
+      const r = run('socrates', [[mk('a', ['study', 'study', 'study', 'study']), mk('a2', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['art'])]]);
+      expect(r.delta).toEqual([8, -3, -3]);
+      // 学習係の係ボーナスも乗る（📚📚×2＝4）
+      const roles = run('socrates', [[mk('a', ['study', 'study'])], [], []], [10, 10, 10], [[{ role: 'study', uid: 'a' }], [], []]);
+      expect(roles.delta[0]).toBe(8);
+      // アイコンは増えない
+      expect(r.after.players[0].students.find((x) => x.uid === 'a')!.attrs).toHaveLength(4);
     });
 
     describe('ostracism: a secret vote; the class with the most votes sends one child away', () => {
