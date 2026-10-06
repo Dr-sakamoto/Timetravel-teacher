@@ -35,7 +35,7 @@ const STUDENTS: Student[] = [
   modern('banchou', '山本 剛', ['fight', 'fight', 'fight']),
   modern('olympian', '中村 隼', ['sports', 'sports', 'sports', 'study']),
   hist('yukimura'),
-  hist('keiji'),
+  hist('hanzo'),
 ];
 const byArt = (art: string) => STUDENTS.find((s) => s.art === art)!.uid;
 const ROLE_PICK: Partial<Record<RoleId, string>> = {
@@ -93,7 +93,7 @@ function scenario(id: string, label: string): Scenario {
 const SCENARIOS: Scenario[] = [
   scenario('n_sports', '🏃 通常カード'),
   scenario('visit', '👀 共通イベント（👑−👊）'),
-  scenario('sekigahara', '⚔️ 時代イベント'),
+  scenario('chibi', '⛵ 時代イベント'),
   scenario('raid_sengoku', '👊 襲来（−敵の強さ）'),
 ];
 

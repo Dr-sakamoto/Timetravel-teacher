@@ -82,7 +82,6 @@ export const ART: Record<string, ArtSpec> = {
   ieyasu: { skin: SKIN.fair, hair: 'topknot', hairColor: black, outfit: 'kimono', c1: '#6b4a2a', c2: '#2b2b2b', expr: 'calm', prop: 'sensu' },
   yukimura: { skin: SKIN.fair, outfit: 'yoroi', c1: '#d23a2a', c2: '#2b2b2b', hat: 'kabuto', hatColor: '#d23a2a', crest: 'antler', expr: 'angry', prop: 'spear' },
   hanzo: { skin: SKIN.fair, outfit: 'ninja', c1: '#2e3440', c2: '#7b5ea7', hat: 'ninja', hatColor: '#2e3440', expr: 'cool', prop: 'shuriken' },
-  keiji: { skin: SKIN.fair, back: 'tail', hair: 'spiky', hairColor: '#8a3a2a', outfit: 'kimono', c1: '#e5534b', c2: '#f2c94c', expr: 'grin', prop: 'kiseru' },
 
   // ---- 江戸・幕末 ----
   ryoma: { skin: SKIN.fair, back: 'tail', hair: 'messy', hairColor: black, outfit: 'kimono', c1: '#2b2b2b', c2: '#5a5a5a', expr: 'grin', prop: 'pistol' },
