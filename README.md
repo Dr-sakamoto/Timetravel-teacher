@@ -74,7 +74,7 @@ npm run build   # dist/ に静的ファイルを出力
 
 - `src/game/` — ゲームロジック（React非依存）。`engine.ts` が状態遷移、`ai.ts` がCPU思考
 - `src/game/data/` — カード・時代・係・クラス・イベントのデータ。カードを増やすならここ
-- `src/ui/` — 画面
+- `src/ui/` — 画面（`#motion-demo` を付けて開くと、山札から配る・捨てる・転入・装備・転校のカードの動きの見本）
 - `src/net/` — 通信対戦。`host.ts` がルームを作った人の端末（ゲームを進めて全員に状態を配る）、`guest.ts` が参加した人の端末（操作を送る）、`protocol.ts` がやりとりの型と「今その人が操作してよいか」の判定
 
 通信対戦の仲介サーバーを自前の [PeerJS Server](https://github.com/peers/peerjs-server) にする時は、ビルド時に `VITE_PEER_HOST`・`VITE_PEER_PORT`・`VITE_PEER_PATH`・`VITE_PEER_SECURE` を指定します。

@@ -1,5 +1,5 @@
 import { ERAS } from '../game/data/eras';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, NEW_WORLD_MAP, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
@@ -29,12 +29,12 @@ export interface Pick {
 }
 
 /** 場のカード1枚の見た目 */
-function MarketCard({ id, selected, dim, onClick }: { id: string; selected: boolean; dim: boolean; onClick?: () => void }) {
+function MarketCard({ id, mk, selected, dim, onClick }: { id: string; mk: string; selected: boolean; dim: boolean; onClick?: () => void }) {
   const cost = marketCost(id);
   const costLabel = cost > 0 ? `${cost}点` : '無料';
   if (id.startsWith('person:')) {
     return (
-      <button className={`mcard person ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
+      <button data-mk={mk} className={`mcard person ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
         <TcgCard student={previewStudent(id)} size="mini" />
         <span className={`mcard-cost ${cost > 0 ? '' : 'free'}`}>{costLabel}</span>
       </button>
@@ -44,13 +44,32 @@ function MarketCard({ id, selected, dim, onClick }: { id: string; selected: bool
   const attr = 'attr' in c && c.attr && c.attr !== 'all' ? ATTR_ICON[c.attr] : null;
   const tone = c.kind === 'normal' ? 'normal' : 'personal';
   return (
-    <button className={`mcard tone-${tone} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
+    <button data-mk={mk} className={`mcard tone-${tone} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
       <span className="mcard-icon">{c.icon}</span>
       <span className="mcard-name">{c.name}</span>
       {attr && <span className="mcard-attr">{attr}</span>}
       <span className={`mcard-cost ${cost > 0 ? '' : 'free'}`}>{costLabel}</span>
     </button>
   );
+}
+
+/**
+ * 場のカードの見分け（動きをつけるため）。取ったカードを抜いて後ろに補充しても、残ったカードは同じ見分けのまま。
+ * 同じカードが2枚あっても、前から順に前の並びと突き合わせるので、抜いた方だけが消える
+ */
+function useMarketKeys(market: string[]): string[] {
+  const ref = useRef<{ market: string[]; keys: string[]; n: number }>({ market: [], keys: [], n: 0 });
+  const prev = ref.current;
+  if (prev.market === market) return prev.keys;
+  let j = 0;
+  const keys = market.map((id) => {
+    const k = prev.market.indexOf(id, j);
+    if (k < 0) return `${id}@${++prev.n}`;
+    j = k + 1;
+    return prev.keys[k];
+  });
+  ref.current = { market, keys, n: prev.n };
+  return keys;
 }
 
 /** 卓の中央：山札・場のカード・捨て札・めくったカードと手番の操作 */
@@ -66,6 +85,7 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
   const [sel, setSel] = useState<number | null>(null);
   const selected = canPick && sel !== null && sel < state.market.length ? sel : null;
   const guerrilla = inGuerrilla(state);
+  const marketKeys = useMarketKeys(state.market);
 
   return (
     <div className={`center ph-${ph.kind} ${guerrilla ? 'in-guerrilla' : ''}`}>
@@ -93,10 +113,11 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
         </div>
         {ph.kind !== 'memberDraw' && state.market.length > 0 && (
           <div className={`market ${canPick ? 'glow' : ''}`}>
-            {state.market.map((id, i) => (
+            {marketKeys.map((mk, i) => (
               <MarketCard
-                key={`${i}-${id}`}
-                id={id}
+                key={mk}
+                mk={mk}
+                id={state.market[i]}
                 selected={selected === i}
                 dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
                 onClick={canPick ? () => setSel(i) : undefined}

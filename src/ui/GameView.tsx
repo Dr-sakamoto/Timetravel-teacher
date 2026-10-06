@@ -9,6 +9,7 @@ import { OpponentSeat, Playmat } from './Playmat';
 import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
 import { useGameFx } from './useGameFx';
+import { useTableMotion } from './useTableMotion';
 
 interface Props {
   state: GameState;
@@ -41,6 +42,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   // どのカードから何点入ったかの演出（CPUの「速い」設定では早送り）
   const fx = useGameFx(state, feltRef, speed === 'fast' ? 0.35 : 1, focus);
   const fxLength = fx?.length ?? 0;
+  // 配る・捨てる・転入・転校・装備のカードの動き
+  useTableMotion(feltRef, speed === 'fast' ? 0.6 : 1);
   /** ゲリラの最中（誰の手番でもない。転校で選んでいる人も手番の光り方にしない） */
   const guerrilla = inGuerrilla(state);
   const upNext = guerrilla ? nextTurnPlayer(state) : null;

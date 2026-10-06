@@ -6,6 +6,7 @@ import { GameView } from './ui/GameView';
 import { Online } from './ui/Online';
 import { normalizeCode } from './net/protocol';
 import { Rules } from './ui/Rules';
+import { MotionDemo } from './ui/MotionDemo';
 import { ScoreDemo } from './ui/ScoreDemo';
 
 const SAVE_KEY = 'timetravel-teacher-save-v10';
@@ -35,6 +36,8 @@ const DEFAULT_NAMES = ['赤井先生', '青山先生', '緑川先生', '黄瀬�
 export default function App() {
   // 得点演出の見本（#score-demo）
   if (location.hash.startsWith('#score-demo')) return <ScoreDemo />;
+  // カードの動きの見本（#motion-demo）
+  if (location.hash.startsWith('#motion-demo')) return <MotionDemo />;
   return <Game />;
 }
 

@@ -204,6 +204,7 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
   return (
     <button
       data-pid={player.id}
+      data-n={player.students.length}
       className={`opp ${acting ? 'acting' : ''} ${picking ? 'picking' : ''} ${upNext ? 'up-next' : ''} ${targetable ? 'targetable' : ''} ${targeted ? 'targeted' : ''}`}
       style={{ '--pc': player.color } as CSSProperties}
       onClick={onClick}
