@@ -512,20 +512,29 @@ describe('engine', () => {
       expect(step(t, { type: 'build' })).toBe(t);
     });
 
-    it('when it is finished, each class gets its stones ×2 and the class that built most gets +5', () => {
+    it('when it is finished, a class that built 7 or more gets +20, and 14 or more gets +30', () => {
       const t = egyptTerm();
       const pi = building(t);
       const others = [0, 1, 2].filter((i) => i !== pi);
-      t.pyramid!.stones[others[0]] = 10;
+      t.pyramid!.stones[others[0]] = 14;
       t.pyramid!.stones[others[1]] = 3;
-      t.players[pi].students = runners(8);
+      t.players[pi].students = runners(4);
       const before = t.players.map((p) => p.points);
       const after = step(t, { type: 'build' });
       expect(after.pyramid!.done).toBe(true);
       const delta = after.players.map((p, i) => p.points - before[i]);
-      expect(delta[pi]).toBe(16);
-      expect(delta[others[0]]).toBe(20 + 5);
-      expect(delta[others[1]]).toBe(6);
+      // 3個は足切り（7）に届かず0、4個積んだクラスも0、14個は+30
+      expect(delta).toEqual([0, 1, 2].map((i) => (i === others[0] ? 30 : 0)));
+      // 7個ちょうどなら+20
+      const u = egyptTerm();
+      const pj = building(u);
+      const rest = [0, 1, 2].filter((i) => i !== pj);
+      u.pyramid!.stones[rest[0]] = 7;
+      u.pyramid!.stones[rest[1]] = 7;
+      u.players[pj].students = runners(7);
+      const b2 = u.players.map((p) => p.points);
+      const done2 = step(u, { type: 'build' });
+      expect(done2.players.map((p, i) => p.points - b2[i])).toEqual([20, 20, 20]);
       // 完成したらもう積めない
       expect(canBuild(after, pi)).toBe(false);
     });

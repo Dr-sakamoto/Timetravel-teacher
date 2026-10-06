@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, NEW_WORLD_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { MONTHS, canBuild, canTake, pyramidCard, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow, voteTargets } from './engine';
+import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -131,7 +131,7 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
   }
 }
 
-/** ピラミッドに石を積む値打ち（完成すれば積んだ石×per と一番のボーナス。完成しなければ、学期の残りで完成しそうな分だけ） */
+/** ピラミッドに石を積む値打ち（完成させれば、積んだ石で届く段のほうび。完成しなければ、学期の残りで完成しそうな分だけ） */
 export function buildValue(s: GameState, pi: number): number {
   const c = pyramidCard(s);
   const py = s.pyramid;
@@ -139,10 +139,12 @@ export function buildValue(s: GameState, pi: number): number {
   const t = attrScore(s.players[pi], c.attr).total;
   const mine = py.stones[pi] + t;
   const sum = py.stones.reduce((a, x) => a + x, 0) + t;
-  if (sum >= py.need) return mine * c.effect.per + (mine >= Math.max(...py.stones) ? c.effect.bonus : 0);
-  // 学期の最後の月（7・12・3月）は完成しないかもしれない
-  const lastMonth = [7, 12, 3].includes(MONTHS[s.monthIdx]);
-  return t * c.effect.per * (lastMonth ? 0.25 : 0.5);
+  if (sum >= py.need) return pyramidReward(c.effect.steps, mine);
+  // 学期の最後の月（7・12・3月）は完成しないかもしれない。次の段に近づいた分も少し数える
+  const odds = [7, 12, 3].includes(MONTHS[s.monthIdx]) ? 0.25 : 0.5;
+  const next = c.effect.steps.map(([n]) => n).find((n) => n > py.stones[pi]) ?? Infinity;
+  const toward = Math.min(t, Math.max(0, next - py.stones[pi]));
+  return (pyramidReward(c.effect.steps, mine) - pyramidReward(c.effect.steps, py.stones[pi]) + toward) * odds;
 }
 
 /** 一番点の高い相手 */

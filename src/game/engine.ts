@@ -335,6 +335,11 @@ export function canBuild(s: GameState, pi: number): boolean {
   return s.phase.kind === 'draw' && s.phase.player === pi && !!s.pyramid && !s.pyramid.done && attrScore(s.players[pi], 'sports').total > 0;
 }
 
+/** 積んだ石の数に応じたほうび（届いた一番上の段。足切りに届かなければ0） */
+export function pyramidReward(steps: [number, number][], stones: number): number {
+  return steps.reduce((best, [n, w]) => (stones >= n ? Math.max(best, w) : best), 0);
+}
+
 /** ピラミッドに石を積む。届いたら完成して、積んだクラスにほうび */
 function build(s: GameState, pi: number) {
   const c = pyramidCard(s)!;
@@ -350,14 +355,13 @@ function build(s: GameState, pi: number) {
     setResult(s, pi, { ...base, say: `石を${sc.total}個積んだ。完成まであと${py.need - sum}個。`, rows: [{ player: pi, count: sc.total, delta: 0, note: `🧱${sc.total}`, uids: sc.holders.map((h) => h.uid) }] }, 'turn');
     return;
   }
-  // 完成：積んだ石×per、一番積んだクラス（同点なら全部）に+bonus
+  // 完成：積んだ石が届いた一番上の段のほうび（足切りに届かないクラスは0）
   py.done = true;
-  const top = Math.max(...py.stones);
   const rows: ResultRow[] = s.players.map((q, i) => {
     const n = py.stones[i];
-    const delta = n * c.effect.per + (n === top ? c.effect.bonus : 0);
+    const delta = pyramidReward(c.effect.steps, n);
     q.points += delta;
-    return { player: i, count: n, delta, note: n === 0 ? '積まず' : n === top ? `🧱${n} 一番` : `🧱${n}`, uids: i === pi ? sc.holders.map((h) => h.uid) : [] };
+    return { player: i, count: n, delta, note: n === 0 ? '積まず' : delta ? `🧱${n}` : `🧱${n} 足りず`, uids: i === pi ? sc.holders.map((h) => h.uid) : [] };
   });
   const say = `ピラミッド完成！ 最後の石を積んだのは${p.name}のクラス。`;
   log(s, say, pi);
