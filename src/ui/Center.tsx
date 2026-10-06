@@ -1,6 +1,6 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { canTake, currentEra, guerrillaDrawer, inGuerrilla, marketCost, nextTurnPlayer, previewStudent } from '../game/engine';
+import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent } from '../game/engine';
 import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
@@ -107,7 +107,7 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
               Array.from({ length: MARKET_SIZE - state.market.length }, (_, i) => (
                 <div key={`gap-${i}`} className={`mcard gap ${i === 0 ? 'bolt' : ''}`}>
                   {i === 0 ? <span className="mcard-icon">⚡</span> : null}
-                  {i === 0 && <span className="mcard-name">ゲリラ</span>}
+                  {i === 0 && <span className="mcard-name">イベント</span>}
                 </div>
               ))}
           </div>
@@ -165,23 +165,9 @@ function NextTurn({ state, inline }: { state: GameState; inline?: boolean }) {
   );
 }
 
-/** ゲリラの見出し：誰の番が終わって、場の補充で何がめくれたか（手番と取り違えないように） */
-function GuerrillaHead({ state }: { state: GameState }) {
-  const d = guerrillaDrawer(state);
-  const p = d !== null ? state.players[d] : null;
-  return (
-    <div className="guerrilla-head">
-      <b>⚡ ゲリラ発生！</b>
-      <span>
-        {p && (
-          <>
-            <b style={{ color: p.color }}>{p.name}</b> の番のあと、
-          </>
-        )}
-        場の補充でめくれた（誰の手番でもない）
-      </span>
-    </div>
-  );
+/** ゲリラのカットイン（紫の帯で「イベント発生！」。手番と取り違えないように） */
+function CutIn() {
+  return <div className="cutin">⚡ イベント発生！</div>;
 }
 
 /** 場のカードを取るとどうなるかを、絵文字の式で（文章にしない） */
@@ -220,7 +206,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     const done = ph.gone.length;
     return (
       <div className="say guerrilla-say">
-        <GuerrillaHead state={state} />
+        <CutIn />
         <div className="say-sub">
           📦 全クラス転校：{who} のクラスが出ていく子を{cpuBusy ? '選んでいます…' : <>タップ {chosen(st)}</>}
           {done > 0 && <small>（{done}人 転校ずみ）</small>}
@@ -375,7 +361,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       return (
         <div className="reveal">
           <div className="reveal-card">
-            {inGuerrilla(state) && <div className="guerrilla-ribbon">⚡ ゲリラ発生 — 場の補充でめくれた（手番ではない）</div>}
+            {inGuerrilla(state) && <CutIn />}
             <EventCardView result={r} />
           </div>
           <div className="reveal-side">
