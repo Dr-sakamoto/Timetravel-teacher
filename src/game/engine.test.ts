@@ -486,7 +486,7 @@ describe('engine', () => {
 
     it('is not in the deck; it waits beside the market for the whole term', () => {
       const s = egyptTerm();
-      expect(s.pyramid).toEqual({ stones: [0, 0, 0], need: 18, done: false });
+      expect(s.pyramid).toEqual({ stones: [0, 0, 0], need: 21, done: false });
       expect(s.eventDeck).not.toContain('giza');
       expect(s.market).not.toContain('giza');
     });
@@ -516,15 +516,15 @@ describe('engine', () => {
       const t = egyptTerm();
       const pi = building(t);
       const others = [0, 1, 2].filter((i) => i !== pi);
-      t.pyramid!.stones[others[0]] = 9;
+      t.pyramid!.stones[others[0]] = 10;
       t.pyramid!.stones[others[1]] = 3;
-      t.players[pi].students = runners(6);
+      t.players[pi].students = runners(8);
       const before = t.players.map((p) => p.points);
       const after = step(t, { type: 'build' });
       expect(after.pyramid!.done).toBe(true);
       const delta = after.players.map((p, i) => p.points - before[i]);
-      expect(delta[pi]).toBe(12);
-      expect(delta[others[0]]).toBe(18 + 5);
+      expect(delta[pi]).toBe(16);
+      expect(delta[others[0]]).toBe(20 + 5);
       expect(delta[others[1]]).toBe(6);
       // 完成したらもう積めない
       expect(canBuild(after, pi)).toBe(false);

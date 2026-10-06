@@ -3298,9 +3298,9 @@ body:has(.title-screen) {
   transform: translateY(-2px);
 }
 
-/* ピラミッド（古代エジプトの学期だけ場の横に残る）：積んだ石をクラスの色で横に積み上げる */
+/* ピラミッド（古代エジプトの学期だけ場の横に残る）：イベントなのでゲリラと同じ紫。積んだ石をクラスの色で横に積み上げる */
 .mcard.pyramid {
-  background: linear-gradient(145deg, #f2d67a, #b8861f);
+  background: linear-gradient(145deg, #c9a2ff, #6a2fb0);
 }
 .mcard.pyramid.done {
   filter: saturate(1.3);
@@ -3316,4 +3316,7 @@ body:has(.title-screen) {
 }
 .pyramid-bar > span {
   height: 100%;
+}
+.mcard.pyramid::before {
+  background: #eadbff;
 }
