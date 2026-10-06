@@ -151,26 +151,35 @@ export function CreaturePart({ kind }: { kind: Creature }) {
         </g>
       );
     case 'oracle':
-      // 全知のAI：モニターの頭に光の輪。まわりに数式が浮かぶ
+      // 全知のAI：人の形ではなく、顔の出る画面を持ったスーパーコンピュータの筐体。両脇にもラックが並ぶ
       return (
         <g>
-          <C x={50} y={44} r={34} fill="#d8f6ff" sw={0} />
-          <P d="M22 100 C26 84 38 76 50 76 C62 76 74 84 78 100Z" fill="#2c3e66" />
-          <P d="M36 100 V90 H44 M64 100 V90 H56 M50 100 V84" stroke="#35e0ff" sw={1.4} />
-          <C x={50} y={84} r={2.2} fill="#35e0ff" sw={0} />
-          <rect x={44} y={64} width={12} height={10} fill="#8f9aa5" stroke={O} strokeWidth={1.3} />
-          <E x={50} y={13} rx={16} ry={4} stroke="#ffd34d" sw={2.2} />
-          <rect x={25} y={20} width={50} height={46} rx={13} fill="#e8edf2" stroke={O} strokeWidth={1.4} />
-          <rect x={30.5} y={25.5} width={39} height={35} rx={9} fill="#14223a" stroke={O} strokeWidth={1.2} />
-          <P d="M37 41 Q41.5 35 46 41 M54 41 Q58.5 35 63 41" stroke="#35e0ff" sw={2.4} />
-          <P d="M43 50 Q50 55 57 50" stroke="#35e0ff" sw={2} />
-          <P d="M34 30 H44" stroke="#35e0ff" sw={1} op={0.5} />
-          <E x={36} y={50} rx={3} ry={1.6} fill="#f59c9c" sw={0} />
-          <E x={64} y={50} rx={3} ry={1.6} fill="#f59c9c" sw={0} />
-          {[['π', 12, 30], ['∑', 86, 34], ['A+', 10, 62], ['√', 88, 64]].map(([t, x, y]) => (
-            <text key={t as string} x={x as number} y={y as number} textAnchor="middle" fontSize={9} fontWeight={900} fill="#2c8fb0">
-              {t}
-            </text>
+          <C x={50} y={50} r={40} fill="#d8f6ff" sw={0} />
+          {[6, 76].map((x) => (
+            <g key={x}>
+              <rect x={x} y={36} width={18} height={64} rx={2} fill="#3a4654" stroke={O} strokeWidth={1.3} />
+              {[42, 50, 58, 66, 74, 82, 90].map((y, k) => (
+                <g key={y}>
+                  <rect x={x + 3} y={y} width={12} height={4} rx={1} fill="#1f2b3a" stroke={O} strokeWidth={0.8} />
+                  <C x={x + 5.5} y={y + 2} r={0.9} fill={['#6ef08a', '#35e0ff', '#ffd34d'][(k + x) % 3]} sw={0} />
+                </g>
+              ))}
+            </g>
+          ))}
+          <P d="M30 14 C26 6 16 8 15 36 M70 14 C74 6 84 8 85 36" stroke="#35e0ff" sw={1.6} />
+          <rect x={24} y={16} width={52} height={86} rx={4} fill="#2c3e66" stroke={O} strokeWidth={1.4} />
+          <rect x={22} y={11} width={56} height={8} rx={2} fill="#b0b6bd" stroke={O} strokeWidth={1.3} />
+          <rect x={29} y={23} width={42} height={26} rx={5} fill="#0f1a2a" stroke={O} strokeWidth={1.2} />
+          <P d="M36 36 Q40 31 44 36 M56 36 Q60 31 64 36" stroke="#35e0ff" sw={2.2} />
+          <P d="M44 42 Q50 46 56 42" stroke="#35e0ff" sw={1.8} />
+          <P d="M32 27 H42" stroke="#35e0ff" sw={0.9} op={0.5} />
+          {[54, 62, 70, 78, 86, 94].map((y, k) => (
+            <g key={y}>
+              <rect x={29} y={y} width={42} height={5} rx={1.2} fill="#1f2b3a" stroke={O} strokeWidth={0.9} />
+              <C x={33} y={y + 2.5} r={1} fill={k % 2 ? '#6ef08a' : '#35e0ff'} sw={0} />
+              <C x={37} y={y + 2.5} r={1} fill={k % 3 ? '#35e0ff' : '#ffd34d'} sw={0} />
+              <P d={`M44 ${y + 2.5} H67`} stroke="#4a5d86" sw={1} />
+            </g>
           ))}
         </g>
       );
