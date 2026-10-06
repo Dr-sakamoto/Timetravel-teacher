@@ -53,15 +53,20 @@ export function roleOf(p: Player, uid: string): RoleId | null {
   return p.roles.find((r) => r.uid === uid)?.role ?? null;
 }
 
+/** 点に数えるアイコン（ペストにかかった子の🏃は数えない） */
+export function counted(s: Student): Attr[] {
+  return s.plague ? s.attrs.filter((a) => a !== 'sports') : s.attrs;
+}
+
 /** 係ボーナスが付いているか（その生徒が、アイコンaの係に就いていて、aを持っている） */
 export function hasRoleBonus(p: Player, s: Student, a: Attr): boolean {
   const r = roleOf(p, s.uid);
-  return r !== null && ROLES[r].attr === a && s.attrs.includes(a);
+  return r !== null && ROLES[r].attr === a && counted(s).includes(a);
 }
 
 /** その生徒が持つアイコンaの数 */
 export function iconsOf(s: Student, a: Attr): number {
-  return s.attrs.filter((x) => x === a).length;
+  return counted(s).filter((x) => x === a).length;
 }
 
 export interface AttrScore {
@@ -79,13 +84,13 @@ export function attrScore(p: Player, a: Attr | 'all', doubleEra?: EraId): AttrSc
     const parts = ATTRS.map((x) => attrScore(p, x, doubleEra));
     const sum = parts.reduce((t, x) => t + x.sum, 0);
     const bonus = parts.reduce((t, x) => t + x.bonus, 0);
-    return { sum, bonus, total: sum + bonus, holders: p.students.filter((s) => s.attrs.length > 0) };
+    return { sum, bonus, total: sum + bonus, holders: p.students.filter((s) => counted(s).length > 0) };
   }
   let sum = 0;
   let bonus = 0;
   const holders: Student[] = [];
   for (const s of p.students) {
-    if (!s.attrs.includes(a)) continue;
+    if (!counted(s).includes(a)) continue;
     holders.push(s);
     const n = s.era === doubleEra ? iconsOf(s, a) * 2 : iconsOf(s, a);
     sum += n;
@@ -96,7 +101,7 @@ export function attrScore(p: Player, a: Attr | 'all', doubleEra?: EraId): AttrSc
 
 
 export function countAttr(p: Player, a: Attr): number {
-  return p.students.filter((s) => s.attrs.includes(a)).length;
+  return p.students.filter((s) => counted(s).includes(a)).length;
 }
 
 /** 定期テストの点：📚の合計数−👊を持つ生徒1人につきpenalty */
@@ -111,7 +116,7 @@ export function baseIcons(s: Student): number {
 }
 
 export function totalPower(p: Player): number {
-  return p.students.reduce((a, s) => a + s.attrs.length, 0);
+  return p.students.reduce((a, s) => a + counted(s).length, 0);
 }
 
 /** 順位（同点は同じ順位） */
@@ -135,14 +140,14 @@ export interface Contribution {
 export function contributions(p: Player, a: Attr | 'all', doubleEra?: EraId): Contribution[] {
   if (a === 'all') {
     return p.students
-      .filter((s) => s.attrs.length > 0)
+      .filter((s) => counted(s).length > 0)
       .map((s) => {
-        const parts = ATTRS.filter((x) => s.attrs.includes(x)).map((x) => contributions({ ...p, students: [s] }, x, doubleEra)[0]);
-        return { student: s, icons: s.attrs.length, era: s.era === doubleEra, role: parts.some((x) => x.role), pts: parts.reduce((t, x) => t + x.pts, 0) };
+        const parts = ATTRS.filter((x) => counted(s).includes(x)).map((x) => contributions({ ...p, students: [s] }, x, doubleEra)[0]);
+        return { student: s, icons: counted(s).length, era: s.era === doubleEra, role: parts.some((x) => x.role), pts: parts.reduce((t, x) => t + x.pts, 0) };
       });
   }
   return p.students
-    .filter((s) => s.attrs.includes(a))
+    .filter((s) => counted(s).includes(a))
     .map((s) => {
       const era = s.era === doubleEra;
       const role = hasRoleBonus(p, s, a);

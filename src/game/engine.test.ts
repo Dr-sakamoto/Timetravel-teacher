@@ -5,7 +5,7 @@ import { CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
-import { canTake, currentEra, deckBreakdown, droppable, exchangePairs, marketCost, newGame, step } from './engine';
+import { MONTHS, canTake, currentEra, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
@@ -356,7 +356,8 @@ describe('engine', () => {
 
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
     for (const era of ERAS) {
-      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien').map((c) => c.attr));
+      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン
+      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague').map((c) => c.attr));
       // 現代は優遇なし：全アイコンで競うカードがある（文化祭だけは出し物なので🎨）
       if (era.favor.length) for (const a of used) expect([...era.favor, 'all'], era.id).toContain(a);
       else expect(used.has('all'), era.id).toBe(true);
@@ -621,13 +622,80 @@ describe('engine', () => {
       expect(run('michinaga', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
     });
 
-    it('joust: champions duel; the winner scores and the last one loses points', () => {
-      const r = run('joust', [[mk('a', ['fight', 'fight', 'fight']), mk('a2', ['fight'])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight'])]]);
-      expect(r.delta).toEqual([10, 0, -5]);
-      expect(r.uids).toEqual([['a', 'a2'], ['b'], ['c']]);
-      // 👊の子がいないクラスは出ない（減点もない）
-      const r2 = run('joust', [[mk('a', ['fight', 'fight'])], [mk('b', ['fight'])], [mk('c', ['study'])]]);
-      expect(r2.delta).toEqual([10, -5, 0]);
+    it('monalisa: each class scores its best painter\'s 🎨 × 3 (role bonus counts)', () => {
+      const r = run('monalisa', [[mk('a', ['art', 'art', 'art']), mk('a2', ['art', 'art'])], [mk('b', ['art'])], [mk('c', ['study'])]]);
+      expect(r.delta).toEqual([9, 3, 0]);
+      // 文化委員の子は2倍に数える
+      const r2 = run('monalisa', [[mk('a', ['art', 'art'])], [mk('b', ['art', 'art', 'art'])], []], [10, 10, 10], [[{ role: 'culture', uid: 'a' }], [], []]);
+      expect(r2.delta).toEqual([12, 9, 0]);
+    });
+
+    it('printing: every student without 📚 gains one; a class where everyone has 📚 gets nothing', () => {
+      const r = run('printing', [[mk('a', ['study', 'study']), mk('x', ['sports', 'sports']), mk('y', ['art'])], [mk('b', ['art'])], [mk('c', ['study'])]]);
+      expect(r.delta).toEqual([0, 0, 0]);
+      // 📚を持っていなかった子は全員📚が1つ増える（📚を持っていた子はそのまま）
+      r.after.players.forEach((p) => expect(p.students.every((x) => x.attrs.includes('study'))).toBe(true));
+      const icons = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!.attrs;
+      expect(icons(0, 'a')).toEqual(['study', 'study']);
+      expect(icons(0, 'x')).toEqual(['sports', 'sports', 'study']);
+      expect(icons(1, 'b')).toEqual(['art', 'study']);
+      // 全員📚を持っていれば何も起こらない
+      const full = Array.from({ length: 5 }, (_, k) => mk(`s${k}`, ['study']));
+      const r2 = run('printing', [full, [], []]);
+      expect(r2.after.players[0].students.map((x) => x.attrs)).toEqual(full.map(() => ['study']));
+    });
+
+    it('plague: one random non-role student per class gets sick, and their 🏃 stops counting', () => {
+      const runner = mk('a', ['sports', 'sports', 'sports']);
+      const r = run('plague', [[runner, mk('a2', ['study']), mk('a3', ['study']), mk('a4', ['study']), mk('a5', ['study'])], [mk('b', ['sports'])], [mk('c', ['sports'])]], [10, 10, 10], [[{ role: 'study', uid: 'a2' }], [], []]);
+      expect(r.delta).toEqual([0, 0, 0]);
+      r.after.players.forEach((p) => {
+        const sick = p.students.filter((x) => x.plague);
+        expect(sick).toHaveLength(1);
+        // 係に就いている子はかからない
+        expect(p.roles.some((x) => x.uid === sick[0].uid)).toBe(false);
+      });
+      // 🏃を数えない（カードのアイコンはそのまま）
+      const t = structuredClone(r.after);
+      const st = t.players[0].students.find((x) => x.uid === 'a')!;
+      st.plague = true;
+      expect(st.attrs).toEqual(['sports', 'sports', 'sports']);
+      expect(attrScore(t.players[0], 'sports').total).toBe(0);
+      // 📚4つ＋学習係のa2の📚が2倍で5（🏃3つは数えない）
+      expect(attrScore(t.players[0], 'all').total).toBe(5);
+      // グッズは装備できる（シューズの🏃も数えない）
+      expect(equippable(t.players[0]).map((x) => x.uid)).toContain('a');
+    });
+
+    it('plague wears off when the term changes', () => {
+      let t = structuredClone(base);
+      t.players.forEach((p) => p.students.forEach((x) => (x.plague = true)));
+      const term = (x: GameState) => termOfMonth(MONTHS[x.monthIdx]);
+      const start = term(t);
+      while (term(t) === start) t = step(t, cpuAction(t)!);
+      expect(t.players.flatMap((p) => p.students).some((x) => x.plague)).toBe(false);
+    });
+
+    it('columbus: classes pick a New World good and who wears it, in 📚 order; taken goods are gone for the next class', () => {
+      let t = run('columbus', [[mk('a', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['study', 'study'])]]).after;
+      expect(t.phase).toMatchObject({ kind: 'newWorld', player: 1 });
+      const ph = () => t.phase as Extract<GameState['phase'], { kind: 'newWorld' }>;
+      t = step(t, { type: 'newWorld', item: 'g_newmap', uid: 'b' });
+      expect(t.phase).toMatchObject({ kind: 'newWorld', player: 2 });
+      expect(ph().items).not.toContain('g_newmap');
+      // 取られた品は選べない。ほかのクラスの子にもつけられない
+      expect(step(t, { type: 'newWorld', item: 'g_newmap', uid: 'c' })).toBe(t);
+      expect(step(t, { type: 'newWorld', item: 'g_tomato', uid: 'a' })).toBe(t);
+      t = step(t, { type: 'newWorld', item: 'g_tomato', uid: 'c' });
+      expect(t.phase).toMatchObject({ kind: 'newWorld', player: 0 });
+      t = step(t, cpuAction(t)!);
+      expect(t.phase).toMatchObject({ kind: 'result', player: null });
+      const b = t.players[1].students.find((x) => x.uid === 'b')!;
+      expect(b.goods?.id).toBe('g_newmap');
+      expect(b.attrs).toEqual(['study', 'study', 'study', 'study']);
+      // グッズを持っている子にはつけられない（2つ目は装備できない）
+      expect(t.players[0].students.filter((x) => x.goods)).toHaveLength(1);
+      expect(t.players.map((p) => p.points)).toEqual([10, 10, 10]);
     });
 
     it('gekokujo: the most-loved class takes points from the class with the most points', () => {
@@ -797,7 +865,7 @@ describe('engine', () => {
         fired++;
         // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところか、陶片追放の投票
         if (s.phase.kind === 'result') expect(s.phase.player).toBeNull();
-        else expect(['push', 'vote']).toContain(s.phase.kind);
+        else expect(['push', 'vote', 'newWorld']).toContain(s.phase.kind);
       }
       expect(fired).toBeGreaterThan(0);
     }

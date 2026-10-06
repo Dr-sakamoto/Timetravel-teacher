@@ -1,4 +1,4 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
+import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, counted, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
 import { CARDS, CARD_MAP, EGG_DINOS, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
@@ -12,6 +12,8 @@ import {
   MARKET_SIZE,
   MACHINE_GOODS,
   MAX_ICONS,
+  NEW_WORLD_GOODS,
+  NEW_WORLD_MAP,
   PERSON_CARDS_PER_TERM,
   TEST_YANKEE_PENALTY,
   cardEra,
@@ -109,7 +111,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 23,
+    version: 24,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -358,11 +360,22 @@ function advanceMonth(s: GameState) {
     return;
   }
   const m = MONTHS[s.monthIdx];
-  if (m === 9 || m === 1) startTerm(s);
-  else startTurns(s);
+  if (m === 9 || m === 1) {
+    curePlague(s);
+    startTerm(s);
+  } else startTurns(s);
+}
+
+/** 学期の区切り：ペストにかかっていた子が治る */
+function curePlague(s: GameState) {
+  const sick = s.players.flatMap((p) => p.students.filter((x) => x.plague));
+  if (!sick.length) return;
+  for (const x of sick) delete x.plague;
+  log(s, `ペストが治まった。${sick.map((x) => x.icon + x.name).join('・')}が元気になった。`);
 }
 
 function yearEnd(s: GameState) {
+  curePlague(s);
   s.monthIdx = MONTHS.length - 1;
   if (s.year < s.years) {
     log(s, `${s.year}年生が終わった。進級！`);
@@ -442,6 +455,9 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
     case 'ostracism':
       // 陶片追放は投票の場面を挟むので fireGuerrilla で始める（ここには来ない）
       throw new Error('ostracism starts a vote');
+    case 'newworld':
+      // 品を選ぶ番が順に回るので、ゲリラの側で始める（fireGuerrilla → startNewWorld）
+      throw new Error('newworld is started by startNewWorld');
     case 'heads':
     case 'tiers':
     case 'disaster':
@@ -456,7 +472,7 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
 /** 点を数える時代イベント（○人につき・段階・災害・目標・勝負） */
 function resolveEraScore(s: GameState, c: ContestCard, e: Extract<EraEffect, { type: 'heads' | 'tiers' | 'disaster' | 'threshold' | 'battle' }>): EventResult {
   /** その子が競うアイコンを持っているか */
-  const has = (x: Student) => (c.attr === 'all' ? x.attrs.length > 0 : x.attrs.includes(c.attr));
+  const has = (x: Student) => (c.attr === 'all' ? counted(x).length > 0 : counted(x).includes(c.attr));
   const scores = s.players.map((p) => attrScore(p, c.attr));
   const values = scores.map((x) => x.total);
   const best = Math.max(...values);
@@ -535,7 +551,7 @@ function bestOf(p: Player, cands: Student[], a: Attr | 'all'): { student: Studen
 }
 
 /** その時代だけの仕組みのイベント（点の数え方ではなく、起こることそのものが違う） */
-function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, { type: 'heads' | 'tiers' | 'disaster' | 'threshold' | 'battle' | 'alien' | 'ostracism' }>): EventResult {
+function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, { type: 'heads' | 'tiers' | 'disaster' | 'threshold' | 'battle' | 'alien' | 'ostracism' | 'newworld' }>): EventResult {
   const ps = s.players;
   const n = ps.length;
   const rows: ResultRow[] = ps.map((_, i) => ({ player: i, delta: 0 }));
@@ -732,33 +748,66 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // 中世：各クラスの代表1人どうしの一騎打ち。1位は+win、最下位は−lose（その子がいないクラスは出ない）
-    case 'duel': {
-      const champs = ps.map((p) => bestOf(p, p.students, c.attr));
-      const vs = champs.flatMap((x) => (x ? [x.pts] : []));
-      champs.forEach((x, i) => {
-        rows[i].count = x?.pts;
-        rows[i].uids = x ? [x.student.uid] : [];
-        if (!x) rows[i].note = '不参加';
-      });
-      if (vs.length < 2 || Math.max(...vs) === Math.min(...vs)) {
-        champs.forEach((x, i) => x && (rows[i].note = '引き分け'));
-        break;
-      }
-      const hi = Math.max(...vs);
-      const lo = Math.min(...vs);
-      champs.forEach((x, i) => {
-        if (!x) return;
-        if (x.pts === hi) {
-          add(i, e.win);
-          x.student.mvp++;
-          rows[i].note = '勝利';
-          moved.push(x.student);
-          tell(`${ps[i].name}のクラスの${name(x.student)}が勝った！`, i);
-        } else if (x.pts === lo) {
-          add(i, -e.lose);
-          rows[i].note = '落馬';
+    // 中世：各クラスの一番の描き手1人が描く。その子の点（係ボーナス込み）× per
+    case 'masterpiece': {
+      ps.forEach((p, i) => {
+        const top = bestOf(p, p.students, c.attr);
+        if (!top) {
+          rows[i].note = '描き手なし';
+          return;
         }
+        add(i, top.pts * e.per);
+        top.student.mvp++;
+        rows[i].count = top.pts;
+        rows[i].uids = [top.student.uid];
+        rows[i].note = `${top.student.name}`;
+      });
+      const hi = Math.max(...rows.map((r) => r.delta));
+      if (hi > 0) {
+        const i = rows.findIndex((r) => r.delta === hi);
+        const st = ps[i].students.find((x) => x.uid === rows[i].uids![0])!;
+        moved.push(st);
+        tell(`一番の名画は${ps[i].name}のクラスの${name(st)}！（+${hi}）`, i);
+      }
+      break;
+    }
+    // 中世：本が安く刷られ、そのアイコンを持っていない子全員のアイコンが1つ増える（全員持っていれば何も起こらない）
+    case 'printing': {
+      if (c.attr === 'all') break;
+      const a = c.attr;
+      ps.forEach((p, i) => {
+        const readers = p.students.filter((x) => !x.attrs.includes(a) && baseIcons(x) < MAX_ICONS);
+        rows[i].count = readers.length;
+        if (!readers.length) {
+          rows[i].note = `全員${ATTR_ICON[a]}あり`;
+          return;
+        }
+        for (const x of readers) {
+          x.attrs = [...x.attrs, a];
+          x.mvp++;
+          moved.push(x);
+        }
+        rows[i].uids = readers.map((x) => x.uid);
+        rows[i].note = `${readers.length}人 ${ATTR_ICON[a]}＋1`;
+        tell(`${p.name}のクラスの${readers.length}人が本を読んで、${ATTR_ICON[a]}が1つ増えた。`, i);
+      });
+      break;
+    }
+    // 中世：各クラスの係に就いていない子1人（ランダム）がペストにかかる。学期の区切りまでそのアイコンを数えない
+    case 'plague': {
+      ps.forEach((p, i) => {
+        const cands = p.students.filter((x) => roleOf(p, x.uid) === null && !x.plague);
+        if (!cands.length) {
+          rows[i].note = '無事';
+          return;
+        }
+        const st = pick(s, cands);
+        st.plague = true;
+        moved.push(st);
+        rows[i].count = c.attr === 'all' ? undefined : iconsOf({ ...st, plague: false }, c.attr);
+        rows[i].uids = [st.uid];
+        rows[i].note = `${st.name}が感染`;
+        tell(`${p.name}のクラスの${name(st)}がペストにかかった。`, i);
       });
       break;
     }
@@ -992,7 +1041,7 @@ export function nextTurnPlayer(s: GameState): number | null {
 /** いまゲリラの最中か（転校で出ていく子を選んでいる間と、ゲリラの結果を見せている間）。誰の手番でもない */
 export function inGuerrilla(s: GameState): boolean {
   const ph = s.phase;
-  return ph.kind === 'push' || ph.kind === 'vote' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
+  return ph.kind === 'push' || ph.kind === 'vote' || ph.kind === 'newWorld' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
 }
 
 /** 転校：めくった人から席順に、全クラスが1人ずつ外す */
@@ -1079,6 +1128,45 @@ function ostracismResult(s: GameState, drawer: number, votes: number[], gone: St
   return { ...eraResult(s, c, rows, { students: gone, outUids: gone.map((x) => x.uid) }), say };
 }
 
+/** コロンブスの新大陸到達：アイコンの多いクラスから順に（同点ならポイントの少ないクラスが先）、品と装備させる子（グッズを持っていない子）を選ぶ。品がなくなったら終わり */
+function startNewWorld(s: GameState, c: ContestCard) {
+  const a = c.attr;
+  const values = s.players.map((p) => attrScore(p, a).total);
+  const order = s.players.map((_, i) => i).sort((x, y) => values[y] - values[x] || s.players[x].points - s.players[y].points || x - y);
+  nextNewWorld(s, order, NEW_WORLD_GOODS.map((g) => g.id), []);
+}
+
+/** 新大陸の品の次の人へ。全員選び終わったら（品がなくなったら）結果を出す */
+function nextNewWorld(s: GameState, left: number[], items: string[], got: { player: number; uid: string; item: string }[]) {
+  for (let i = 0; i < left.length && items.length; i++) {
+    const pi = left[i];
+    if (equippable(s.players[pi]).length > 0) {
+      s.phase = { kind: 'newWorld', player: pi, left: left.slice(i + 1), items, got };
+      return;
+    }
+    log(s, `${s.players[pi].name}のクラスには品を受け取れる子がいなかった。`, pi);
+  }
+  const c = EVENT_MAP.columbus as ContestCard;
+  const students = got.map((g) => s.players[g.player].students.find((x) => x.uid === g.uid)!);
+  const rows: ResultRow[] = s.players.map((_, i) => {
+    const g = got.find((x) => x.player === i);
+    if (!g) return { player: i, delta: 0, note: '届かず' };
+    const item = NEW_WORLD_MAP[g.item];
+    return { player: i, delta: 0, note: `${item.icon}${item.name}`, uids: [g.uid] };
+  });
+  logRows(s, c.name, rows);
+  setResult(
+    s,
+    null,
+    {
+      title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c),
+      say: got.length ? students.map((x, i) => `${x.icon}${x.name}に${NEW_WORLD_MAP[got[i].item].icon}`).join(' ') : '品を受け取れるクラスがなかった。',
+      rows, students,
+    },
+    'turn',
+  );
+}
+
 function popCard(s: GameState): string | undefined {
   if (s.eventDeck.length === 0) {
     if (s.discard.length === 0) return undefined;
@@ -1153,6 +1241,7 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
       return;
     case 'contest':
       if (c.effect.type === 'ostracism') startVote(s, pi);
+      else if (c.effect.type === 'newworld') startNewWorld(s, c);
       else setResult(s, null, resolveContest(s, c), 'turn');
       return;
     case 'raid':
@@ -1428,6 +1517,19 @@ export function step(prev: GameState, a: Action): GameState {
         { title: 'サイボーグ化', icon: '🦾', art: 'cyborg', tone: 'personal', desc: `${was}がサイボーグになった！`, rule: cardRule(EVENT_MAP.cyborg), glyph: cardGlyph(EVENT_MAP.cyborg), say: shortRule(EVENT_MAP.cyborg), rows: [], students: [st] },
         'turn',
       );
+      return s;
+    }
+    case 'newWorld': {
+      if (ph.kind !== 'newWorld' || !ph.items.includes(a.item)) return prev;
+      const p = s.players[ph.player];
+      const st = equippable(p).find((x) => x.uid === a.uid);
+      if (!st) return prev;
+      const g = NEW_WORLD_MAP[a.item];
+      st.goods = { id: g.id, name: g.name, icon: g.icon, attr: g.attr };
+      st.attrs = [...st.attrs, g.attr];
+      st.mvp++;
+      log(s, `${p.name}のクラスの${st.name}に新大陸の${g.icon}${g.name}が届いた。`, ph.player);
+      nextNewWorld(s, ph.left, ph.items.filter((x) => x !== a.item), [...ph.got, { player: ph.player, uid: st.uid, item: g.id }]);
       return s;
     }
     case 'equip': {

@@ -414,39 +414,97 @@ const SCENES: Record<string, () => ReactNode> = {
   ),
 
   // ---------- 中世・ルネサンス ----------
-  medici: () => (
+  monalisa: () => (
     <g>
-      <Bg sky="#f4e6c8" ground="#a87a4a" y={58} />
-      <P d="M32 8 H68 V36 C68 50 58 56 50 60 C42 56 32 50 32 36Z" fill="#f2c94c" />
-      {[[50, 18, '#3f7fd0'], [42, 26, '#d14b3c'], [58, 26, '#d14b3c'], [42, 36, '#d14b3c'], [58, 36, '#d14b3c'], [50, 44, '#d14b3c']].map(([x, y, f]) => (
-        <C key={`${x}-${y}`} x={x as number} y={y as number} r={4} fill={f as string} sw={1.1} />
+      <Bg sky="#e9dcc0" ground="#8a6a48" y={60} />
+      <P d="M30 70 L40 46 M70 70 L60 46 M50 70 V50" sw={1.6} />
+      <R x={26} y={4} w={48} h={46} fill="#c99a3a" rx={1} />
+      <R x={31} y={9} w={38} h={36} fill="#6f7f52" sw={1} />
+      <P d="M31 30 C40 26 46 32 52 28 C58 24 64 30 69 28 V45 H31Z" fill="#8a8a5a" sw={0} />
+      <P d="M38 45 C38 34 43 30 50 30 C57 30 62 34 62 45Z" fill="#3a2a22" />
+      <P d="M41 26 C40 16 44 12 50 12 C56 12 60 16 59 26 C59 32 56 34 50 34 C44 34 41 32 41 26Z" fill="#2f2a2a" />
+      <E x={50} y={23} rx={6.5} ry={8} fill="#e8c597" sw={1.1} />
+      <C x={47.5} y={21.5} r={0.7} fill={O} sw={0} />
+      <C x={52.5} y={21.5} r={0.7} fill={O} sw={0} />
+      <P d="M47.5 27 Q50 28.4 52.5 27" sw={0.9} />
+      <P d="M44 40 C47 38 53 38 56 40" fill="#e8c597" sw={1} />
+      <E x={86} y={60} rx={11} ry={7} fill="#f6e3c0" />
+      {[[81, 57, '#e5534b'], [87, 55, '#3f7fd0'], [92, 59, '#6fb35a'], [84, 63, '#f2c94c']].map(([x, y, f]) => (
+        <C key={`${x}`} x={x as number} y={y as number} r={1.8} fill={f as string} sw={0.8} />
       ))}
-      <P d="M8 58 C6 48 12 42 20 44 C28 42 32 50 30 58Z" fill="#b8860b" />
-      <P d="M14 44 L18 38 L22 44" fill="#b8860b" sw={1.1} />
-      <text x={19} y={54} textAnchor="middle" fontSize={8} fontWeight={900} fill="#fff3b0">
-        ƒ
-      </text>
-      <E x={82} y={54} rx={14} ry={9} fill="#f6e3c0" />
-      {[[76, 50, '#e5534b'], [84, 48, '#3f7fd0'], [90, 53, '#6fb35a'], [80, 57, '#f2c94c']].map(([x, y, f]) => (
-        <C key={`${x}`} x={x as number} y={y as number} r={2.2} fill={f as string} sw={0.8} />
+      <Stick x1={8} y1={64} x2={20} y2={52} w={1.4} color="#7a5a3a" />
+    </g>
+  ),
+  printing: () => (
+    <g>
+      <Bg sky="#d9c7a3" ground="#7a5a3a" y={60} />
+      <R x={8} y={8} w={6} h={52} fill="#8a5a32" />
+      <R x={44} y={8} w={6} h={52} fill="#8a5a32" />
+      <R x={6} y={6} w={46} h={6} fill="#6f4628" />
+      <Stick x1={29} y1={12} x2={29} y2={28} w={2.2} color="#b9c2cc" />
+      <Stick x1={18} y1={22} x2={40} y2={18} w={1.6} color="#6f4628" />
+      <R x={16} y={28} w={26} h={6} fill="#6f4628" />
+      <R x={12} y={40} w={34} h={8} fill="#a87a4a" />
+      <R x={16} y={36} w={26} h={4} fill="#fbf4e2" sw={1} />
+      {[0, 1, 2, 3].map((i) => (
+        <g key={i} transform={`translate(${60 + (i % 2) * 18} ${14 + Math.floor(i / 2) * 22}) rotate(${i % 2 ? 6 : -5})`}>
+          <R x={0} y={0} w={16} h={20} fill="#fbf4e2" sw={1.1} />
+          {[5, 9, 13, 17].map((y) => (
+            <P key={y} d={`M3 ${y} H13`} sw={0.8} />
+          ))}
+        </g>
+      ))}
+      {['A', 'B', 'C'].map((ch, i) => (
+        <g key={ch}>
+          <R x={14 + i * 10} y={62} w={8} h={8} fill="#b9c2cc" sw={1} />
+          <text x={18 + i * 10} y={68.5} textAnchor="middle" fontSize={6} fontWeight={900} fill={O}>
+            {ch}
+          </text>
+        </g>
       ))}
     </g>
   ),
-  joust: () => (
+  plague: () => (
     <g>
-      <Bg sky="#cfe0ff" ground="#8fbf5a" y={50} />
-      <R x={0} y={44} w={100} h={6} fill="#a87a4a" sw={1} />
-      <P d="M6 58 C8 46 16 42 26 44 L30 40 L34 46 C38 50 36 58 34 62 H10Z" fill="#fbfbf7" />
-      <R x={14} y={28} w={12} h={16} fill="#b9c2cc" rx={3} />
-      <R x={15} y={20} w={10} h={10} fill="#8f9aa5" rx={4} />
-      <P d="M17 25 H23" sw={1.6} />
-      <Stick x1={24} y1={36} x2={58} y2={28} w={2.4} color="#d14b3c" />
-      <P d="M94 58 C92 46 84 42 74 44 L70 40 L66 46 C62 50 64 58 66 62 H90Z" fill="#3a3a44" />
-      <R x={74} y={28} w={12} h={16} fill="#b9c2cc" rx={3} />
-      <R x={75} y={20} w={10} h={10} fill="#8f9aa5" rx={4} />
-      <P d="M77 25 H83" sw={1.6} />
-      <Stick x1={76} y1={36} x2={42} y2={28} w={2.4} color="#3566b8" />
-      <Star x={50} y={28} r={6} fill="#fff3b0" />
+      <Bg sky="#3a3350" ground="#4a4038" y={54} />
+      <C x={82} y={12} r={7} fill="#d8d0b0" />
+      {[[6, 26, 18], [26, 20, 16], [44, 28, 14], [60, 22, 18]].map(([x, y, w]) => (
+        <g key={x}>
+          <P d={`M${x} ${y} L${x + w / 2} ${y - 9} L${x + w} ${y}Z`} fill="#5a4a42" />
+          <R x={x} y={y} w={w} h={54 - y} fill="#7a6a5a" />
+          <R x={x + w / 2 - 3} y={44} w={6} h={10} fill="#3a2a22" sw={1} />
+        </g>
+      ))}
+      <P d="M30 40 L36 46 M36 40 L30 46" stroke="#d14b3c" sw={1.6} />
+      {[[22, 62, 1], [56, 64, 1.2], [80, 60, 0.9]].map(([x, y, k]) => (
+        <g key={x} transform={`translate(${x} ${y}) scale(${k})`}>
+          <E x={0} y={0} rx={7} ry={4} fill="#6b6b74" />
+          <C x={7} y={-2} r={3} fill="#6b6b74" sw={1.1} />
+          <C x={7} y={-5} r={1.4} fill="#e8a0a0" sw={0.8} />
+          <C x={8.5} y={-2.5} r={0.6} fill="#222" sw={0} />
+          <P d="M-7 0 C-12 0 -14 4 -18 2" sw={1.1} />
+        </g>
+      ))}
+    </g>
+  ),
+  columbus: () => (
+    <g>
+      <Bg sky="#9fd3ff" ground="#2f6fa8" y={48} />
+      <P d="M0 56 Q12 52 25 56 T50 56 T75 56 T100 56" stroke="#cfeaff" sw={1} />
+      <P d="M66 48 C70 40 86 38 100 40 V48Z" fill="#e8d6a8" />
+      <Stick x1={84} y1={42} x2={86} y2={22} w={1.6} color="#7a5a3a" />
+      {[[-10, -4], [-8, 4], [8, -4], [9, 4]].map(([dx, dy]) => (
+        <P key={`${dx}${dy}`} d={`M86 22 Q${86 + dx / 2} ${22 + dy - 3} ${86 + dx} ${22 + dy + 2}`} stroke="#3f8f4a" sw={2} />
+      ))}
+      <P d="M8 48 L52 48 L46 58 L14 58Z" fill="#8a5a32" />
+      {[18, 30, 42].map((x, i) => (
+        <g key={x}>
+          <Stick x1={x} y1={48} x2={x} y2={i === 1 ? 12 : 18} w={1.2} color="#6f4628" />
+          <P d={`M${x - 7} ${i === 1 ? 16 : 22} H${x + 7} V${i === 1 ? 32 : 34} H${x - 7}Z`} fill="#fbf4e2" sw={1.1} />
+          <P d={`M${x} ${i === 1 ? 19 : 25} V${i === 1 ? 29 : 31} M${x - 3} ${i === 1 ? 24 : 28} H${x + 3}`} stroke="#d14b3c" sw={1.4} />
+        </g>
+      ))}
+      <P d="M30 12 L36 14 L30 16" fill="#d14b3c" sw={0.9} />
     </g>
   ),
 
