@@ -643,6 +643,73 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
+    // エジプト：🏃の子1人につき収穫。そのあと👑が一番多いクラス（ファラオ。同点なら全部）に、ほかの全クラスが税を納める
+    case 'nile': {
+      const has = (x: Student) => c.attr !== 'all' && counted(x).includes(c.attr);
+      const farmers = ps.map((p) => p.students.filter(has));
+      farmers.forEach((f, i) => {
+        add(i, f.length * e.per);
+        rows[i].count = f.length;
+        rows[i].uids = f.map((x) => x.uid);
+        rows[i].note = `収穫${f.length}人`;
+        f.forEach((x) => x.mvp++);
+      });
+      const crowns = ps.map((p) => attrScore(p, e.also).total);
+      const hi = Math.max(...crowns);
+      if (hi === Math.min(...crowns)) {
+        tell('大豊作！ ファラオは決まらず、税はなし。');
+        break;
+      }
+      const pharaohs = crowns.flatMap((v, i) => (v === hi ? [i] : []));
+      ps.forEach((_, i) => {
+        if (pharaohs.includes(i)) return;
+        for (const t of pharaohs) {
+          add(i, -e.tax);
+          add(t, e.tax);
+        }
+        rows[i].note += '・納税';
+      });
+      pharaohs.forEach((t) => (rows[t].note += '・ファラオ'));
+      tell(`大豊作！ ${pharaohs.map((t) => ps[t].name).join('・')}のクラスに税が集まった。`);
+      break;
+    }
+    // エジプト：Xと also を両方持つ子（書記）1人につき +per
+    case 'scribe': {
+      const a = c.attr;
+      const scribes = ps.map((p) => p.students.filter((x) => a !== 'all' && counted(x).includes(a) && counted(x).includes(e.also)));
+      scribes.forEach((f, i) => {
+        add(i, f.length * e.per);
+        rows[i].count = f.length;
+        rows[i].uids = f.map((x) => x.uid);
+        rows[i].note = f.length ? `書記${f.length}人` : '書記なし';
+        f.forEach((x) => x.mvp++);
+      });
+      const most = Math.max(...scribes.map((f) => f.length));
+      if (most > 0) {
+        const i = scribes.findIndex((f) => f.length === most);
+        moved.push(...scribes[i]);
+        tell(`${ps[i].name}のクラスの書記${most}人が、ヒエログリフを書き残した。`, i);
+      }
+      break;
+    }
+    // エジプト：グッズを装備している子1人につき +per（副葬品）
+    case 'burial': {
+      const rich = ps.map((p) => p.students.filter((x) => x.goods));
+      rich.forEach((f, i) => {
+        add(i, f.length * e.per);
+        rows[i].count = f.length;
+        rows[i].uids = f.map((x) => x.uid);
+        rows[i].note = f.length ? `副葬品${f.length}つ` : '副葬品なし';
+        f.forEach((x) => x.mvp++);
+      });
+      const most = Math.max(...rich.map((f) => f.length));
+      if (most > 0) {
+        const i = rich.findIndex((f) => f.length === most);
+        moved.push(...rich[i]);
+        tell(`${ps[i].name}のクラスのお墓に、${rich[i].map((x) => x.goods!.icon).join('')}が納められた。`, i);
+      }
+      break;
+    }
     // ギリシャ：各クラスの、Xと also の合計が一番多い子が闘技場へ。1位（同点なら全員）は+win、負けたクラスと出せる子がいないクラスは−lose
     case 'arena': {
       const power = (p: Player, x: Student) => studentPts(p, x, c.attr) + studentPts(p, x, e.also);

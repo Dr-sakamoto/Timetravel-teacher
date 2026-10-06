@@ -45,7 +45,7 @@ export const ART: Record<string, ArtSpec> = {
   cleopatra: { skin: SKIN.tan, back: 'egypt', hair: 'patsun', hairColor: black, outfit: 'egypt', c1: '#3f7fd0', hat: 'diadem', acc: ['earring'], expr: 'calm', liner: true },
   tut: { skin: SKIN.tan, outfit: 'egypt', c1: '#3f7fd0', hat: 'nemes', hatColor: '#2f5fb3', expr: 'smile', liner: true },
   imhotep: { skin: SKIN.tan, outfit: 'egypt', c1: '#35a37a', expr: 'calm', prop: 'setsquare', acc: ['old'] },
-  nefertiti: { skin: SKIN.tan, outfit: 'egypt', c1: '#d14b3c', hat: 'nefercrown', hatColor: '#3566b8', acc: ['earring'], expr: 'calm', liner: true },
+  ramesses: { skin: SKIN.tan, outfit: 'egypt', c1: '#d14b3c', hat: 'nemes', hatColor: '#d9a441', expr: 'cool', liner: true, prop: 'spear' },
   mason: { skin: SKIN.brown, outfit: 'bare', c1: '#f6f1e4', hat: 'headcloth', hatColor: '#f6f1e4', expr: 'grin', prop: 'brick', acc: ['sweat'] },
 
   // ---- ギリシャ・ローマ ----

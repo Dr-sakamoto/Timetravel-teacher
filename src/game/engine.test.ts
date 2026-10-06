@@ -356,8 +356,8 @@ describe('engine', () => {
 
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
     for (const era of ERAS) {
-      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン
-      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague').map((c) => c.attr));
+      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン。ヒエログリフの書記は🎨📚の両方を持つ子
+      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague' && c.effect.type !== 'scribe').map((c) => c.attr));
       // 現代は優遇なし：全アイコンで競うカードがある（文化祭だけは出し物なので🎨）
       if (era.favor.length) for (const a of used) expect([...era.favor, 'all'], era.id).toContain(a);
       else expect(used.has('all'), era.id).toBe(true);
@@ -534,6 +534,31 @@ describe('engine', () => {
       expect(run('giza', [[s3('a'), s3('b'), s3('c')], [s3('d'), s3('e')], [s3('f')]]).delta).toEqual([6, 6, 0]);
       // 合計 3+3+0 < 18 → 全クラス−3
       expect(run('giza', [[s3('a')], [s3('b')], []]).delta).toEqual([-3, -3, -3]);
+    });
+
+    it('nile: every farmer (🏃) harvests, then the other classes pay tax to the pharaoh (most 👑)', () => {
+      // 収穫：2人×2・1人×2・0。税：👑一番のクラス2に、ほかの2クラスが2点ずつ
+      const r = run('nile', [[mk('a', ['sports']), mk('b', ['sports', 'sports'])], [mk('c', ['sports', 'charm'])], [mk('d', ['charm', 'charm'])]]);
+      expect(r.delta).toEqual([4 - 2, 2 - 2, 0 + 4]);
+      // ファラオが並べば、それぞれに納める
+      expect(run('nile', [[mk('a', ['charm'])], [mk('b', ['charm'])], [mk('c', ['sports'])]]).delta).toEqual([2, 2, 2 - 4]);
+      // 👑が全クラス同じなら税はなし
+      expect(run('nile', [[mk('a', ['sports'])], [], []]).delta).toEqual([2, 0, 0]);
+    });
+
+    it('hieroglyph: each scribe (a child with both 🎨 and 📚) scores', () => {
+      const r = run('hieroglyph', [[mk('a', ['art', 'study']), mk('b', ['art', 'art', 'study'])], [mk('c', ['art']), mk('d', ['study'])], []]);
+      expect(r.delta).toEqual([6, 0, 0]);
+      // アイコンは増えない
+      expect(r.after.players[0].students.find((x) => x.uid === 'a')!.attrs).toEqual(['art', 'study']);
+    });
+
+    it('mummy: each child wearing goods is buried with treasure and scores', () => {
+      const withGoods = (u: string) => ({ ...mk(u, ['charm', 'charm']), goods: { id: 'g_mask', name: '黄金のマスク', icon: '🎭', attr: 'charm' as const } });
+      const r = run('mummy', [[withGoods('a'), withGoods('b')], [withGoods('c'), mk('d', ['charm'])], [mk('e', ['charm', 'charm', 'charm'])]]);
+      expect(r.delta).toEqual([8, 4, 0]);
+      // グッズはそのまま
+      expect(r.after.players[0].students.filter((x) => x.goods).map((x) => x.uid)).toEqual(['a', 'b']);
     });
 
     it('colosseum: each class\'s best fighter (🏃+👊) enters the arena; the winner scores and every other class loses points', () => {
