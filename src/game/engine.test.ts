@@ -356,8 +356,8 @@ describe('engine', () => {
 
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
     for (const era of ERAS) {
-      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン。ヒエログリフの書記は🎨📚の両方を持つ子
-      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague' && c.effect.type !== 'scribe').map((c) => c.attr));
+      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン
+      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague').map((c) => c.attr));
       // 現代は優遇なし：全アイコンで競うカードがある（文化祭だけは出し物なので🎨）
       if (era.favor.length) for (const a of used) expect([...era.favor, 'all'], era.id).toContain(a);
       else expect(used.has('all'), era.id).toBe(true);
@@ -619,16 +619,17 @@ describe('engine', () => {
       expect(run('nile', [[mk('a', ['sports'])], [], []]).delta).toEqual([2, 0, 0]);
     });
 
-    it('hieroglyph: each scribe (a child with both 🎨 and 📚) scores', () => {
-      const r = run('hieroglyph', [[mk('a', ['art', 'study']), mk('b', ['art', 'art', 'study'])], [mk('c', ['art']), mk('d', ['study'])], []]);
+    it('hieroglyph: each scribe (a child with both 👑 and 📚) scores', () => {
+      const r = run('hieroglyph', [[mk('a', ['charm', 'study']), mk('b', ['charm', 'charm', 'study'])], [mk('c', ['charm']), mk('d', ['study'])], []]);
       expect(r.delta).toEqual([6, 0, 0]);
       // アイコンは増えない
-      expect(r.after.players[0].students.find((x) => x.uid === 'a')!.attrs).toEqual(['art', 'study']);
+      expect(r.after.players[0].students.find((x) => x.uid === 'a')!.attrs).toEqual(['charm', 'study']);
     });
 
-    it('mummy: each child wearing goods is buried with treasure and scores', () => {
-      const withGoods = (u: string) => ({ ...mk(u, ['charm', 'charm']), goods: { id: 'g_mask', name: '黄金のマスク', icon: '🎭', attr: 'charm' as const } });
-      const r = run('mummy', [[withGoods('a'), withGoods('b')], [withGoods('c'), mk('d', ['charm'])], [mk('e', ['charm', 'charm', 'charm'])]]);
+    it('mummy: each child with 👑 wearing goods is buried with treasure and scores', () => {
+      const withGoods = (u: string, attrs: Attr[]) => ({ ...mk(u, attrs), goods: { id: 'g_book', name: '参考書', icon: '📕', attr: 'study' as const } });
+      const r = run('mummy', [[withGoods('a', ['charm']), withGoods('b', ['charm', 'charm'])], [withGoods('c', ['charm']), withGoods('d', ['art'])], [mk('e', ['charm', 'charm', 'charm'])]]);
+      // 👑のない子のグッズ・グッズのない👑の子は数えない
       expect(r.delta).toEqual([8, 4, 0]);
       // グッズはそのまま
       expect(r.after.players[0].students.filter((x) => x.goods).map((x) => x.uid)).toEqual(['a', 'b']);

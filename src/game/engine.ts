@@ -756,9 +756,10 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       }
       break;
     }
-    // エジプト：グッズを装備している子1人につき +per（副葬品）
+    // エジプト：Xを持っていて、グッズを装備している子1人につき +per（副葬品）
     case 'burial': {
-      const rich = ps.map((p) => p.students.filter((x) => x.goods));
+      const a = c.attr;
+      const rich = ps.map((p) => p.students.filter((x) => x.goods && (a === 'all' || counted(x).includes(a))));
       rich.forEach((f, i) => {
         add(i, f.length * e.per);
         rows[i].count = f.length;
