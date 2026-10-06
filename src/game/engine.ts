@@ -1,5 +1,5 @@
 import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
-import { CARDS, CARD_MAP, toIcons } from './data/cards';
+import { CARDS, CARD_MAP, EGG_DINOS, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import {
   ALL_EVENT_CARDS,
@@ -109,7 +109,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 21,
+    version: 22,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -214,7 +214,7 @@ function removeStudent(s: GameState, p: Player, uid: string, returnToPool: boole
   if (i < 0) return null;
   const [st] = p.students.splice(i, 1);
   p.roles = p.roles.filter((r) => r.uid !== uid);
-  if (returnToPool && st.cardId && !s.pools[st.era].includes(st.cardId)) s.pools[st.era].push(st.cardId);
+  if (returnToPool && st.cardId && CARDS.some((c) => c.id === st.cardId) && !s.pools[st.era].includes(st.cardId)) s.pools[st.era].push(st.cardId);
   return st;
 }
 
@@ -305,13 +305,44 @@ function startTerm(s: GameState) {
 function startTurns(s: GameState) {
   s.queue = order(s);
   s.queueIdx = 0;
-  s.phase = { kind: 'draw', player: s.queue[0] };
+  beginTurn(s, s.queue[0]);
 }
 
 function endTurn(s: GameState) {
   s.queueIdx++;
-  if (s.queueIdx < s.queue.length) s.phase = { kind: 'draw', player: s.queue[s.queueIdx] };
+  if (s.queueIdx < s.queue.length) beginTurn(s, s.queue[s.queueIdx]);
   else monthEnd(s);
+}
+
+/** 手番の始め：卵を持っていれば先に孵して見せる（次へで手番に進む） */
+function beginTurn(s: GameState, pi: number) {
+  const p = s.players[pi];
+  const eggs = p.students.filter(isEgg);
+  if (!eggs.length) {
+    s.phase = { kind: 'draw', player: pi };
+    return;
+  }
+  for (const egg of eggs) hatch(s, egg);
+  const desc = eggs.map((x) => `${x.icon}${x.name}`).join('・');
+  log(s, `${p.name}のクラスで卵が孵った！ ${desc}`, pi);
+  setResult(s, pi, { title: '卵が孵った！', icon: '🥚', tone: 'personal', desc: `${desc}が生まれた！`, rows: [{ player: pi, delta: 0, note: '孵化', uids: eggs.map((x) => x.uid) }], students: eggs }, 'hatch');
+}
+
+/** 恐竜の卵（オヴィラプトルの卵泥棒で来る。アイコンはなく、席を1つ使う） */
+function makeEgg(s: GameState): Student {
+  return { uid: `u${s.uidCounter++}`, name: '恐竜の卵', title: '何が孵るかな', era: 'cretaceous', rarity: 'N', icon: '🥚', art: 'egg', attrs: [], flavor: 'ときどき中から音がする。', joined: joinedLabel(s), mvp: 0 };
+}
+
+export function isEgg(x: Student): boolean {
+  return x.art === 'egg';
+}
+
+/** 卵を恐竜に変える（uid はそのまま。係に就いていればそのまま）。アイコン1個:2個:3個 = 5:4:1 */
+function hatch(s: GameState, egg: Student) {
+  const total = EGG_DINOS.reduce((a, d) => a + d.weight, 0);
+  let r = rand(s) * total;
+  const d = EGG_DINOS.find((x) => (r -= x.weight) < 0) ?? EGG_DINOS[0];
+  Object.assign(egg, { cardId: d.id, name: d.name, title: d.title, rarity: d.rarity, icon: d.icon, art: d.id, attrs: [...d.attrs], flavor: d.flavor });
 }
 
 function monthEnd(s: GameState) {
@@ -410,6 +441,7 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
       return resolveInvasion(s, c);
     case 'heads':
     case 'tiers':
+    case 'disaster':
     case 'threshold':
     case 'battle':
       return resolveEraScore(s, c, e);
@@ -418,8 +450,8 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
   }
 }
 
-/** 点を数える時代イベント（○人につき・段階・目標・勝負） */
-function resolveEraScore(s: GameState, c: ContestCard, e: Extract<EraEffect, { type: 'heads' | 'tiers' | 'threshold' | 'battle' }>): EventResult {
+/** 点を数える時代イベント（○人につき・段階・災害・目標・勝負） */
+function resolveEraScore(s: GameState, c: ContestCard, e: Extract<EraEffect, { type: 'heads' | 'tiers' | 'disaster' | 'threshold' | 'battle' }>): EventResult {
   /** その子が競うアイコンを持っているか */
   const has = (x: Student) => (c.attr === 'all' ? x.attrs.length > 0 : x.attrs.includes(c.attr));
   const scores = s.players.map((p) => attrScore(p, c.attr));
@@ -438,6 +470,14 @@ function resolveEraScore(s: GameState, c: ContestCard, e: Extract<EraEffect, { t
         const n = p.students.filter(has).length;
         count = n;
         delta = n * e.per;
+        note = `${n}人`;
+        break;
+      }
+      case 'disaster': {
+        // 全クラスが同じだけ失い、持っている子1人につき取り返す
+        const n = p.students.filter(has).length;
+        count = n;
+        delta = n * e.per - e.lose;
         note = `${n}人`;
         break;
       }
@@ -492,7 +532,7 @@ function bestOf(p: Player, cands: Student[], a: Attr | 'all'): { student: Studen
 }
 
 /** その時代だけの仕組みのイベント（点の数え方ではなく、起こることそのものが違う） */
-function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, { type: 'heads' | 'tiers' | 'threshold' | 'battle' | 'alien' }>): EventResult {
+function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, { type: 'heads' | 'tiers' | 'disaster' | 'threshold' | 'battle' | 'alien' }>): EventResult {
   const ps = s.players;
   const n = ps.length;
   const rows: ResultRow[] = ps.map((_, i) => ({ player: i, delta: 0 }));
@@ -535,6 +575,31 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       rows[win].note = '奪った';
       rows[lose].note = '奪われた';
       tell(`${ps[win].name}のクラスが${ps[lose].name}のクラスから${e.amount}点奪った！`, win);
+      break;
+    }
+    // 白亜紀：一番すばしこいクラス（1クラスだけ）の空いた席に卵が置かれる。孵るのはそのクラスの次の手番の始め
+    case 'egg': {
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+      });
+      const tops = values.flatMap((v, i) => (v === best ? [i] : []));
+      if (best === worst || tops.length > 1) {
+        rows.forEach((r) => (r.note = '互角'));
+        break;
+      }
+      const win = tops[0];
+      if (ps[win].students.length >= MAX_CLASS) {
+        rows[win].note = '満席';
+        break;
+      }
+      const egg = makeEgg(s);
+      ps[win].students.push(egg);
+      scores[win].holders.forEach((h) => h.mvp++);
+      moved.push(egg);
+      rows[win].note = '🥚ゲット';
+      rows[win].uids = [egg.uid];
+      tell(`${ps[win].name}のクラスが恐竜の卵を持ち帰った！次の手番で孵る。`, win);
       break;
     }
     // エジプト：全クラスの合計で1つのピラミッド。完成なら全員にほうび、一番少ないクラスはサボりで0
@@ -1114,6 +1179,9 @@ export function step(prev: GameState, a: Action): GameState {
       switch (ph.ctx) {
         case 'turn':
           refill(s);
+          break;
+        case 'hatch':
+          if (ph.player !== null) s.phase = { kind: 'draw', player: ph.player };
           break;
         case 'monthEnd':
           advanceMonth(s);

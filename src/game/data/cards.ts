@@ -62,7 +62,6 @@ export const CARDS: CardDef[] = [
   ...era('cretaceous', [
     ['trex', 'ティラノサウルス', '暴君竜', 'SSR', '🦖', 10, '=fffff', ['恐竜', 'ヤンキー'], '腕は短いが噛む力は時空最強。給食の時間が一番こわい。'],
     ['triceratops', 'トリケラトプス', '三本角の重戦車', 'SR', '🦏', 7, '=ffff', ['恐竜', 'ヤンキー'], '角で他校の自転車を3台まとめて止めた。'],
-    ['brachio', 'ブラキオサウルス', '優しい巨人', 'SR', '🦕', 8, '=fff', ['恐竜', 'ヤンキー'], '高い所からクラス全員を見守る。窓拭きも担当。'],
     ['ptera', 'プテラノドン', '空の支配者', 'R', '🦅', 8, '=fpp', ['恐竜', 'ヤンキー'], '屋上が定位置。遅刻ギリギリでも飛んでくる。'],
     ['raptor', 'ヴェロキラプトル', '知恵ある狩人', 'R', '🦎', 6, '=ffp', ['恐竜', 'ヤンキー'], '群れで行動する。最近ドアの開け方を覚えた。'],
   ]),
@@ -134,4 +133,14 @@ export const CARDS: CardDef[] = [
   ]),
 ];
 
-export const CARD_MAP: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
+/**
+ * 卵から孵る恐竜（オヴィラプトルの卵泥棒）。人物カードのプールとは別枠で、数に限りはない。
+ * weight の比で孵る（アイコン1個:2個:3個 = 5:4:1）。白亜紀のイベントに出てくる恐竜を回収する
+ */
+export const EGG_DINOS: (CardDef & { weight: number })[] = [
+  { ...era('cretaceous', [['oviraptor', 'オヴィラプトル', '卵泥棒', 'N', '🦤', 3, '=p', ['恐竜'], '名前の意味は「卵泥棒」。本当は自分の卵を温めていただけ。']])[0], weight: 5 },
+  { ...era('cretaceous', [['parasaur', 'パラサウロロフス', '群れの呼び声', 'R', '🦕', 5, '=pp', ['恐竜'], 'トサカをラッパのように鳴らして群れを呼ぶ。大移動の先頭。']])[0], weight: 4 },
+  { ...era('cretaceous', [['spino', 'スピノサウルス', '川辺の王', 'SR', '🐊', 8, '=ffp', ['恐竜', 'ヤンキー'], '背中の帆が自慢。プールの授業だけは誰にも負けない。']])[0], weight: 1 },
+];
+
+export const CARD_MAP: Record<string, CardDef> = Object.fromEntries([...CARDS, ...EGG_DINOS].map((c) => [c.id, c]));

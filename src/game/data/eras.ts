@@ -14,7 +14,7 @@ export interface EraDef {
 
 /** 時空タイムライン（左から古い順）。現代がスタート地点 */
 export const ERAS: EraDef[] = [
-  { id: 'cretaceous', name: '白亜紀', when: '約6600万年前', icon: '🦖', color: '#8bc34a', favor: ['fight'], motto: '理屈も作法も通じない。ただ強い者だけが生き残る時代' },
+  { id: 'cretaceous', name: '白亜紀', when: '約6600万年前', icon: '🦖', color: '#8bc34a', favor: ['fight', 'sports'], motto: '理屈も作法も通じない。強い者と、すばしこく逃げ回れる者だけが生き残る時代' },
   { id: 'egypt', name: '古代エジプト', when: '前3000年頃〜', icon: '🔺', color: '#e8bf4f', favor: ['sports', 'charm'], motto: '王の威光のもと、石を運ぶたくましい腕がピラミッドを築いた時代' },
   { id: 'greece', name: 'ギリシャ・ローマ', when: '前500年頃〜', icon: '🏛️', color: '#90a4d4', favor: ['sports', 'study'], motto: '鍛えた肉体と、問い続ける頭脳が市民の誇りだった時代' },
   { id: 'china', name: '古代中国', when: '春秋〜三国', icon: '🐉', color: '#e57373', favor: ['study', 'fight'], motto: '筆で国を治め、剣で天下を争った時代' },

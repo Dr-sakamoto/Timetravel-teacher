@@ -45,6 +45,8 @@ export interface SwingCard {
  *   battle    … 「Xの数で勝負：1位 +win、2位 +second、最下位 −lose、ほかは0」（同点は同じ順位）
  * その時代だけの仕組み（時代ごとに1枚。点の数え方ではなく、起こることそのものが違う。生徒が問答無用でいなくなるものは入れない）
  *   plunder   … 白亜紀「Xが一番多いクラスが、一番少ないクラスから amount 点奪う」
+ *   disaster  … 白亜紀「全クラス −lose。Xを持つ子1人につき +per」
+ *   egg       … 白亜紀「Xが一番多いクラス（1クラスだけ）の空いた席に卵が置かれ、そのクラスの次の手番の始めに恐竜が孵る」
  *   together  … エジプト「全クラスのXの合計が need×クラス数 以上なら全クラス +win（Xが一番少ないクラスだけ0）、届かなければ全クラス −lose」
  *   ostracism … ギリシャ「全校でアイコンが一番多い子のクラスが −lose」
  *   upgrade   … 中国「各クラスのXが一番多い子が受験。need 以上なら合格して、Xが1つ増える」
@@ -67,6 +69,8 @@ export type EraEffect =
   | { type: 'threshold'; need: number; win: number; lose: number }
   | { type: 'battle'; win: number; second: number; lose: number }
   | { type: 'plunder'; amount: number }
+  | { type: 'disaster'; lose: number; per: number }
+  | { type: 'egg' }
   | { type: 'together'; need: number; win: number; lose: number }
   | { type: 'ostracism'; lose: number }
   | { type: 'upgrade'; need: number }
@@ -268,9 +272,11 @@ export const ERA_CARDS: ContestCard[] = [
   C('taiikusai', '体育祭', '🏟️', 'sports', { type: 'heads', per: 2 }, 'クラス対抗リレー。走れる子が多いほど盛り上がる。', 'present', 1),
   C('seitokai', '生徒会長選挙', '🗳️', 'charm', { type: 'elect' }, '全校で一番人望のある子が会長に。肩書きがついて、ますます慕われる。', 'present', 1),
   C('shugakuryoko', '修学旅行', '🚌', 'all', { type: 'tiers', steps: [[12, 5], [18, 10], [24, 15]] }, 'いろんな子がいるクラスほど、旅の思い出がふくらむ。', 'present', 1),
-  // 白亜紀：👊のみ。弱肉強食（強い群れが弱い群れから奪う）
-  C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'plunder', amount: 8 }, '強い群れが、一番弱い群れの獲物を奪っていく。', 'cretaceous'),
-  C('trex_sumo', 'ティラノサウルスと力くらべ', '🦖', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, '力を合わせて押し返せ。力が足りないと踏みつぶされる。', 'cretaceous'),
+  // 白亜紀：👊が中心。弱肉強食の時代と、恐竜を絶滅させた隕石。卵から孵る恐竜（EGG_DINOS）はここに出てくる恐竜
+  C('meteor', '巨大隕石の衝突', '☄️', 'sports', { type: 'disaster', lose: 8, per: 2 }, '恐竜の時代を終わらせた隕石。生き延びたのは、すばしこく逃げ回れた者たち。', 'cretaceous', 1),
+  C('trex_hunt', 'ティラノサウルスの狩り', '🦖', 'fight', { type: 'plunder', amount: 8 }, '強い者が、一番弱い者を狩っていく。', 'cretaceous', 1),
+  C('migration', '大移動', '🦕', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, 'パラサウロロフスの群れが大地を渡る。群れを守り切れるか。', 'cretaceous', 1),
+  C('egg_theft', 'オヴィラプトルの卵泥棒', '🥚', 'sports', { type: 'egg' }, '一番すばしこいクラスが、恐竜の卵をこっそり持ち帰る。何が孵るかはお楽しみ。', 'cretaceous', 1),
   // 古代エジプト：🏃👑。全クラスで1つのピラミッドを積む（サボったクラスは分け前なし）
   C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'together', need: 6, win: 6, lose: 3 }, '全クラス総出で石を積む。完成すれば全員にほうび、サボったクラスは分け前なし。', 'egypt'),
   C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'heads', per: 2 }, 'ファラオに気に入られる子が多いほど、クラスの株が上がる。', 'egypt'),
@@ -370,6 +376,10 @@ export function eraEffectRule(c: ContestCard): string {
   switch (e.type) {
     case 'heads':
       return `${a}を持つ子1人につき+${e.per}`;
+    case 'disaster':
+      return `全クラス−${e.lose}。${a}を持つ子1人につき+${e.per}`;
+    case 'egg':
+      return `${a}が一番多いクラスの空いた席に卵が来て、次の手番に恐竜が孵る`;
     case 'tiers':
       return `${a}の総数が${e.steps.map(([n, w]) => `${n}以上で+${w}`).join('、')}`;
     case 'elect':
@@ -445,6 +455,10 @@ function contestGlyph(c: ContestCard): string {
   switch (e.type) {
     case 'heads':
       return `🧑${a} → +${e.per}ずつ`;
+    case 'disaster':
+      return `全員−${e.lose}　🧑${a} → +${e.per}ずつ`;
+    case 'egg':
+      return `${a}🥇 ⟵ 🥚 → 🦖`;
     case 'tiers':
       return e.steps.map(([n, w]) => `${n}↑+${w}`).join('／');
     case 'elect':
