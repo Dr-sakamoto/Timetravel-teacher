@@ -720,6 +720,30 @@ body:has(.title-screen) {
   border-color: #10301a;
 }
 /* 人物カードは下端に属性アイコンがあるので、コストは上の角に出して重ねない */
+/* 場に滞在しているかぐや姫と、各クラスに頼んでいる宝（枠の色がクラスの色） */
+.kaguya-stay {
+  box-shadow: 0 0 10px 2px rgba(255, 243, 176, 0.75);
+}
+.kaguya-asks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -9px;
+  display: flex;
+  justify-content: center;
+  gap: 1px;
+}
+.kaguya-ask {
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 1px;
+  border-radius: 5px;
+  border: 2px solid;
+  background: #fffbe8;
+}
+.kaguya-ask.done {
+  opacity: 0.55;
+}
 .mcard.person .mcard-cost {
   top: -8px;
   right: -8px;

@@ -7,6 +7,7 @@ import { DeckInfo } from './DeckInfo';
 import { ATTR_ICON, type Action, type GameState, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
 import { TcgCard } from './TcgCard';
+import { KaguyaStay } from './KaguyaStay';
 
 interface Props {
   state: GameState;
@@ -83,6 +84,9 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
               <span className="pile-label">現代の生徒</span>
               <span className="pile-count">{state.starters.length}</span>
             </button>
+          ) : state.kaguya ? (
+            // かぐや姫が滞在している間は、時代の偉人の山の場所に座る（卓の幅を変えない）
+            <KaguyaStay state={state} />
           ) : (
             <div className="pile era-pile" style={{ borderColor: era.color }} title={`まだ転入していない${era.name}の生徒`}>
               <span className="pile-back">{era.icon}</span>

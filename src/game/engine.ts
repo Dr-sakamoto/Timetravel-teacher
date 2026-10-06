@@ -294,6 +294,7 @@ function order(s: GameState): number[] {
 }
 
 function startTerm(s: GameState) {
+  kaguyaLeaves(s);
   s.queue = order(s);
   s.queueIdx = 0;
   const t = termOfMonth(MONTHS[s.monthIdx]);
@@ -768,28 +769,22 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // 平安：かぐや姫が各クラスに宝（アイコン）を1つずつ、重ならないようにくじで頼む。クラスにそのアイコンが need 以上あれば持ってこられる
+    // 平安：かぐや姫が学期の区切りまで滞在し、各クラスに宝（平安のグッズ）を1つずつ、重ならないようにくじで頼む。もう装備していればすぐ差し出す
     case 'kaguya': {
-      const asks = shuffle(s, [...KAGUYA_TREASURES]);
-      let got = 0;
+      const asks = shuffle(s, KAGUYA_TREASURES.map((g) => g.id));
+      s.kaguya = ps.map((_, i) => asks[i % asks.length]);
       ps.forEach((p, i) => {
-        const t = asks[i % asks.length];
-        const sc = attrScore(p, t.attr);
-        rows[i].count = sc.total;
-        rows[i].uids = sc.holders.map((h) => h.uid);
-        if (sc.total >= e.need) {
-          add(i, e.win);
-          sc.holders.forEach((h) => h.mvp++);
-          got++;
-          rows[i].note = `${t.icon}${t.name}`;
-          tell(`${p.name}のクラスは${t.icon}「${t.name}」（${ATTR_ICON[t.attr]}${sc.total}）を持ってきた！`, i);
-        } else {
-          add(i, -e.lose);
-          rows[i].note = `${t.icon}${ATTR_ICON[t.attr]}${e.need}に届かず`;
-          tell(`${p.name}のクラスは${t.icon}「${t.name}」（${ATTR_ICON[t.attr]}${sc.total}／${e.need}）を見つけられなかった。`, i);
-        }
+        const g = EVENT_MAP[s.kaguya![i]!] as GoodsCard;
+        rows[i].note = `${g.icon}${g.name}`;
+        const st = presentKaguya(s, i, e.win);
+        if (st) {
+          rows[i].delta += e.win;
+          rows[i].uids = [st.uid];
+          rows[i].note = `${g.icon}差し出した`;
+          moved.push(st);
+          tell(`${p.name}のクラスは${name(st)}の${g.icon}${g.name}をすぐに差し出した！（+${e.win}）`, i);
+        } else tell(`${p.name}のクラスは${g.icon}「${g.name}」を頼まれた。`, i);
       });
-      if (!got) tell('だれも宝を持ってこられず、かぐや姫は月へ帰っていった。');
       break;
     }
     // 平安：Xの合計が need 以上のクラスが弁慶を倒す。一番多いクラス（同点ならポイントが少ないクラス。満席なら次のクラス）に弁慶が家来として転入。届かないクラスは刀を取られて −lose
@@ -1040,6 +1035,40 @@ function resolveInvasion(s: GameState, c: ContestCard): EventResult {
   });
   log(s, `【${c.name}】 空席のあるクラスにエイリアンが転入した。`);
   return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows, students: aliens.slice(0, 1) };
+}
+
+/**
+ * かぐや姫に頼まれた宝を装備した子がいれば差し出す（宝は消えて +win）。差し出した子を返す。
+ * 宝が届くのは、かぐや姫が来たときと、そのクラスがグッズを装備したとき
+ */
+function presentKaguya(s: GameState, pi: number, win = kaguyaWin()): Student | null {
+  const want = s.kaguya?.[pi];
+  if (!want) return null;
+  const p = s.players[pi];
+  const st = p.students.find((x) => x.goods?.id === want);
+  if (!st) return null;
+  const g = st.goods!;
+  const k = st.attrs.lastIndexOf(g.attr);
+  st.attrs = st.attrs.filter((_, i) => i !== k);
+  delete st.goods;
+  st.mvp++;
+  p.points += win;
+  s.kaguya![pi] = null;
+  log(s, `${p.name}のクラスの${st.name}が、かぐや姫に${g.icon}${g.name}を差し出した！（+${win}）`, pi);
+  return st;
+}
+
+/** かぐや姫に宝を差し出したときの点（カードの効果から） */
+function kaguyaWin(): number {
+  const e = (EVENT_MAP.kaguya as ContestCard).effect;
+  return e.type === 'kaguya' ? e.win : 0;
+}
+
+/** 学期の区切り：滞在していたかぐや姫が月へ帰る */
+function kaguyaLeaves(s: GameState) {
+  if (!s.kaguya) return;
+  log(s, s.kaguya.some((x) => x) ? '宝がそろわないまま、かぐや姫は月へ帰っていった。' : 'かぐや姫は月へ帰っていった。');
+  delete s.kaguya;
 }
 
 /** 五条大橋の弁慶で来た弁慶（1人しかいない） */
@@ -1633,10 +1662,12 @@ export function step(prev: GameState, a: Action): GameState {
       st.goods = { id: c.id, name: c.name, icon: c.icon, attr: c.attr };
       st.attrs = [...st.attrs, c.attr];
       log(s, `${p.name}のクラスの${st.name}が${c.icon}${c.name}を装備した。`, ph.player);
+      // かぐや姫に頼まれた宝なら、そのまま差し出す
+      const gift = presentKaguya(s, ph.player);
       setResult(
         s,
         ph.player,
-        { title: c.name, icon: c.icon, attr: c.attr, tone: 'personal', desc: `${st.icon}${st.name}が装備した！`, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows: [], students: [st] },
+        { title: c.name, icon: c.icon, attr: c.attr, tone: 'personal', desc: gift ? `${st.icon}${st.name}が、かぐや姫に差し出した！（+${kaguyaWin()}）` : `${st.icon}${st.name}が装備した！`, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows: [], students: [st] },
         'turn',
       );
       return s;

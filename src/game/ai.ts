@@ -102,6 +102,12 @@ function cyborged(st: Student): Student {
   return { ...st, attrs: [...CYBORG_ATTRS], goods: undefined };
 }
 
+/** かぐや姫に宝を差し出したときの点 */
+const KAGUYA_GIFT = (() => {
+  const c = EVENT_MAP.kaguya;
+  return c.kind === 'contest' && c.effect.type === 'kaguya' ? c.effect.win : 0;
+})();
+
 /** その場のカードを取る値打ち（払うポイントを差し引いた、この先の得点の目安） */
 export function marketValue(s: GameState, pi: number, slot: number): number {
   const p = s.players[pi];
@@ -118,6 +124,8 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
     case 'normal':
       return attrScore(p, c.attr).total;
     case 'goods':
+      // かぐや姫に頼まれた宝なら、装備してすぐ差し出す（宝は消えて点が入る）
+      if (s.kaguya?.[pi] === c.id && equippable(p).length) return KAGUYA_GIFT - cost;
       return Math.max(...equippable(p).map((st) => gain(s, p, swap(st.uid, equipped(st, c.attr))))) - cost;
     case 'cyborg':
       return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;

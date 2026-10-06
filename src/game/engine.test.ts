@@ -3,7 +3,7 @@ import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
 import { BENKEI, CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
-import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
+import { ERA_CARDS, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
 import { MONTHS, canTake, currentEra, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
@@ -634,18 +634,39 @@ describe('engine', () => {
       expect(role.delta).toEqual([3, 0, 0]);
     });
 
-    it('kaguya: each class is asked for a different treasure and brings it with 4+ of that icon', () => {
-      // どのクラスもすべてのアイコンを4つずつ持っていれば、どの宝でも持ってこられる
-      const all: Attr[] = ['study', 'sports', 'art', 'charm', 'fight'];
-      const rich = (i: number) => [mk(`x${i}`, [...all, ...all]), mk(`y${i}`, [...all, ...all])];
-      const r = run('kaguya', [rich(0), rich(1), rich(2)]);
-      expect(r.delta).toEqual([8, 8, 8]);
-      // 宝は重ならない
-      const res = r.after.phase.kind === 'result' ? r.after.phase.result : null;
-      const notes = res!.rows.map((x) => x.note);
-      expect(new Set(notes).size).toBe(3);
-      // アイコンが何もなければ、どの宝も持ってこられずに−2
-      expect(run('kaguya', [[], [], []]).delta).toEqual([-2, -2, -2]);
+    it('kaguya: Kaguya stays until the term ends and asks each class for a different treasure', () => {
+      // クラス0は5つの宝を全部装備した子がいるので、頼まれた宝をすぐに差し出す（宝は消えて+5）
+      const holders = KAGUYA_TREASURES.map((g, k) => ({ ...mk(`t${k}`, ['study', g.attr]), goods: { id: g.id, name: g.name, icon: g.icon, attr: g.attr } }));
+      const r = run('kaguya', [holders, [mk('b', ['art'])], [mk('c', ['charm'])]]);
+      expect(r.delta).toEqual([5, 0, 0]);
+      const asks = r.after.kaguya!;
+      expect(asks[0]).toBeNull();
+      expect(asks[1]).not.toBe(asks[2]);
+      expect(KAGUYA_TREASURES.map((g) => g.id)).toContain(asks[1]);
+      const left = r.after.players[0].students.filter((x) => x.goods);
+      expect(left).toHaveLength(KAGUYA_TREASURES.length - 1);
+      const gave = r.after.players[0].students.find((x) => x.uid.startsWith('t') && !x.goods)!;
+      expect(gave.attrs).toEqual(['study']);
+      // あとから頼まれた宝を装備すると、そのまま差し出す（グッズ代2点を払って+5）
+      const t = structuredClone(r.after);
+      t.phase = { kind: 'draw', player: 1 };
+      t.market[0] = asks[1]!;
+      const eq = step(step(t, { type: 'take', slot: 0 }), { type: 'equip', uid: 'b' });
+      expect(eq.players[1].points - t.players[1].points).toBe(5 - 2);
+      expect(eq.players[1].students.find((x) => x.uid === 'b')!.goods).toBeUndefined();
+      expect(eq.kaguya![1]).toBeNull();
+      // ほかのクラスに頼まれた宝なら、ふつうのグッズとして装備する
+      const u = structuredClone(r.after);
+      u.phase = { kind: 'draw', player: 1 };
+      u.market[0] = asks[2]!;
+      const other = step(step(u, { type: 'take', slot: 0 }), { type: 'equip', uid: 'b' });
+      expect(other.players[1].students.find((x) => x.uid === 'b')!.goods?.id).toBe(asks[2]);
+      expect(other.kaguya![1]).toBe(asks[1]);
+      // 学期の区切りで月へ帰る
+      let v = r.after;
+      for (let n = 0; n < 2000 && v.phase.kind !== 'roles'; n++) v = step(v, cpuAction(v)!);
+      expect(v.phase.kind).toBe('roles');
+      expect(v.kaguya).toBeUndefined();
     });
 
     it('gojo: classes with 3+ 👊 beat Benkei, and he joins the strongest one', () => {
