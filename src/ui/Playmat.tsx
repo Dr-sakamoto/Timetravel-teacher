@@ -117,6 +117,7 @@ export function Playmat(props: Props) {
         <span className="plate-name">
           {player.name}
           {player.isCpu && <small>🤖</small>}
+          {player.freeGoods && <small title="楽市楽座：次に取るグッズ1つがタダ">🪙</small>}
         </span>
         <span className="plate-class">
           {className(player.id, year)} 👥{view.students.length}/{MAX_CLASS}
@@ -214,6 +215,7 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
           {player.name}
           {player.isCpu && <small>🤖</small>}
           {offline && <small title="通信が切れています">📵</small>}
+          {player.freeGoods && <small title="楽市楽座：次に取るグッズ1つがタダ">🪙</small>}
         </span>
         <span className="opp-class">{className(player.id, year)}</span>
         <span className="opp-pts">{player.points}</span>

@@ -3232,10 +3232,10 @@ body:has(.title-screen) {
   z-index: 2;
   pointer-events: none;
 }
-/* 新大陸の品を選んでいる人 */
-.new-world .opp.picking::after,
-.new-world .playmat.picking::after {
-  content: '🌎 選んでいる';
+/* 配られた品（新大陸の品・鉄砲）を装備させる子を選んでいる人 */
+.gift-pick .opp.picking::after,
+.gift-pick .playmat.picking::after {
+  content: '🎁 選んでいる';
 }
 /* ゲリラのあと次に手番をする人 */
 .opp.up-next:not(.picking)::after,
