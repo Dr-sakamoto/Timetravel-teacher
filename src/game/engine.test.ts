@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
-import { CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
+import { BENKEI, CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
@@ -153,7 +153,7 @@ describe('engine', () => {
       ...CARDS.map((c) => ({ name: c.name, attrs: c.attrs, tags: c.tags })),
       ...ARCHETYPES.map((a) => ({ name: a.title, attrs: parseAttrs(a.attrs), tags: a.tags })),
     ];
-    for (const x of [...all, ...EGG_DINOS]) {
+    for (const x of [...all, ...EGG_DINOS, BENKEI]) {
       if (x.attrs.includes('fight')) expect(x.tags, x.name).toContain('ヤンキー');
       else expect(x.tags, x.name).not.toContain('ヤンキー');
     }
@@ -356,8 +356,8 @@ describe('engine', () => {
 
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
     for (const era of ERAS) {
-      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン
-      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague').map((c) => c.attr));
+      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン。五条大橋の弁慶は平安でただ1枚の👊のイベント
+      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague' && c.effect.type !== 'benkei').map((c) => c.attr));
       // 現代は優遇なし：全アイコンで競うカードがある（文化祭だけは出し物なので🎨）
       if (era.favor.length) for (const a of used) expect([...era.favor, 'all'], era.id).toContain(a);
       else expect(used.has('all'), era.id).toBe(true);
@@ -616,10 +616,63 @@ describe('engine', () => {
       expect(attrs(2, 'c')).toEqual(['study', 'study']);
     });
 
-    it('michinaga: every other class sends gifts to the class with the most 👑', () => {
-      expect(run('michinaga', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, -3, -3]);
+    it('mochizuki: every other class sends gifts to the class with the most 👑', () => {
+      expect(run('mochizuki', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, -3, -3]);
       // 一番が2クラスなら、残りのクラスがそれぞれに贈る
-      expect(run('michinaga', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
+      expect(run('mochizuki', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
+    });
+
+    it('genji: the school\'s best 🎨 writer\'s class scores 3 per 👑 reader in that class', () => {
+      // 作者はクラス0の a（🎨3）。クラス0で👑を持つ子は a 自身と r1・r2 の3人
+      const r = run('genji', [[mk('a', ['art', 'art', 'art', 'charm']), mk('r1', ['charm']), mk('r2', ['charm', 'study'])], [mk('b', ['art', 'art']), mk('r3', ['charm', 'charm'])], [mk('c', ['charm'])]]);
+      expect(r.delta).toEqual([9, 0, 0]);
+      // 同点なら作者が2人。👑の読者がいなければ0点
+      const tie = run('genji', [[mk('a', ['art', 'art']), mk('r1', ['charm'])], [mk('b', ['art', 'art'])], [mk('c', ['charm', 'charm'])]]);
+      expect(tie.delta).toEqual([3, 0, 0]);
+      // 文化委員の子は🎨を2倍に数えて作者になる
+      const role = run('genji', [[mk('a', ['art', 'art']), mk('r1', ['charm'])], [mk('b', ['art', 'art', 'art']), mk('r2', ['charm'])], []], [10, 10, 10], [[{ role: 'culture', uid: 'a' }], [], []]);
+      expect(role.delta).toEqual([3, 0, 0]);
+    });
+
+    it('kaguya: each class is asked for a different treasure and brings it with 4+ of that icon', () => {
+      // どのクラスもすべてのアイコンを4つずつ持っていれば、どの宝でも持ってこられる
+      const all: Attr[] = ['study', 'sports', 'art', 'charm', 'fight'];
+      const rich = (i: number) => [mk(`x${i}`, [...all, ...all]), mk(`y${i}`, [...all, ...all])];
+      const r = run('kaguya', [rich(0), rich(1), rich(2)]);
+      expect(r.delta).toEqual([8, 8, 8]);
+      // 宝は重ならない
+      const res = r.after.phase.kind === 'result' ? r.after.phase.result : null;
+      const notes = res!.rows.map((x) => x.note);
+      expect(new Set(notes).size).toBe(3);
+      // アイコンが何もなければ、どの宝も持ってこられずに−2
+      expect(run('kaguya', [[], [], []]).delta).toEqual([-2, -2, -2]);
+    });
+
+    it('gojo: classes with 3+ 👊 beat Benkei, and he joins the strongest one', () => {
+      const benkei = (st: GameState) => st.players.map((p) => p.students.filter((x) => x.cardId === 'benkei').length);
+      // 義経（👊3）がいるクラスは、それだけで必ず勝てる
+      const yoshitsune = CARDS.find((c) => c.id === 'yoshitsune')!;
+      expect(yoshitsune.attrs.filter((a) => a === 'fight')).toHaveLength(3);
+      const r = run('gojo', [[mk('y', [...yoshitsune.attrs])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight']), mk('d', ['fight', 'fight'])]]);
+      // 👊4のクラス2が弁慶を連れて帰る。クラス0も勝ちで減点なし、クラス1は届かず−2
+      expect(r.delta).toEqual([0, -2, 0]);
+      expect(benkei(r.after)).toEqual([0, 0, 1]);
+      const st = r.after.players[2].students.find((x) => x.cardId === 'benkei')!;
+      expect(st.attrs).toEqual(['fight', 'fight', 'fight']);
+      // 同点ならポイントが少ないクラスへ
+      const tie = run('gojo', [[mk('a', ['fight', 'fight', 'fight'])], [mk('b', ['fight', 'fight', 'fight'])], []], [20, 5, 10]);
+      expect(benkei(tie.after)).toEqual([0, 1, 0]);
+      expect(tie.delta).toEqual([0, 0, -2]);
+      // 弁慶がもういれば何も起こらない
+      const t = structuredClone(r.after);
+      t.phase = base.phase;
+      t.eventDeck.push('gojo');
+      const again = step(t, pass);
+      expect(again.players.map((p) => p.points)).toEqual(t.players.map((p) => p.points));
+      expect(benkei(again)).toEqual([0, 0, 1]);
+      // 満席なら次に強いクラスへ
+      const full = run('gojo', [[mk('a', ['fight', 'fight', 'fight', 'fight']), ...Array.from({ length: MAX_CLASS - 1 }, (_, k) => mk(`f${k}`, ['study']))], [mk('b', ['fight', 'fight', 'fight'])], []]);
+      expect(benkei(full.after)).toEqual([0, 1, 0]);
     });
 
     it('monalisa: each class scores its best painter\'s 🎨 × 3 (role bonus counts)', () => {

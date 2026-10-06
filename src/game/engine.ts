@@ -1,6 +1,8 @@
 import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, counted, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock } from './calc';
 import { CARDS, CARD_MAP, EGG_DINOS, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
+import { BENKEI } from './data/cards';
+import { KAGUYA_TREASURES } from './data/events';
 import {
   ALL_EVENT_CARDS,
   KACHIKOMI_CARDS,
@@ -748,6 +750,86 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
+    // 平安：全校で一番の書き手（同点なら全員）が作者。作者のクラスで also を持つ子（物語を読む貴族）1人につき +per
+    case 'genji': {
+      const authors = ps.map((p) => bestOf(p, p.students, c.attr));
+      const hi = Math.max(0, ...authors.map((x) => x?.pts ?? 0));
+      if (hi === 0) break;
+      authors.forEach((x, i) => {
+        if (!x || x.pts !== hi) return;
+        const readers = ps[i].students.filter((y) => counted(y).includes(e.also));
+        add(i, readers.length * e.per);
+        x.student.mvp++;
+        moved.push(x.student);
+        rows[i].count = readers.length;
+        rows[i].uids = [x.student.uid, ...readers.filter((y) => y !== x.student).map((y) => y.uid)];
+        rows[i].note = `作者・読者${readers.length}人`;
+        tell(`${ps[i].name}のクラスの${name(x.student)}が物語を書いた！${ATTR_ICON[e.also]}の読者${readers.length}人（+${readers.length * e.per}）`, i);
+      });
+      break;
+    }
+    // 平安：かぐや姫が各クラスに宝（アイコン）を1つずつ、重ならないようにくじで頼む。クラスにそのアイコンが need 以上あれば持ってこられる
+    case 'kaguya': {
+      const asks = shuffle(s, [...KAGUYA_TREASURES]);
+      let got = 0;
+      ps.forEach((p, i) => {
+        const t = asks[i % asks.length];
+        const sc = attrScore(p, t.attr);
+        rows[i].count = sc.total;
+        rows[i].uids = sc.holders.map((h) => h.uid);
+        if (sc.total >= e.need) {
+          add(i, e.win);
+          sc.holders.forEach((h) => h.mvp++);
+          got++;
+          rows[i].note = `${t.icon}${t.name}`;
+          tell(`${p.name}のクラスは${t.icon}「${t.name}」（${ATTR_ICON[t.attr]}${sc.total}）を持ってきた！`, i);
+        } else {
+          add(i, -e.lose);
+          rows[i].note = `${t.icon}${ATTR_ICON[t.attr]}${e.need}に届かず`;
+          tell(`${p.name}のクラスは${t.icon}「${t.name}」（${ATTR_ICON[t.attr]}${sc.total}／${e.need}）を見つけられなかった。`, i);
+        }
+      });
+      if (!got) tell('だれも宝を持ってこられず、かぐや姫は月へ帰っていった。');
+      break;
+    }
+    // 平安：Xの合計が need 以上のクラスが弁慶を倒す。一番多いクラス（同点ならポイントが少ないクラス。満席なら次のクラス）に弁慶が家来として転入。届かないクラスは刀を取られて −lose
+    case 'benkei': {
+      if (ps.some((p) => p.students.some(isBenkei))) {
+        tell('弁慶はもう義経の家来になって、橋にはだれもいない。');
+        break;
+      }
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+      });
+      const wins = ps.map((_, i) => i).filter((i) => values[i] >= e.need);
+      ps.forEach((_, i) => {
+        if (wins.includes(i)) {
+          rows[i].note = '弁慶に勝った';
+          scores[i].holders.forEach((h) => h.mvp++);
+        } else {
+          add(i, -e.lose);
+          rows[i].note = '刀を取られた';
+        }
+      });
+      if (!wins.length) {
+        tell('どのクラスも弁慶にかなわず、刀を取られた。');
+        break;
+      }
+      wins.sort((x, y) => values[y] - values[x] || ps[x].points - ps[y].points);
+      const to = wins.find((i) => ps[i].students.length < MAX_CLASS);
+      if (to === undefined) {
+        tell('弁慶を倒したが、どのクラスも満席で家来にできなかった。');
+        break;
+      }
+      const st = fromCard(s, BENKEI.id, joinedLabel(s));
+      ps[to].students.push(st);
+      moved.push(st);
+      rows[to].note = '弁慶が家来に';
+      rows[to].uids = [...(rows[to].uids ?? []), st.uid];
+      tell(`${ps[to].name}のクラスが弁慶を倒した！${name(st)}が家来になって転入した。`, to);
+      break;
+    }
     // 中世：各クラスの一番の描き手1人が描く。その子の点（係ボーナス込み）× per
     case 'masterpiece': {
       ps.forEach((p, i) => {
@@ -958,6 +1040,11 @@ function resolveInvasion(s: GameState, c: ContestCard): EventResult {
   });
   log(s, `【${c.name}】 空席のあるクラスにエイリアンが転入した。`);
   return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows, students: aliens.slice(0, 1) };
+}
+
+/** 五条大橋の弁慶で来た弁慶（1人しかいない） */
+export function isBenkei(x: Student): boolean {
+  return x.cardId === BENKEI.id;
 }
 
 /** 機械の子：機械の人物・サイボーグ・機械のグッズ（スマホ・タブレット・電脳チップ）を装備した子 */

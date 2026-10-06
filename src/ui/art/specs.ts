@@ -64,10 +64,12 @@ export const ART: Record<string, ArtSpec> = {
 
   // ---- 平安 ----
   seimei: { skin: SKIN.pale, outfit: 'robe', c1: '#fbfbf7', c2: '#7b5ea7', hat: 'eboshi', expr: 'calm', prop: 'ofuda' },
+  michinaga: { skin: SKIN.pale, outfit: 'robe', c1: '#3a2a6a', c2: '#c9a7e8', hat: 'eboshi', expr: 'cool', prop: 'sensu' },
+  seishonagon: { skin: SKIN.pale, back: 'hime', hair: 'patsun', hairColor: black, outfit: 'juuni', c1: '#d9822b', c2: '#f2c94c', expr: 'wink', prop: 'brush' },
   murasaki: { skin: SKIN.pale, back: 'hime', hair: 'patsun', hairColor: black, outfit: 'juuni', c1: '#7b5ea7', c2: '#c9a7e8', expr: 'calm', prop: 'scroll' },
   yoshitsune: { skin: SKIN.pale, outfit: 'yoroi', c1: '#c0392b', c2: '#f2c94c', hat: 'kabuto', hatColor: '#c0392b', crest: 'horns', expr: 'smile', prop: 'katana' },
+  // 五条大橋の弁慶で来る弁慶
   benkei: { skin: SKIN.tan, outfit: 'yoroi', c1: '#2b2b2b', c2: '#f6f1e4', hat: 'monkhood', hatColor: '#f6f1e4', beard: 'stubble', beardColor: dark, expr: 'angry', prop: 'naginata' },
-  komachi: { skin: SKIN.pale, back: 'hime', hair: 'patsun', hairColor: black, outfit: 'juuni', c1: '#f48fb1', c2: '#d14b6c', expr: 'smile', prop: 'sensu' },
 
   // ---- 中世・ルネサンス ----
   davinci: { skin: SKIN.fair, back: 'shoulder', hair: 'mid', hairColor: white, outfit: 'tunic', c1: '#a0442f', c2: '#5a3a2a', hat: 'beret', hatColor: '#3a2a2a', beard: 'long', beardColor: white, expr: 'calm', acc: ['old'], prop: 'palette' },

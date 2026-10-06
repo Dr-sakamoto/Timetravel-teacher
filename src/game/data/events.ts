@@ -53,6 +53,9 @@ export interface SwingCard {
  *   ostracism … ギリシャ「全クラスが自分以外のクラスに秘密で投票し、票が一番多いクラスが、係に就いていない子を1人転校させる」
  *   upgrade   … 中国「各クラスのXが一番多い子が受験。need 以上なら合格して、Xが1つ増える」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
+ *   genji     … 平安「全校でXが一番多い子が作者。作者のクラスで also を持つ子1人につき +per」（同点なら作者が複数）
+ *   kaguya    … 平安「かぐや姫が各クラスに宝（アイコン）を1つずつくじで出す。そのアイコンがクラスに need 以上あれば +win、なければ −lose」
+ *   benkei    … 平安「Xの合計が need 以上のクラスが弁慶を倒し、一番多いクラスに弁慶が家来として転入。届かないクラスは −lose」
  *   masterpiece … 中世「各クラスのXが一番多い子1人の、Xの数 × per」
  *   printing  … 中世「Xを持っていない子全員のXが1つ増える（全員持っていれば何も起こらない）」
  *   plague    … 中世「各クラスの係に就いていない子1人（ランダム）がペストにかかる。学期の区切りまでXを数えない」
@@ -82,6 +85,9 @@ export type EraEffect =
   | { type: 'ostracism' }
   | { type: 'upgrade'; need: number }
   | { type: 'tribute'; per: number }
+  | { type: 'genji'; also: Attr; per: number }
+  | { type: 'kaguya'; need: number; win: number; lose: number }
+  | { type: 'benkei'; need: number; lose: number }
   | { type: 'masterpiece'; per: number }
   | { type: 'printing' }
   | { type: 'plague' }
@@ -254,6 +260,15 @@ export const NEW_WORLD_GOODS: GoodsCard[] = [
 ];
 export const NEW_WORLD_MAP: Record<string, GoodsCard> = Object.fromEntries(NEW_WORLD_GOODS.map((g) => [g.id, g]));
 
+/** かぐや姫の5つの宝（竹取物語の難題）。くじで各クラスに1つずつ、重ならないように出す */
+export const KAGUYA_TREASURES: { name: string; icon: string; attr: Attr }[] = [
+  { name: '仏の御石の鉢', icon: '🥣', attr: 'study' },
+  { name: '燕の子安貝', icon: '🐚', attr: 'sports' },
+  { name: '蓬莱の玉の枝', icon: '🌿', attr: 'art' },
+  { name: '火鼠の皮衣', icon: '🔥', attr: 'charm' },
+  { name: '龍の首の珠', icon: '🐉', attr: 'fight' },
+];
+
 /** サイボーグ化（未来の学期だけ山札に入る） */
 export const CYBORG_CARDS: CyborgCard[] = [{ id: 'cyborg', kind: 'cyborg', name: 'サイボーグ化', icon: '🦾', era: 'future', count: 1 }];
 /** サイボーグになった生徒のアイコン */
@@ -307,9 +322,11 @@ export const ERA_CARDS: ContestCard[] = [
   // 古代中国：📚👊。科挙に受かった子はずっと強くなる
   C('keju', '科挙', '📜', 'study', { type: 'upgrade', need: 3 }, '超難関の官僚登用試験。合格すれば一生の箔がつく。', 'china'),
   C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
-  // 平安：🎨👑。権力者のもとに、ほかのクラスから贈り物が集まる
-  C('tentoku', '天徳内裏歌合', '🌸', 'art', { type: 'battle', win: 15, second: 5, lose: 10 }, '村上天皇の御前で和歌の勝負。勝ち負けがはっきりつく。', 'heian'),
-  C('michinaga', '藤原道長の宴', '🌕', 'charm', { type: 'tribute', per: 3 }, '「この世をば…」。道長に一番気に入られたクラスへ、ほかのクラスから贈り物が届く。', 'heian'),
+  // 平安：🎨👑。物語を書く子と読む貴族、権力者への贈り物、かぐや姫の難題、五条大橋の弁慶（👊だけはこの1枚）
+  C('genji', '源氏物語', '📖', 'art', { type: 'genji', also: 'charm', per: 3 }, '紫式部が書いた光源氏の物語。宮中の貴族たちが続きを楽しみに回し読みした。', 'heian', 1),
+  C('mochizuki', '藤原道長の望月の歌', '🌕', 'charm', { type: 'tribute', per: 3 }, '「この世をば わが世とぞ思ふ 望月の 欠けたることも なしと思へば」。道長に一番気に入られたクラスへ、ほかのクラスから贈り物が届く。', 'heian', 1),
+  C('kaguya', '竹取物語・かぐや姫の難題', '🌙', 'all', { type: 'kaguya', need: 4, win: 8, lose: 2 }, 'かぐや姫が「この宝を持ってきた人と結婚します」。どの宝を頼まれるかはくじで決まる。', 'heian', 1),
+  C('gojo', '五条大橋の弁慶', '🌉', 'fight', { type: 'benkei', need: 3, lose: 2 }, '京の五条大橋で、弁慶が通る人の刀を奪っている。力を合わせて倒せば、弁慶が家来になる。', 'heian', 1),
   // 中世・ルネサンス：🎨📚。ペストにかかった子は走れなくなり、新大陸の品は早い者勝ち
   C('monalisa', 'モナ・リザ制作', '🖼️', 'art', { type: 'masterpiece', per: 3 }, '何年もかけて仕上げられた、謎の微笑み。名画を生むのはクラス一番の描き手の腕前。', 'europe', 1),
   C('printing', '活版印刷', '📘', 'study', { type: 'printing' }, 'グーテンベルクの印刷機で、本が安く刷れるようになった。本を読んだことのない子も、みんな学び始める。', 'europe', 1),
@@ -429,6 +446,12 @@ export function eraEffectRule(c: ContestCard): string {
       return `各クラスの${a}が一番多い子が受験：${a}${e.need}以上で合格し、${a}が1つ増える`;
     case 'tribute':
       return `${a}が一番多いクラスに、ほかの全クラスが${e.per}点ずつ贈る`;
+    case 'genji':
+      return `全校で${a}が一番多い子が作者に：作者のクラスで${ATTR_ICON[e.also]}を持つ子1人につき+${e.per}`;
+    case 'kaguya':
+      return `かぐや姫がくじで宝（${KAGUYA_TREASURES.map((t) => t.icon + ATTR_ICON[t.attr]).join('')}）を1つずつ頼む：そのアイコンが${e.need}以上なら+${e.win}、足りないと−${e.lose}`;
+    case 'benkei':
+      return `${a}の合計が${e.need}以上のクラスが弁慶を倒し、一番多いクラスに弁慶（${a}${a}${a}）が転入。届かないクラスは−${e.lose}`;
     case 'masterpiece':
       return `各クラスの${a}が一番多い子1人の、${a}の数×${e.per}`;
     case 'printing':
@@ -518,6 +541,12 @@ function contestGlyph(c: ContestCard): string {
       return `🧑${a}${e.need}↑ → ${a}＋1`;
     case 'tribute':
       return `${a}🥇 ⟵ ${e.per}点ずつ`;
+    case 'genji':
+      return `🧑${a}🥇 → 🧑${ATTR_ICON[e.also]}×${e.per}`;
+    case 'kaguya':
+      return `🌙 → ${KAGUYA_TREASURES.map((t) => t.icon).join('')}？ ${e.need}↑ +${e.win}／−${e.lose}`;
+    case 'benkei':
+      return `${a}${e.need}↑ → 🪓🧑　届かず−${e.lose}`;
     case 'masterpiece':
       return `🧑${a}🥇 → ${a}×${e.per}`;
     case 'printing':
