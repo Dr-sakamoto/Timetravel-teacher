@@ -3118,3 +3118,125 @@ body:has(.title-screen) {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- ゲリラ（誰の手番でもない学校全体のできごと） ---------- */
+/* 卓全体を紫がかった色にして、手番とは別のできごとだと分かるようにする */
+.felt.in-guerrilla {
+  box-shadow: inset 0 0 0 4px #b57cff, inset 0 0 60px rgba(181, 124, 255, 0.35);
+}
+.guerrilla-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #5b2a9e, #8a3fd1);
+  color: #fff;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  text-align: center;
+  animation: guerrilla-in 0.4s ease-out;
+}
+.guerrilla-head > b {
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+}
+@keyframes guerrilla-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+.say.guerrilla-say {
+  border: 2px solid #b57cff;
+}
+.say.guerrilla-say .say-sub {
+  margin-top: 0.3rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+.say.guerrilla-say small {
+  margin-left: 0.3em;
+  color: var(--chalk-dim);
+}
+/* 補充しようとした場所（ゲリラがめくれた所） */
+.mcard.gap {
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  box-shadow: none;
+  color: var(--chalk-dim);
+}
+.mcard.gap::before {
+  display: none;
+}
+.mcard.gap.bolt {
+  border-color: #b57cff;
+  color: #fff;
+  background: rgba(138, 63, 209, 0.45);
+  animation: guerrilla-in 0.4s ease-out;
+}
+/* 転校で選んでいる人：手番の黄色ではなく紫の点線 */
+.opp.picking,
+.playmat.picking {
+  animation: none;
+  box-shadow:
+    0 0 0 3px #b57cff,
+    0 4px 0 rgba(0, 0, 0, 0.35);
+}
+.opp.picking::after,
+.playmat.picking::after {
+  content: '📦 選んでいる';
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 0.5em;
+  border-radius: 999px;
+  background: #8a3fd1;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 900;
+  white-space: nowrap;
+  z-index: 2;
+  pointer-events: none;
+}
+/* ゲリラのあと次に手番をする人 */
+.opp.up-next:not(.picking)::after,
+.playmat.up-next:not(.picking)::after {
+  content: '▶ 次の番';
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 0.5em;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 0.65rem;
+  font-weight: 900;
+  white-space: nowrap;
+  z-index: 2;
+  pointer-events: none;
+}
+.reveal-card {
+  position: relative;
+}
+/* ゲリラの結果：カードの上にかける帯 */
+.guerrilla-ribbon {
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 0.1rem 0.7rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #5b2a9e, #8a3fd1);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  animation: guerrilla-in 0.4s ease-out;
+}
