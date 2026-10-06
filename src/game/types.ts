@@ -134,7 +134,9 @@ export type Phase =
   /** 満席で人物カードを取る：代わりに転校させる生徒を選ぶ（slot は場のカードの位置） */
   | { kind: 'makeRoom'; player: number; slot: number }
   /** 転校：全クラスが順番に、係に就いていない生徒を1人ずつクラスから外す（player は今選んでいる人、left はこの後に選ぶ人） */
-  | { kind: 'push'; player: number; drawer: number; left: number[]; gone: Student[] }
+  | { kind: 'push'; player: number; drawer: number; left: number[]; gone: Student[]; votes?: number[] }
+  /** 陶片追放：全クラスが順番に、自分以外のクラスへ秘密で1票ずつ入れる（player は今投票している人、left はこの後に投票する人、ballots は入った票の行き先。画面には出さない） */
+  | { kind: 'vote'; player: number; drawer: number; left: number[]; ballots: number[] }
   /** カチコミ（場から取った）：他のクラスを1つ選んで、自分の👊の数×3だけ減点させる */
   | { kind: 'kachikomi'; player: number; slot: number }
   /** クラス替え：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える（アイコンの数が同じ子どうしだけ） */
@@ -154,7 +156,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 22;
+  version: 23;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -193,6 +195,8 @@ export type Action =
   /** 満席で人物を迎える時に、代わりに転校させる生徒（null でやめる） */
   | { type: 'makeRoom'; uid: string | null }
   | { type: 'push'; uid: string }
+  /** 陶片追放の投票（自分以外のクラス） */
+  | { type: 'vote'; target: number }
   | { type: 'kachikomi'; target: number | null }
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
   | { type: 'equip'; uid: string | null }

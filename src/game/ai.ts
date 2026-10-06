@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow } from './engine';
+import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -163,6 +163,9 @@ export function cpuAction(s: GameState): Action | null {
     }
     case 'kachikomi':
       return { type: 'kachikomi', target: leader(s, kachikomiTargets(s, ph.player)) };
+    case 'vote':
+      // 陶片追放：一番点の高い相手に入れる
+      return { type: 'vote', target: leader(s, voteTargets(s, ph.player)) };
     case 'exchange': {
       const p = s.players[ph.player];
       let best: { uid: string; target: number; theirUid: string; gain: number } | null = null;

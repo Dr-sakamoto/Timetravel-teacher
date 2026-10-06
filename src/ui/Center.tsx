@@ -1,6 +1,6 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent } from '../game/engine';
+import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
@@ -191,6 +191,36 @@ function effectOf(state: GameState, pi: number, id: string): ReactNode {
   );
 }
 
+/** 陶片追放の投票用紙（投票する人だけが見る。ほかの人の票は出さない） */
+function VotePopup({ state, voter, onVote }: { state: GameState; voter: number; onVote: (target: number) => void }) {
+  const [target, setTarget] = useState<number | null>(null);
+  const me = state.players[voter];
+  return (
+    <div className="modal-back">
+      <div className="modal vote-modal">
+        <h2>
+          🏺 陶片追放 — <span style={{ color: me.color }}>{me.name}</span> の投票
+        </h2>
+        <p>陶片に、アテネから追い出したいクラスを書こう。だれがどこに入れたかは、ほかの人には見えない。票が一番多いクラス（同票ならポイントが多いクラス）が、係に就いていない子を1人転校させる。</p>
+        <div className="vote-options">
+          {voteTargets(state, voter).map((pi) => {
+            const p = state.players[pi];
+            return (
+              <button key={pi} className={`btn vote-option ${target === pi ? 'selected' : ''}`} style={{ borderColor: p.color }} onClick={() => setTarget(pi)}>
+                <b style={{ color: p.color }}>{p.name}</b>
+                <small>{p.points}点</small>
+              </button>
+            );
+          })}
+        </div>
+        <button className="btn primary" disabled={target === null} onClick={() => target !== null && onVote(target)}>
+          🗳️ 投票する
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** 選んだ生徒（未選択なら「？」） */
 const chosen = (st?: Student) => <span className="pick-chip">{st ? `${st.icon}${st.name}` : '？'}</span>;
 
@@ -208,7 +238,15 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       <div className="say guerrilla-say">
         <CutIn />
         <div className="say-sub">
-          📦 全クラス転校：{who} のクラスが出ていく子を{cpuBusy ? '選んでいます…' : <>タップ {chosen(st)}</>}
+          {ph.votes ? (
+            <>
+              🏺 陶片追放：{who} のクラスに票が集まった。アテネを去る子を{cpuBusy ? '選んでいます…' : <>タップ {chosen(st)}</>}
+            </>
+          ) : (
+            <>
+              📦 全クラス転校：{who} のクラスが出ていく子を{cpuBusy ? '選んでいます…' : <>タップ {chosen(st)}</>}
+            </>
+          )}
           {done > 0 && <small>（{done}人 転校ずみ）</small>}
         </div>
         <div className="say-sub">
@@ -219,6 +257,24 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
           )}
           <NextTurn state={state} inline />
         </div>
+      </div>
+    );
+  }
+
+  // 陶片追放は秘密投票：投票する人にだけポップアップを出す（入った票はだれにも見せない）
+  if (ph.kind === 'vote') {
+    const voted = ph.ballots.length;
+    return (
+      <div className="say guerrilla-say">
+        <CutIn />
+        <div className="say-sub">
+          🏺 陶片追放：{who} が{cpuBusy ? '陶片に名前を書いています…' : '投票中'}
+          {voted > 0 && <small>（{voted}人 投票ずみ）</small>}
+        </div>
+        <div className="say-sub">
+          <NextTurn state={state} inline />
+        </div>
+        {!cpuBusy && <VotePopup key={ph.player} state={state} voter={ph.player} onVote={(target) => dispatch({ type: 'vote', target })} />}
       </div>
     );
   }

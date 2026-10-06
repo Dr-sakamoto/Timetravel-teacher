@@ -3234,3 +3234,32 @@ body:has(.title-screen) {
   translate: -50% 0;
   z-index: 3;
 }
+
+/* 陶片追放の投票用紙 */
+.vote-modal {
+  max-width: 440px;
+  text-align: center;
+}
+.vote-modal p {
+  font-size: 0.85rem;
+  color: var(--chalk-dim);
+}
+.vote-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.8rem 0 1rem;
+}
+.vote-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 6.5rem;
+  border: 3px solid;
+  background: rgba(255, 255, 255, 0.06);
+}
+.vote-option.selected {
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateY(-2px);
+}

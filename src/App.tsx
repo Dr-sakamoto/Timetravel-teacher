@@ -15,7 +15,7 @@ function loadSave(): GameState | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as GameState;
-    return s.version === 22 ? s : null;
+    return s.version === 23 ? s : null;
   } catch {
     return null;
   }
