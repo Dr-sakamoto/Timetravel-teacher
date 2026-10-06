@@ -59,23 +59,37 @@ describe('engine', () => {
     }
   }
 
-  it('turns go round in seat order, never twice in a row across months, terms or years', () => {
-    for (const players of [2, 4]) {
-      let s = newGame(Array.from({ length: players }, (_, i) => ({ name: `P${i + 1}`, isCpu: true })), 2, players);
-      const turns: number[] = [];
-      const seen = new Set<string>();
-      while (s.phase.kind !== 'gameOver') {
-        s = step(s, cpuAction(s)!);
-        // 新しく手番が始まったところだけ数える（同じ手番の選び直しは数えない）
-        const key = `${s.year}-${s.monthIdx}-${s.queueIdx}`;
-        if (s.phase.kind === 'draw' && !seen.has(key)) {
-          seen.add(key);
-          turns.push(s.phase.player);
+  it('turn order is fixed within a term and starts from the lowest score each new term', () => {
+    let s = newGame(Array.from({ length: 4 }, (_, i) => ({ name: `P${i + 1}`, isCpu: true })), 2, 4);
+    let term = '';
+    let q: number[] = [];
+    let turns: number[] = [];
+    const seen = new Set<string>();
+    const check = () => {
+      if (!turns.length) return;
+      turns.forEach((p, i) => expect(p).toBe(q[i % q.length]));
+    };
+    while (s.phase.kind !== 'gameOver') {
+      s = step(s, cpuAction(s)!);
+      const t = `${s.year}-${termOfMonth(MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)])}`;
+      if (s.phase.kind === 'roles' && s.queueIdx === 0 && t !== term) {
+        check();
+        term = t;
+        turns = [];
+        q = [...s.queue];
+        if (q.length && term !== '1-1') {
+          const pts = q.map((i) => s.players[i].points);
+          expect(pts).toEqual([...pts].sort((a, b) => a - b));
         }
       }
-      expect(turns.length).toBeGreaterThan(players * 10);
-      turns.forEach((p, i) => expect(p).toBe(i % players));
+      const key = `${s.year}-${s.monthIdx}-${s.queueIdx}`;
+      if (s.phase.kind === 'draw' && !seen.has(key)) {
+        seen.add(key);
+        turns.push(s.phase.player);
+      }
     }
+    check();
+    expect([...q].sort()).toEqual([0, 1, 2, 3]);
   });
 
   it('deals 6 random modern students one card at a time, alternating', () => {
@@ -786,12 +800,13 @@ describe('engine', () => {
   it('setRoles requires choosing the newly unlocked kind, and unlocked kinds stay', () => {
     let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }], 1, 11);
     while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
-    const uid = s.players[0].students[0].uid;
+    const f = s.queue[0];
+    const uid = s.players[f].students[0].uid;
     expect(step(s, { type: 'setRoles', roles: [] })).toBe(s);
     expect(step(s, { type: 'setRoles', roles: [{ role: 'pe', uid }], unlock: ['study'] })).toBe(s);
     const next = step(s, { type: 'setRoles', roles: [{ role: 'study', uid }], unlock: ['study'] });
-    expect(next.players[0].unlocked).toEqual(['study']);
-    expect(next.players[0].roles).toEqual([{ role: 'study', uid }]);
+    expect(next.players[f].unlocked).toEqual(['study']);
+    expect(next.players[f].roles).toEqual([{ role: 'study', uid }]);
   });
 
   it('exchange swaps students with the same number of printed icons; the other side must have no role', () => {
