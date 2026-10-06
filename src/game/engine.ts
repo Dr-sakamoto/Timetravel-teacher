@@ -111,7 +111,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 24,
+    version: 25,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
@@ -245,7 +245,7 @@ function afterMemberDraw(s: GameState, last: { player: number; student: Student 
   const next = nextMemberDrawer(s);
   if (next === null) {
     log(s, '全クラスの初期メンバーがそろった！');
-    startTerm(s);
+    startTerm(s, true);
   } else {
     s.phase = { kind: 'memberDraw', player: next, last };
   }
@@ -286,17 +286,24 @@ function buildDeck(s: GameState): string[] {
 
 // ---------- 進行 ----------
 
-/** 手番の順：いつも席順（月や学年が変わっても、同じ人が2回続けて手番をしないように） */
-function order(s: GameState): number[] {
-  return s.players.map((_, i) => i);
+/** 手番の順：学期の間は固定。ゲームの最初はランダム、以降は学期ごとに得点の低い順（最下位から。同点はランダム） */
+function termOrder(s: GameState, first: boolean): number[] {
+  const ids = shuffle(s, s.players.map((_, i) => i));
+  return first ? ids : ids.sort((a, b) => s.players[a].points - s.players[b].points);
 }
 
-function startTerm(s: GameState) {
-  s.queue = order(s);
+/** 今の学期の手番の順（学期の間は変わらない） */
+function order(s: GameState): number[] {
+  return s.queue;
+}
+
+function startTerm(s: GameState, first = false) {
+  s.queue = termOrder(s, first);
   s.queueIdx = 0;
   const t = termOfMonth(MONTHS[s.monthIdx]);
   const era = ERAS[currentEra(s)];
   log(s, `${t}学期スタート！今学期の時代は${era.icon}${era.name} —「${era.motto}」`);
+  log(s, `今学期の手番順（${first ? 'ランダム' : '最下位から'}）：${s.queue.map((i) => s.players[i].name).join(' → ')}`);
   s.eventDeck = buildDeck(s);
   s.discard = [];
   s.market = [];

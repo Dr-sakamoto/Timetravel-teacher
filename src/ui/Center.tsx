@@ -474,7 +474,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             {canContinue ? (
               <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
                 {/* 手番の終わりに場を補充する（ここでゲリラがめくれることがある）と分かるように */}
-                {ph.ctx === 'turn' && ph.player !== null ? '🃏 場を補充 ▶' : '次へ ▶'}
+                {ph.ctx === 'turn' && state.market.length < MARKET_SIZE ? '🃏 場を補充 ▶' : '次へ ▶'}
               </button>
             ) : (
               <div className="say-sub">⏳ {who}</div>

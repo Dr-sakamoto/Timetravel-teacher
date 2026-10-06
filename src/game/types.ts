@@ -160,7 +160,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 24;
+  version: 25;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -170,6 +170,7 @@ export interface GameState {
   years: number;
   year: number;
   monthIdx: number;
+  /** 今学期の手番の順（1学期はランダム、2学期からは得点の低い順＝最下位から） */
   queue: number[];
   queueIdx: number;
   phase: Phase;
