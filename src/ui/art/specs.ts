@@ -98,6 +98,7 @@ export const ART: Record<string, ArtSpec> = {
 
   // ---- 未来 ----
   android: { creature: 'android' },
+  oracle: { creature: 'oracle' },
   cyberbanchou: { skin: SKIN.fair, hair: 'pompadour', hairColor: '#4a5a6a', outfit: 'cyber', c1: '#c0392b', acc: ['visor'], expr: 'cool', prop: 'fist' },
   marsgirl: { skin: SKIN.fair, back: 'bob', hair: 'short', hairColor: pink, outfit: 'spacesuit', c1: '#e5534b', hat: 'space', expr: 'grin' },
   alien: { creature: 'alien' },

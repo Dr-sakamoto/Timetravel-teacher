@@ -1,7 +1,7 @@
 import { C, E, O, P } from './parts';
 
 /** 人の形をしていない生徒（恐竜・ロボ・宇宙人など）。100×100 の座標系 */
-export type Creature = 'trex' | 'triceratops' | 'brachio' | 'ptera' | 'raptor' | 'android' | 'alien' | 'robodog' | 'martian' | 'cyborg';
+export type Creature = 'trex' | 'triceratops' | 'brachio' | 'ptera' | 'raptor' | 'android' | 'alien' | 'robodog' | 'martian' | 'cyborg' | 'oracle';
 
 const cheek = (x: number, y: number) => <E x={x} y={y} rx={3} ry={1.9} fill="#f59c9c" sw={0} />;
 const eye = (x: number, y: number, r = 2.3) => (
@@ -148,6 +148,30 @@ export function CreaturePart({ kind }: { kind: Creature }) {
           <P d="M46 58 Q50 61 54 58" sw={1.5} />
           {cheek(32, 54)}
           {cheek(68, 54)}
+        </g>
+      );
+    case 'oracle':
+      // 全知のAI：モニターの頭に光の輪。まわりに数式が浮かぶ
+      return (
+        <g>
+          <C x={50} y={44} r={34} fill="#d8f6ff" sw={0} />
+          <P d="M22 100 C26 84 38 76 50 76 C62 76 74 84 78 100Z" fill="#2c3e66" />
+          <P d="M36 100 V90 H44 M64 100 V90 H56 M50 100 V84" stroke="#35e0ff" sw={1.4} />
+          <C x={50} y={84} r={2.2} fill="#35e0ff" sw={0} />
+          <rect x={44} y={64} width={12} height={10} fill="#8f9aa5" stroke={O} strokeWidth={1.3} />
+          <E x={50} y={13} rx={16} ry={4} stroke="#ffd34d" sw={2.2} />
+          <rect x={25} y={20} width={50} height={46} rx={13} fill="#e8edf2" stroke={O} strokeWidth={1.4} />
+          <rect x={30.5} y={25.5} width={39} height={35} rx={9} fill="#14223a" stroke={O} strokeWidth={1.2} />
+          <P d="M37 41 Q41.5 35 46 41 M54 41 Q58.5 35 63 41" stroke="#35e0ff" sw={2.4} />
+          <P d="M43 50 Q50 55 57 50" stroke="#35e0ff" sw={2} />
+          <P d="M34 30 H44" stroke="#35e0ff" sw={1} op={0.5} />
+          <E x={36} y={50} rx={3} ry={1.6} fill="#f59c9c" sw={0} />
+          <E x={64} y={50} rx={3} ry={1.6} fill="#f59c9c" sw={0} />
+          {[['π', 12, 30], ['∑', 86, 34], ['A+', 10, 62], ['√', 88, 64]].map(([t, x, y]) => (
+            <text key={t as string} x={x as number} y={y as number} textAnchor="middle" fontSize={9} fontWeight={900} fill="#2c8fb0">
+              {t}
+            </text>
+          ))}
         </g>
       );
     case 'robodog':
