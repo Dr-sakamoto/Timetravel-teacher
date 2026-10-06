@@ -61,6 +61,21 @@ const SCENES: Record<string, () => ReactNode> = {
       <Mini x={76} y={52} c="#d97ab0" />
     </g>
   ),
+  taiikusai: () => (
+    <g>
+      <Bg sky="#bfe6ff" ground="#c98a5a" y={44} />
+      <P d="M0 12 Q50 22 100 12" sw={0.8} />
+      {[8, 20, 32, 44, 56, 68, 80, 92].map((x, i) => (
+        <P key={x} d={`M${x - 4} ${13 + (x < 50 ? x / 12 : (100 - x) / 12)} l4 7 l4 -7Z`} fill={['#e5534b', '#f2c94c', '#3f8fd8', '#6fb35a'][i % 4]} sw={0.8} />
+      ))}
+      <P d="M0 56 H100 M0 64 H100" stroke="#fbfbf7" sw={1.4} />
+      <Mini x={30} y={46} c="#e5534b" s={1.3} />
+      <Mini x={58} y={46} c="#3f8fd8" s={1.3} />
+      <P d="M36 50 L44 48" sw={1.4} />
+      <R x={43} y={46} w={6} h={3} fill="#f2c94c" rx={1} sw={1} />
+      <P d="M18 44 l-6 -2 M18 48 l-7 0 M46 44 l-6 -2 M46 48 l-7 0" sw={1} />
+    </g>
+  ),
   seitokai: () => (
     <g>
       <Bg sky="#dff0e6" ground="#c9a978" y={56} />
@@ -78,6 +93,26 @@ const SCENES: Record<string, () => ReactNode> = {
       <C x={18} y={46} r={7} fill="#f2c94c" />
       <P d="M14 52 L12 62 L18 58 L22 62 L21 52" fill="#e5534b" sw={1} />
       <Star x={18} y={46} r={4} fill="#fff" />
+    </g>
+  ),
+
+  shugakuryoko: () => (
+    <g>
+      <Bg sky="#cfe8ff" ground="#9fbf6a" y={54} />
+      <P d="M44 54 L66 20 L88 54Z" fill="#7d8fc0" />
+      <P d="M58 32 L66 20 L74 32 L70 30 L66 33 L62 30Z" fill="#fbfbf7" sw={1} />
+      <R x={8} y={34} w={50} h={22} fill="#f2c94c" rx={5} />
+      {[13, 23, 33, 43].map((x) => (
+        <R key={x} x={x} y={38} w={8} h={7} fill="#cfe8ff" rx={1.5} sw={1} />
+      ))}
+      <R x={50} y={38} w={6} h={10} fill="#cfe8ff" rx={1.5} sw={1} />
+      <P d="M8 48 H58" sw={1} />
+      <C x={18} y={57} r={4.5} fill="#3a3a44" />
+      <C x={48} y={57} r={4.5} fill="#3a3a44" />
+      <C x={18} y={57} r={1.6} fill="#b9c2cc" sw={0.8} />
+      <C x={48} y={57} r={1.6} fill="#b9c2cc" sw={0.8} />
+      <Stick x1={24} y1={34} x2={24} y2={20} w={0.8} color="#7a5a3a" />
+      <P d="M25 20 L35 23 L25 26Z" fill="#e5534b" sw={1} />
     </g>
   ),
 
@@ -478,6 +513,36 @@ const SCENES: Record<string, () => ReactNode> = {
       <C x={86} y={58} r={5} fill="#f2c94c" />
       <C x={86} y={58} r={2} fill="#1f2b4a" sw={1} />
       <Star x={50} y={64} r={4} />
+    </g>
+  ),
+  singularity: () => (
+    <g>
+      <Bg sky="#14223a" />
+      {[[10, 10], [88, 14], [20, 60], [80, 62], [50, 6]].map(([x, y]) => (
+        <C key={`${x}${y}`} x={x} y={y} r={0.9} fill="#fff" sw={0} />
+      ))}
+      <P d="M14 36 H30 M70 36 H86 M50 8 V18 M50 54 V66 M24 18 L36 26 M76 18 L64 26 M24 56 L36 46 M76 56 L64 46" stroke="#35e0ff" sw={1.6} />
+      {[[14, 36], [86, 36], [50, 8], [50, 66], [24, 18], [76, 18], [24, 56], [76, 56]].map(([x, y]) => (
+        <C key={`n${x}${y}`} x={x} y={y} r={2.2} fill="#35e0ff" sw={1} />
+      ))}
+      <P d="M36 36 C30 30 32 20 40 20 C42 15 50 14 52 18 C58 14 66 18 66 24 C72 26 72 36 66 40 C66 48 58 52 52 48 C48 54 38 52 38 46 C32 46 30 40 36 36Z" fill="#f59ac2" />
+      <P d="M50 19 V48 M42 26 C46 28 46 32 42 34 M58 26 C54 28 54 32 58 34 M40 42 C44 40 46 42 46 44 M60 42 C56 40 54 42 54 44" sw={1.1} />
+    </g>
+  ),
+  timemachine: () => (
+    <g>
+      <Bg sky="#2c3e66" />
+      {[30, 22, 14, 7].map((r, i) => (
+        <C key={r} x={50} y={36} r={r} fill={['#4a3a8a', '#6a4ab0', '#8f6fd8', '#c8b4ff'][i]} sw={1.2} />
+      ))}
+      <P d="M50 36 V20 M50 36 L60 40" stroke="#fbfbf7" sw={2} />
+      <C x={50} y={36} r={1.8} fill="#fbfbf7" sw={0} />
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((k) => {
+        const a = (Math.PI / 6) * k;
+        return <C key={k} x={50 + Math.cos(a) * 26} y={36 + Math.sin(a) * 26} r={1.2} fill="#ffd34d" sw={0} />;
+      })}
+      <Mini x={82} y={52} c="#e5534b" head="#f0c08f" s={1.3} />
+      <P d="M74 50 l-6 -2 M74 54 l-7 0" stroke="#fbfbf7" sw={1} />
     </g>
   ),
   martian: () => (

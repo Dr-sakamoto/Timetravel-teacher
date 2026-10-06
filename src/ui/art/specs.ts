@@ -101,7 +101,7 @@ export const ART: Record<string, ArtSpec> = {
   oracle: { creature: 'oracle' },
   cyberbanchou: { skin: SKIN.fair, hair: 'pompadour', hairColor: '#4a5a6a', outfit: 'cyber', c1: '#c0392b', acc: ['visor'], expr: 'cool', prop: 'fist' },
   marsgirl: { skin: SKIN.fair, back: 'bob', hair: 'short', hairColor: pink, outfit: 'spacesuit', c1: '#e5534b', hat: 'space', expr: 'grin' },
-  alien: { creature: 'alien' },
+  vidol: { back: 'twin', hair: 'patsun', hairColor: '#35e0ff', outfit: 'dress', c1: '#7a5cff', c2: '#ffd34d', acc: ['headset'], expr: 'wink', prop: 'mic' },
   robodog: { creature: 'robodog' },
   // 火星人の侵略で座るエイリアン、サイボーグ化した子
   martian: { creature: 'martian' },

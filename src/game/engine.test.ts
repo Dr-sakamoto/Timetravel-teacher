@@ -3,7 +3,7 @@ import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
 import { CARDS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
-import { ERA_CARDS, PERSON_CARDS_PER_TERM } from './data/events';
+import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
 import { canTake, currentEra, deckBreakdown, droppable, exchangePairs, marketCost, newGame, step } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
@@ -188,12 +188,12 @@ describe('engine', () => {
     expect(persons.every((id) => id.startsWith('person:m:'))).toBe(true);
   });
 
-  it('every era has 3-6 figures and 2 era events', () => {
+  it('every era has 3-6 figures and 4 era event cards', () => {
     for (const era of ERAS.filter((e) => e.id !== 'present')) {
       const figures = CARDS.filter((c) => c.era === era.id).length;
       expect(figures, era.name).toBeGreaterThanOrEqual(3);
       expect(figures, era.name).toBeLessThanOrEqual(6);
-      expect(ERA_CARDS.filter((c) => c.era === era.id)).toHaveLength(2);
+      expect(ERA_CARDS.filter((c) => c.era === era.id).reduce((a, c) => a + c.count, 0), era.name).toBe(4);
     }
   });
 
@@ -295,7 +295,7 @@ describe('engine', () => {
     t.players[pi].students = [mk('y', ['fight', 'fight'])];
     t.players[pi].roles = [];
     t.eventDeck.push('raid_present');
-    expect(step(t, pass).players[pi].points - t.players[pi].points).toBe(2 * 2 - 4);
+    expect(step(t, pass).players[pi].points - t.players[pi].points).toBe(2 - 4);
     const u = structuredClone(t);
     u.players[pi].students = [mk('y', ['fight', 'fight', 'fight'], 'sengoku')];
     expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(3 - 4);
@@ -450,22 +450,25 @@ describe('engine', () => {
     expect(run('olympia', [A, B, C])).toEqual([15, 5, -10]);
     // 関ヶ原の戦い：👊の数で勝負、1位+15・2位+5・最下位−10
     expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 5, -10]);
-    // 文化祭：🎨を持つ子1人につき+2（現代の子は2人分）
-    expect(run('bunkasai', [[mk('c', ['charm', 'art']), mk('d', ['study', 'charm'])], B, C])).toEqual([4, 0, 0]);
-    // 生徒会長選挙：同じくアイコンの数で勝負
-    expect(run('seitokai', [A, B, C])).toEqual([15, 5, -10]);
-    // 鹿鳴館の舞踏会：👑を持つ子1人につき+2（近代の子は2人分）
-    expect(run('rokumeikan', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'modern')], B, C])).toEqual([6, 0, 0]);
+    // 文化祭：🎨を持つ子1人につき+2（その時代の子も同じ）
+    expect(run('bunkasai', [[mk('c', ['charm', 'art'], 'present'), mk('d', ['art', 'art'])], B, C])).toEqual([4, 0, 0]);
+    // 体育祭：🏃を持つ子1人につき+2
+    expect(run('taiikusai', [A, B, C])).toEqual([4, 2, 0]);
+    // 修学旅行：アイコンの総数が12以上で+5、18以上で+10、24以上で+15（順位はつけない）
+    const many = (u: string, n: number) => Array.from({ length: n }, (_, k) => mk(`${u}${k}`, ['study', 'art', 'charm']));
+    expect(run('shugakuryoko', [many('a', 8), many('b', 4), many('c', 3)])).toEqual([15, 5, 0]);
+    // 鹿鳴館の舞踏会：👑を持つ子1人につき+2
+    expect(run('rokumeikan', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'modern')], B, C])).toEqual([4, 0, 0]);
   });
 
-  it('every era except the present has a special event with its own mechanism', () => {
+  it('every era has a special event with its own mechanism', () => {
+    const plain = ['heads', 'tiers', 'threshold', 'battle'];
     for (const era of ERAS) {
-      const special = ERA_CARDS.filter((c) => c.era === era.id && !['heads', 'threshold', 'battle'].includes(c.effect.type));
-      if (era.id === 'present') expect(special, era.id).toHaveLength(0);
-      else expect(special.length, era.id).toBeGreaterThanOrEqual(1);
+      const special = ERA_CARDS.filter((c) => c.era === era.id && !plain.includes(c.effect.type));
+      expect(special.length, era.id).toBeGreaterThanOrEqual(1);
     }
     // 特別な仕組みは時代ごとにみんな違う
-    const kinds = ERA_CARDS.filter((c) => !['heads', 'threshold', 'battle'].includes(c.effect.type)).map((c) => c.effect.type);
+    const kinds = ERA_CARDS.filter((c) => !plain.includes(c.effect.type)).map((c) => c.effect.type);
     expect(new Set(kinds).size).toBe(kinds.length);
   });
 
@@ -520,8 +523,8 @@ describe('engine', () => {
       const attrs = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!.attrs;
       expect(attrs(0, 'a')).toEqual(['study', 'study', 'study', 'study']);
       expect(attrs(1, 'b')).toEqual(['study', 'study']);
-      // 中国の子は2倍なので📚2つでも合格
-      expect(attrs(2, 'c')).toEqual(['study', 'study', 'study']);
+      // その時代の子も2倍にはならない
+      expect(attrs(2, 'c')).toEqual(['study', 'study']);
     });
 
     it('michinaga: every other class sends gifts to the class with the most 👑', () => {
@@ -554,8 +557,48 @@ describe('engine', () => {
 
     it('nobel: the single best 📚 student in the school wins for their class', () => {
       expect(run('nobel', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study']), mk('b2', ['study', 'study'])], []]).delta).toEqual([12, 0, 0]);
-      // 近代の子は2倍
-      expect(run('nobel', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study', 'study'], 'modern')], []]).delta).toEqual([0, 12, 0]);
+      // 同点なら全員が受賞
+      expect(run('nobel', [[mk('a', ['study', 'study'])], [mk('b', ['study', 'study'], 'modern')], []]).delta).toEqual([12, 12, 0]);
+    });
+
+    it('seitokai: the student with the most 👑 in the school is elected and gains a 👑', () => {
+      const r = run('seitokai', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm', 'charm']), mk('b2', ['charm'])], [mk('c', ['study'])]]);
+      const attrs = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!.attrs;
+      expect(r.delta).toEqual([0, 0, 0]);
+      // 同点なら2人とも当選
+      expect(attrs(0, 'a')).toEqual(['charm', 'charm', 'charm']);
+      expect(attrs(1, 'b')).toEqual(['charm', 'charm', 'charm']);
+      expect(attrs(1, 'b2')).toEqual(['charm']);
+      // アイコンが上限の子は増えない
+      const full = run('seitokai', [[mk('a', Array(MAX_ICONS).fill('charm'))], [], []]);
+      expect(full.after.players[0].students.find((x) => x.uid === 'a')!.attrs).toHaveLength(MAX_ICONS);
+    });
+
+    it('singularity: machine students (robots, cyborgs, machine goods) gain a 📚', () => {
+      const t = structuredClone(base);
+      const oracle = { ...mk('o', Array(5).fill('study'), 'future'), cardId: 'oracle' };
+      const phone = { ...mk('p', ['art', 'charm']), goods: { id: 'g_phone', name: 'スマホ', icon: '📱', attr: 'charm' as const } };
+      const human = mk('h', ['study']);
+      t.players[0].students = [oracle, phone, human];
+      t.players[1].students = [{ ...mk('c', ['study', 'sports']), art: 'cyborg' }];
+      t.players[2].students = [];
+      t.players.forEach((p) => (p.roles = []));
+      t.eventDeck.push('singularity');
+      const after = step(t, pass);
+      const attrs = (pi: number, uid: string) => after.players[pi].students.find((x) => x.uid === uid)!.attrs;
+      // オラクルも6個まで増える
+      expect(attrs(0, 'o')).toHaveLength(6);
+      expect(attrs(0, 'p')).toEqual(['art', 'charm', 'study']);
+      expect(attrs(0, 'h')).toEqual(['study']);
+      expect(attrs(1, 'c')).toEqual(['study', 'sports', 'study']);
+    });
+
+    it('timemachine: the class with the fewest points gets a free figure from any era', () => {
+      const r = run('timemachine', [[mk('a', [])], [mk('b', [])], [mk('c', [])]], [10, 3, 8]);
+      expect(r.delta).toEqual([0, 0, 0]);
+      expect(r.uids.map((u) => u.length)).toEqual([1, 2, 1]);
+      const st = r.after.players[1].students.find((x) => x.uid !== 'b')!;
+      expect(Object.values(r.after.pools).flat()).not.toContain(st.cardId);
     });
   });
 

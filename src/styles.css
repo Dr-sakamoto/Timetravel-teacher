@@ -1696,7 +1696,8 @@ body:has(.title-screen) {
 }
 .tcg-attrs.n4 .tcg-attr,
 .tcg-attrs.n5 .tcg-attr,
-.tcg-attrs.n6 .tcg-attr {
+.tcg-attrs.n6 .tcg-attr,
+.tcg-attrs.n7 .tcg-attr {
   font-size: 0.85rem;
 }
 .tcg.mini .tcg-head {

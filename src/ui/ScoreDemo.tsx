@@ -93,7 +93,7 @@ function scenario(id: string, label: string): Scenario {
 const SCENARIOS: Scenario[] = [
   scenario('n_sports', '🏃 通常カード'),
   scenario('visit', '👀 共通イベント（👑−👊）'),
-  scenario('sekigahara', '⚔️ 時代イベント（×2）'),
+  scenario('sekigahara', '⚔️ 時代イベント'),
   scenario('raid_sengoku', '👊 襲来（−敵の強さ）'),
 ];
 
@@ -113,7 +113,7 @@ export function ScoreDemo() {
   const sc = SCENARIOS[s];
   const variant = VARIANTS[v];
   const fx = sc.fx;
-  const list = useMemo(() => contributions(PLAYER, fx.attr, fx.era), [fx]);
+  const list = useMemo(() => contributions(PLAYER, fx.attr), [fx]);
   const minus = useMemo(() => (fx.minus ? minusList(STUDENTS, fx.minus === 'heads' ? null : contributions(PLAYER, fx.minus)) : []), [fx]);
   const total = list.reduce((a, x) => a + x.pts, 0);
   const delta = fx.threat !== undefined ? total - fx.threat : total - minus.reduce((a, x) => a + x.pts, 0);
@@ -169,7 +169,7 @@ export function ScoreDemo() {
         />
       </div>
       <div className="fx-layer">{frame.overlay}</div>
-      <p className="demo-legend">係に就いた子（係ボードの下に係アイコン）はそのアイコンが×2。時代イベントと襲来では、その時代（ここでは戦国）出身の子が×2。</p>
+      <p className="demo-legend">係に就いた子（係ボードの下に係アイコン）はそのアイコンが×2。</p>
     </div>
   );
 }

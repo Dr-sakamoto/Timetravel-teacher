@@ -1,5 +1,4 @@
-import { ATTR_ICON, type Attr, type EraId, type Rarity } from '../types';
-import { ERAS } from './eras';
+import { ATTR_ICON, type Attr, type EraId } from '../types';
 
 /** 通常カード（○○の時間）：場から取った人だけ、クラス全員のそのアイコンの合計数（＋係ボーナス）が入る。全時代共通 */
 export interface NormalCard {
@@ -31,14 +30,17 @@ export interface SwingCard {
   plus: Attr;
   /** 減点になるアイコン。なければプラスだけ */
   minus?: Attr;
+  /** あれば「プラスのアイコンを持つ子1人につき +per」（アイコンの数ではなく人数で数える） */
+  per?: number;
   desc: string;
   count: number;
 }
 
 /**
- * 時代イベントの効果（どれも1文で言えるもの。数えるアイコンはカードの attr。その時代出身の生徒のアイコンは2倍、係ボーナスも乗る）
+ * 時代イベントの効果（どれも1文で言えるもの。数えるアイコンはカードの attr。係ボーナスも乗る）
  * 点を数えるもの
- *   heads     … 「Xを持つ子1人につき +per」（その時代出身の子は2人分）
+ *   heads     … 「Xを持つ子1人につき +per」
+ *   tiers     … 「Xが steps[i][0] 以上なら +steps[i][1]」（一番上の届いた段だけ。順位はつけない）
  *   threshold … 「Xが need 以上なら +win、足りないと −lose」
  *   battle    … 「Xの数で勝負：1位 +win、2位 +second、最下位 −lose、ほかは0」（同点は同じ順位）
  * その時代だけの仕組み（時代ごとに1枚。点の数え方ではなく、起こることそのものが違う。生徒が問答無用でいなくなるものは入れない）
@@ -51,10 +53,17 @@ export interface SwingCard {
  *   gekokujo  … 戦国「Xが一番多いクラスが、ポイントが一番多いクラスから amount 点奪う」
  *   lottery   … 江戸「全クラスが fee 点ずつ出し、くじで当たった1クラスが総取り」
  *   prize     … 近代「全校でXが一番多い子が受賞し、その子のクラスに +win」
- *   alien     … 未来「点は動かない。空いている席があるクラス全部に、アイコンのないエイリアンが1人ずつ転入する」
+ *   elect     … 現代「全校でXが一番多い子が当選し、Xが1つ増える」（同点なら全員）
+ *   alien     … 未来「点は動かない。空いている席があるクラス全部に、アイコンのない火星人が1人ずつ転入する」
+ *   machine   … 未来「機械の子（機械の人物・サイボーグ・機械のグッズを装備した子）は、Xが1つ増える」
+ *   timemachine … 未来「ポイントが一番少ないクラスに、まだ誰のクラスにもいない人物が1人、無料で転入する」
  */
 export type EraEffect =
   | { type: 'heads'; per: number }
+  | { type: 'tiers'; steps: [need: number, win: number][] }
+  | { type: 'elect' }
+  | { type: 'machine' }
+  | { type: 'timemachine' }
   | { type: 'threshold'; need: number; win: number; lose: number }
   | { type: 'battle'; win: number; second: number; lose: number }
   | { type: 'plunder'; amount: number }
@@ -68,12 +77,13 @@ export type EraEffect =
   | { type: 'prize'; win: number }
   | { type: 'alien' };
 
-/** その時代出身の子のアイコンが2倍になる効果か（アイコンを数えないものは2倍にならない） */
-export function eraDoubles(e: EraEffect): boolean {
-  return e.type !== 'alien' && e.type !== 'ostracism' && e.type !== 'lottery';
-}
+/** カードに載るアイコンの上限（科挙・生徒会長選挙・シンギュラリティで増えるのもここまで。グッズの＋1は別） */
+export const MAX_ICONS = 6;
 
-/** 時代イベント（全クラス）：カードごとの効果。その時代出身の生徒のアイコンは2倍 */
+/** 機械のグッズ（装備した子はシンギュラリティで機械として数える） */
+export const MACHINE_GOODS = ['g_phone', 'g_tablet', 'g_chip'];
+
+/** 時代イベント（全クラス）：カードごとの効果 */
 export interface ContestCard {
   id: string;
   kind: 'contest';
@@ -87,7 +97,7 @@ export interface ContestCard {
   count: number;
 }
 
-/** 襲来（時代イベント・全クラス）：クラスの👊の数 − 敵の強さ（その時代出身の生徒は2倍）。撃退すれば大きくプラス、守れなければ大きくマイナス */
+/** 襲来（時代イベント・全クラス）：クラスの👊の数 − 敵の強さ。撃退すれば大きくプラス、守れなければ大きくマイナス */
 export interface RaidCard {
   id: string;
   kind: 'raid';
@@ -147,9 +157,12 @@ export const PERSON_CARDS_PER_TERM = 7;
 
 /** 場に表向きで並ぶカードの枚数 */
 export const MARKET_SIZE = 4;
-/** 人物カードを取るのに払うクラスポイント（レア度ごと） */
-/** 下位レアは安くすぐ元が取れ、SSRは長い試合でないと元が取れない（短期戦ならR、長期戦ならSSRが狙い目） */
-export const PERSON_COST: Record<Rarity, number> = { N: 2, R: 4, SR: 12, SSR: 24 };
+/** 人物カードを取るのに払うクラスポイント（カードに印刷されたアイコンの数ごと。添字＝アイコン数） */
+/** アイコンが少ない子は安くすぐ元が取れ、多い子は長い試合でないと元が取れない */
+export const PERSON_COST_BY_ICONS = [0, 2, 4, 8, 14, 24];
+export function personCost(icons: number): number {
+  return PERSON_COST_BY_ICONS[Math.min(icons, PERSON_COST_BY_ICONS.length - 1)];
+}
 /** グッズ・サイボーグ化を取るのに払うクラスポイント */
 export const GOODS_COST = 2;
 
@@ -173,14 +186,15 @@ export const NORMAL_CARDS: NormalCard[] = [
 
 export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, count: 3 }];
 
-const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | undefined, desc: string): SwingCard => ({
-  id, kind: 'swing', name, icon, plus, minus, desc, count: 1,
+const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | undefined, desc: string, per?: number): SwingCard => ({
+  id, kind: 'swing', name, icon, plus, minus, desc, per, count: 1,
 });
 export const SWING_CARDS: SwingCard[] = [
   W('poptest', '抜き打ちテスト', '📝', 'study', undefined, '日ごろの勉強がものを言う。'),
   W('visit', '授業参観', '👀', 'charm', 'fight', '親の前でいいところを見せたい。'),
-  W('marathon', '持久走大会', '🥵', 'sports', undefined, '全員が走る。足の速い子が多いクラスが有利。'),
-  W('chorus', '合唱コンクール', '🎶', 'art', undefined, '全員で歌う。歌のうまい子が多いほど響く。'),
+  // 持久走大会・合唱コンクールは、現代の体育祭・文化祭（1人につき+2）の弱い版
+  W('marathon', '持久走大会', '🥵', 'sports', undefined, '全員が走る。走れる子が多いクラスが有利。', 1),
+  W('chorus', '合唱コンクール', '🎶', 'art', undefined, '全員で歌う。歌える子が多いほど響く。', 1),
 ];
 
 export const MOVE_CARDS: MoveCard[] = [
@@ -242,15 +256,18 @@ export const RAID_CARDS: RaidCard[] = (Object.keys(ERA_RAIDERS) as EraId[]).map(
   return { id: `raid_${era}`, kind: 'raid', era, name: `襲来！${name}`, icon, threat, count: 1 };
 });
 
-const C = (id: string, name: string, icon: string, attr: Attr | 'all', effect: EraEffect, desc: string, era: EraId): ContestCard => ({
-  id, kind: 'contest', name, icon, attr, effect, desc, era, count: 2,
+/** count：その時代の固有イベントが4種の時代は1枚ずつ、2種の時代は2枚ずつ（どの時代も合わせて4枚） */
+const C = (id: string, name: string, icon: string, attr: Attr | 'all', effect: EraEffect, desc: string, era: EraId, count = 2): ContestCard => ({
+  id, kind: 'contest', name, icon, attr, effect, desc, era, count,
 });
 
-/** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代の優遇アイコン（ERAS の favor）で競う。その時代出身の生徒はアイコン2倍 */
+/** 時代の固有イベントカード：その時代の学期だけ山札に混ざる。その時代の優遇アイコン（ERAS の favor）で競う */
 export const ERA_CARDS: ContestCard[] = [
-  // 現代：優遇なし（生徒会長選挙は全アイコンで競う。文化祭は出し物なので🎨）。いつもの学校なので、特別な仕組みはない
-  C('bunkasai', '文化祭', '🎪', 'art', { type: 'heads', per: 2 }, 'クラスの出し物。絵や音楽が得意な子が多いほど盛り上がる。', 'present'),
-  C('seitokai', '生徒会長選挙', '🗳️', 'all', { type: 'battle', win: 15, second: 5, lose: 10 }, '一番頼れるクラスから会長が出る。', 'present'),
+  // 現代：いつもの学校の行事。文化祭・体育祭は共通イベントの合唱コンクール・持久走大会の強い版
+  C('bunkasai', '文化祭', '🎪', 'art', { type: 'heads', per: 2 }, 'クラスの出し物。絵や音楽が得意な子が多いほど盛り上がる。', 'present', 1),
+  C('taiikusai', '体育祭', '🏟️', 'sports', { type: 'heads', per: 2 }, 'クラス対抗リレー。走れる子が多いほど盛り上がる。', 'present', 1),
+  C('seitokai', '生徒会長選挙', '🗳️', 'charm', { type: 'elect' }, '全校で一番人望のある子が会長に。肩書きがついて、ますます慕われる。', 'present', 1),
+  C('shugakuryoko', '修学旅行', '🚌', 'all', { type: 'tiers', steps: [[12, 5], [18, 10], [24, 15]] }, 'いろんな子がいるクラスほど、旅の思い出がふくらむ。', 'present', 1),
   // 白亜紀：👊のみ。弱肉強食（強い群れが弱い群れから奪う）
   C('nawabari', '縄張り争い', '🦴', 'fight', { type: 'plunder', amount: 8 }, '強い群れが、一番弱い群れの獲物を奪っていく。', 'cretaceous'),
   C('trex_sumo', 'ティラノサウルスと力くらべ', '🦖', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, '力を合わせて押し返せ。力が足りないと踏みつぶされる。', 'cretaceous'),
@@ -278,9 +295,11 @@ export const ERA_CARDS: ContestCard[] = [
   // 近代：📚👑。クラスではなく、たった1人の天才が賞を取る
   C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'prize', win: 12 }, '受賞するのは全校でたった1人。その子のクラスが名誉を手にする。', 'modern'),
   C('rokumeikan', '鹿鳴館の舞踏会', '💃', 'charm', { type: 'heads', per: 2 }, '文明開化の社交界。踊りに誘われる子が多いほど評判が上がる。', 'modern'),
-  // 未来：📚のみ
-  C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'threshold', need: 8, win: 10, lose: 4 }, 'ロボットを作って出場。頭脳が足りないと動かない。', 'future'),
-  C('martian', '火星人の侵略', '👽', 'study', { type: 'alien' }, '空いている席に、何もできない火星人が勝手に座る。', 'future'),
+  // 未来：📚。ロボコンとシンギュラリティが📚の枠
+  C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'threshold', need: 8, win: 10, lose: 4 }, 'ロボットを作って出場。頭脳が足りないと動かない。', 'future', 1),
+  C('singularity', 'シンギュラリティ', '🧠', 'study', { type: 'machine' }, 'AIが人間の知能を超えた。機械の子たちが一気に賢くなる。', 'future', 1),
+  C('martian', '火星からの留学生', '👽', 'all', { type: 'alien' }, '空いている席に、何もできない火星人が留学してくる。', 'future', 1),
+  C('timemachine', 'タイムマシン完成', '⏳', 'all', { type: 'timemachine' }, 'いちばん困っているクラスに、どこかの時代から助っ人がやってくる。', 'future', 1),
 ];
 
 /** 固定イベント（学期末のテストと卒業式） */
@@ -328,12 +347,13 @@ export function cardRule(c: EventCard): string {
     case 'kachikomi':
       return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
     case 'swing':
+      if (c.per) return `全クラス：${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       if (!c.minus) return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点`;
       return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点、${ATTR_ICON[c.minus]}の数だけ減点`;
     case 'contest':
-      return eraDoubles(c.effect) ? `全クラス：${eraEffectRule(c)}（この時代の生徒は2倍）` : `全クラス：${eraEffectRule(c)}`;
+      return `全クラス：${eraEffectRule(c)}`;
     case 'raid':
-      return `全クラス：クラスの👊の数 − ${c.threat}（この時代の生徒は2倍）`;
+      return `全クラス：クラスの👊の数 − ${c.threat}`;
     case 'goods':
       return `生徒1人に装備：${ATTR_ICON[c.attr]}＋1（1人1つまで）`;
     case 'cyborg':
@@ -350,6 +370,14 @@ export function eraEffectRule(c: ContestCard): string {
   switch (e.type) {
     case 'heads':
       return `${a}を持つ子1人につき+${e.per}`;
+    case 'tiers':
+      return `${a}の総数が${e.steps.map(([n, w]) => `${n}以上で+${w}`).join('、')}`;
+    case 'elect':
+      return `全校で${a}が一番多い子が当選し、${a}が1つ増える`;
+    case 'machine':
+      return `機械の子（機械の人物・サイボーグ・📱💻💾を装備した子）は${a}が1つ増える`;
+    case 'timemachine':
+      return 'ポイントが一番少ないクラスに、どこかの時代の人物が1人、無料で転入する';
     case 'threshold':
       return `${a}が${e.need}以上なら+${e.win}、足りないと−${e.lose}`;
     case 'battle':
@@ -394,6 +422,7 @@ export function cardGlyph(c: EventCard): string {
     case 'kachikomi':
       return `👊×${c.mult} → 😵`;
     case 'swing':
+      if (c.per) return `🧑${ATTR_ICON[c.plus]} → +${c.per}ずつ`;
       return c.minus ? `+${ATTR_ICON[c.plus]}　−${ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
     case 'contest':
       return contestGlyph(c);
@@ -416,6 +445,14 @@ function contestGlyph(c: ContestCard): string {
   switch (e.type) {
     case 'heads':
       return `🧑${a} → +${e.per}ずつ`;
+    case 'tiers':
+      return e.steps.map(([n, w]) => `${n}↑+${w}`).join('／');
+    case 'elect':
+      return `全校の🧑${a}🥇 → ${a}＋1`;
+    case 'machine':
+      return `🤖🦾📱 → ${a}＋1`;
+    case 'timemachine':
+      return 'ポイント最下位 ⟵ ⏳🧑';
     case 'threshold':
       return `${a}${e.need}↑ +${e.win}／−${e.lose}`;
     case 'battle':
@@ -455,11 +492,12 @@ export function shortRule(c: EventCard): string {
     case 'kachikomi':
       return `相手に👊×${c.mult}のダメージ`;
     case 'swing':
+      if (c.per) return `${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       return c.minus ? `${ATTR_ICON[c.plus]}で得点、${ATTR_ICON[c.minus]}で減点` : `${ATTR_ICON[c.plus]}の数だけ得点`;
     case 'contest':
-      return eraDoubles(c.effect) ? `${eraEffectRule(c)}（${ERAS.find((x) => x.id === c.era)!.icon}の子×2）` : eraEffectRule(c);
+      return eraEffectRule(c);
     case 'raid':
-      return `👊の数から敵の強さ${c.threat}を引いた分だけ得点（${ERAS.find((x) => x.id === c.era)!.icon}の子×2）`;
+      return `👊の数から敵の強さ${c.threat}を引いた分だけ得点`;
     case 'goods':
       return '';
     case 'cyborg':
