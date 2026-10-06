@@ -719,6 +719,12 @@ body:has(.title-screen) {
   color: #10301a;
   border-color: #10301a;
 }
+/* 人物カードは下端に属性アイコンがあるので、コストは上の角に出して重ねない */
+.mcard.person .mcard-cost {
+  top: -8px;
+  right: -8px;
+  bottom: auto;
+}
 .say-sub.warn {
   color: var(--down);
   font-weight: 900;
@@ -2457,6 +2463,11 @@ body:has(.title-screen) {
     bottom: -7px;
     right: -6px;
     border-width: 1px;
+  }
+  .mcard.person .mcard-cost {
+    top: -7px;
+    right: -6px;
+    bottom: auto;
   }
   .piles {
     display: flex;
