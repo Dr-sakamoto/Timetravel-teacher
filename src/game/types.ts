@@ -82,6 +82,8 @@ export interface Player {
   /** 係に就いている生徒（解放した係に1人ずつ） */
   roles: RoleSeat[];
   points: number;
+  /** 楽市楽座：次に取るグッズ1つがタダ */
+  freeGoods?: boolean;
 }
 
 export interface ResultRow {
@@ -145,8 +147,11 @@ export type Phase =
   | { kind: 'exchange'; player: number; slot: number }
   /** サイボーグ化：自分のクラスの生徒1人をサイボーグに作り替える */
   | { kind: 'cyborg'; player: number; slot: number }
-  /** 新大陸の品（コロンブスの新大陸到達・ゲリラ）：📚の多いクラスから順に、品と装備させる子を選ぶ（取られた品は次のクラスは選べない。left はこの後に選ぶクラス） */
-  | { kind: 'newWorld'; player: number; left: number[]; items: string[]; got: { player: number; uid: string; item: string }[] }
+  /**
+   * 品を配る（ゲリラ。card はめくったイベント）：クラスが順番に、品と装備させる子（グッズのない子）を選ぶ。left はこの後に選ぶクラス
+   * コロンブスの新大陸到達は📚の多いクラスから順に、取られた品は次のクラスは選べない。鉄砲伝来は全クラスに同じ鉄砲が1丁ずつ届く
+   */
+  | { kind: 'gift'; card: string; player: number; left: number[]; items: string[]; got: { player: number; uid: string; item: string }[] }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
@@ -160,7 +165,7 @@ export interface LogEntry {
 }
 
 export interface GameState {
-  version: 24;
+  version: 25;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -170,6 +175,7 @@ export interface GameState {
   years: number;
   year: number;
   monthIdx: number;
+  /** 今学期の手番の順（1学期はランダム、2学期からは得点の低い順＝最下位から） */
   queue: number[];
   queueIdx: number;
   phase: Phase;
@@ -204,5 +210,5 @@ export type Action =
   | { type: 'kachikomi'; target: number | null }
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
   | { type: 'equip'; uid: string | null }
-  | { type: 'newWorld'; item: string; uid: string }
+  | { type: 'gift'; item: string; uid: string }
   | { type: 'cyborg'; uid: string | null };

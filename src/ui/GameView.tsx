@@ -108,7 +108,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
 
   // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ（転校は自分の生徒だけ）
   const choosing =
-    (ph.kind === 'push' || ph.kind === 'makeRoom' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg' || ph.kind === 'newWorld') && !cpuTurn && !othersTurn && ph.player === focus
+    (ph.kind === 'push' || ph.kind === 'makeRoom' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg' || ph.kind === 'gift') && !cpuTurn && !othersTurn && ph.player === focus
       ? ph.kind
       : null;
   // クラス替え：アイコンの数が同じ子どうしの組み合わせ（自分の子を選んでいたらその子の相手だけ）
@@ -121,7 +121,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const selectable =
     choosing === 'push' || choosing === 'makeRoom' ? droppable(meNow)
     : choosing === 'exchange' ? meNow.students.filter((x) => pairs.some((y) => y.uid === x.uid))
-    : choosing === 'equip' || choosing === 'newWorld' ? equippable(meNow)
+    : choosing === 'equip' || choosing === 'gift' ? equippable(meNow)
     : choosing === 'cyborg' ? cyborgable(meNow)
     : [];
   const pickOpponent = (pi: number) => {
@@ -174,7 +174,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
 
       {banner}
 
-      <div className={`felt ${guerrilla ? 'in-guerrilla' : ''} ${ph.kind === 'newWorld' ? 'new-world' : ''}`} ref={feltRef}>
+      <div className={`felt ${guerrilla ? 'in-guerrilla' : ''} ${ph.kind === 'gift' ? 'gift-pick' : ''}`} ref={feltRef}>
         <div className="opponents">
           {others.map((pi) => (
             <OpponentSeat
