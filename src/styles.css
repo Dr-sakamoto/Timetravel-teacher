@@ -815,6 +815,20 @@ body:has(.title-screen) {
   border: 1px dashed var(--chalk-dim);
   font-weight: 900;
 }
+.roles-ready {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 6px;
+}
+.roles-ready .pick-chip {
+  opacity: 0.6;
+}
+.roles-ready .pick-chip.ready {
+  opacity: 1;
+  border-style: solid;
+  background: rgba(120, 220, 140, 0.25);
+}
 /* 結果：入ってきた子は光らせ、出ていった子は灰色に */
 .deal-card {
   position: relative;

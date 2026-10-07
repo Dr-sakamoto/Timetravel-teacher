@@ -132,7 +132,8 @@ export type ResultCtx = 'turn' | 'hatch' | 'kaguya' | 'monthEnd' | 'yearEnd' | '
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
   | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
-  | { kind: 'roles'; player: number }
+  /** 係決め：全クラスが一斉に決め、全員の準備OK（ready）がそろったら手番に進む */
+  | { kind: 'roles'; player: null; ready: boolean[] }
   /** 手番：場のカードを1枚取る（または1枚捨てて見送る） */
   | { kind: 'draw'; player: number }
   /** 満席で人物カードを取る：代わりに転校させる生徒を選ぶ（slot は場のカードの位置） */
@@ -219,7 +220,8 @@ export type Action =
   | { type: 'drawMember' }
   | { type: 'drawAllMembers' }
   | { type: 'continue' }
-  | { type: 'setRoles'; roles: RoleSeat[]; unlock?: RoleId[] }
+  /** 係決めの準備OK（係決めは一斉なので、だれのクラスかを player で言う） */
+  | { type: 'setRoles'; player: number; roles: RoleSeat[]; unlock?: RoleId[] }
   /** 場のカードを取る（人物・グッズはクラスポイントを払う） */
   | { type: 'take'; slot: number }
   /** 場のカードを1枚捨てて見送る */

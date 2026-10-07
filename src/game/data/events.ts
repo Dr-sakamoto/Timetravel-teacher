@@ -469,7 +469,7 @@ export function eraEffectRule(c: ContestCard): string {
     case 'elect':
       return `全校で${a}が一番多い子が当選し、${a}が1つ増える`;
     case 'machine':
-      return `機械の子（機械の人物・サイボーグ・📱💻💾を装備した子）は${a}が1つ増える`;
+      return `機械の子（機械の人物・サイボーグ・スマホ・タブレット・電脳チップを装備した子）は${a}が1つ増える`;
     case 'timemachine':
       return 'ポイントが一番少ないクラスに、どこかの時代の人物が1人、無料で転入する';
     case 'threshold':
@@ -503,7 +503,7 @@ export function eraEffectRule(c: ContestCard): string {
     case 'genji':
       return `全校で${a}が一番多い子が作者に：作者のクラスで${ATTR_ICON[e.also]}を持つ子1人につき+${e.per}`;
     case 'kaguya':
-      return `かぐや姫が学期の終わりまで滞在し、宝（${KAGUYA_TREASURES.map((t) => t.icon).join('')}）をクラスごとに1つずつ頼む：頼まれた宝を装備していれば、手番で差し出して+${e.win}（宝は消える）`;
+      return `かぐや姫が学期の終わりまで滞在し、宝（${KAGUYA_TREASURES.map((t) => t.name).join('・')}）をクラスごとに1つずつ頼む：頼まれた宝を装備していれば、手番で差し出して+${e.win}（宝は消える）`;
     case 'benkei':
       return `${a}の合計が${e.need}以上のクラスが弁慶を倒し、一番多いクラスに弁慶（${a}${a}${a}）が転入。届かないクラスは−${e.lose}`;
     case 'masterpiece':
@@ -513,7 +513,7 @@ export function eraEffectRule(c: ContestCard): string {
     case 'plague':
       return `各クラスの係でない子1人（ランダム）がペストにかかり、学期の区切りまで${a}を数えない`;
     case 'newworld':
-      return `${a}の多いクラスから順に新大陸の品（${NEW_WORLD_GOODS.map((g) => g.icon + ATTR_ICON[g.attr]).join('')}）を1つ選び、グッズを持っていない子1人に装備（早い者勝ち）`;
+      return `${a}の多いクラスから順に新大陸の品（${NEW_WORLD_GOODS.map((g) => g.name + ATTR_ICON[g.attr]).join('・')}）を1つ選び、グッズを持っていない子1人に装備（早い者勝ち）`;
     case 'gekokujo':
       return `${a}が一番多いクラスが、ポイントが一番多いクラスから${e.amount}点奪う`;
     case 'teppo':
@@ -542,17 +542,17 @@ export function fixedRule(f: FixedEvent): string {
 }
 
 /**
- * カードの効果を絵文字の式で（文章を読まなくても分かるように）。
- * 例：授業「👑 → +」、共通イベント「🏃 − 👥」、時代イベント「🥇👊×2」、襲来「👊 − 8」
+ * カードの効果を短い式で（文章を読まなくても分かるように）。絵文字は5つのアイコン（📚🏃🎨👑👊）だけ使う。
+ * 例：授業「👑 → +」、時代イベント「👊1位 +12」、襲来「👊 − 8」
  */
 export function cardGlyph(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
       return `${ATTR_ICON[c.attr]} → +`;
     case 'kachikomi':
-      return `👊×${c.mult} → 😵　👊×${c.drain} → +`;
+      return `相手 −👊×${c.mult}　自分 +👊×${c.drain}`;
     case 'swing':
-      if (c.per) return `🧑${ATTR_ICON[c.plus]} → +${c.per}ずつ`;
+      if (c.per) return `${ATTR_ICON[c.plus]}の子1人 +${c.per}`;
       return c.minus ? `+${ATTR_ICON[c.plus]}　−${ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
     case 'contest':
       return contestGlyph(c);
@@ -561,11 +561,11 @@ export function cardGlyph(c: EventCard): string {
     case 'goods':
       return `装備 ${ATTR_ICON[c.attr]}＋1`;
     case 'cyborg':
-      return '🧑 → 🦾';
+      return '1人をサイボーグに';
     case 'push':
-      return '👥 → 👋🧑';
+      return '全クラス 1人転校';
     case 'exchange':
-      return '🧑 ⇄ 🧑';
+      return '1人ずつ交換';
   }
 }
 
@@ -574,84 +574,84 @@ function contestGlyph(c: ContestCard): string {
   const e = c.effect;
   switch (e.type) {
     case 'heads':
-      return `🧑${a} → +${e.per}ずつ`;
+      return `${a}の子1人 +${e.per}`;
     case 'disaster':
-      return `全員−${e.lose}　🧑${a} → +${e.per}ずつ`;
+      return `全員−${e.lose}　${a}の子1人 +${e.per}`;
     case 'egg':
-      return `${a}🥇 ⟵ 🥚 → 🦖`;
+      return `${a}1位 → 卵が来る`;
     case 'tiers':
-      return e.steps.map(([n, w]) => `${n}↑+${w}`).join('／');
+      return e.steps.map(([n, w]) => `${n}以上+${w}`).join('／');
     case 'elect':
-      return `全校の🧑${a}🥇 → ${a}＋1`;
+      return `全校の${a}1位の子 → ${a}＋1`;
     case 'machine':
-      return `🤖🦾📱 → ${a}＋1`;
+      return `機械の子 → ${a}＋1`;
     case 'timemachine':
-      return 'ポイント最下位 ⟵ ⏳🧑';
+      return 'ポイント最下位に1人転入';
     case 'threshold':
-      return `${a}${e.need}↑ +${e.win}／−${e.lose}`;
+      return `${a}${e.need}以上 +${e.win}／未満 −${e.lose}`;
     case 'battle':
-      return `${a}で勝負 🥇+${e.win} 🥈+${e.second}${e.lose ? ` 最下位−${e.lose}` : ''}`;
+      return `${a}1位 +${e.win}　2位 +${e.second}${e.lose ? `　最下位 −${e.lose}` : ''}`;
     case 'arena':
-      return `🧑${a}${ATTR_ICON[e.also]} 剣闘 🥇+${e.win} 負け−${e.lose}`;
+      return `代表の${a}＋${ATTR_ICON[e.also]}　1位 +${e.win}　負け −${e.lose}`;
     case 'dialogue':
-      return `🧑${a}🥇 vs 🧔${e.need}　+${e.win}／−${e.lose}`;
+      return `代表の${a}${e.need}以上 +${e.win}／未満 −${e.lose}`;
     case 'plunder':
-      return `${a}🥇 ⟵${e.amount}点 ${a}最下位`;
+      return `${a}1位が最下位から${e.amount}点奪う`;
     case 'pyramid':
-      return `${a} → 🧱 → 🔺完成で ${e.steps.map(([n, w]) => `🧱${n}↑+${w}`).join('／')}`;
+      return `${a}の数だけ石を積む　完成で ${e.steps.map(([n, w]) => `${n}個以上+${w}`).join('／')}`;
     case 'scribe':
-      return `🧑${a}${ATTR_ICON[e.also]} → +${e.per}ずつ`;
+      return `${a}と${ATTR_ICON[e.also]}の子1人 +${e.per}`;
     case 'burial':
-      return `🧑${c.attr === 'all' ? '' : a}💍 → +${e.per}ずつ`;
+      return `グッズ持ちの子1人 +${e.per}`;
     case 'ostracism':
-      return '🗳️ 票🥇のクラス → 👋🧑';
+      return '投票1位のクラス 1人転校';
     case 'fireattack':
-      return `${a}🥇 vs 📚🥇 🔥 +${e.win}／−${e.lose}`;
+      return `${a}1位 vs 📚1位　+${e.win}／−${e.lose}`;
     case 'kongming':
-      return `👑−${a} 🥇 ⟵ 🪶孔明`;
+      return `👑−${a} 1位に孔明が転入`;
     case 'bridge':
-      return `🌉🧑${a}${e.need}↑ ⟵${e.take}点 ポイント🥇／−${e.lose}`;
+      return `代表の${a}${e.need}以上で1位から${e.take}点奪う／未満 −${e.lose}`;
     case 'oath':
-      return `ポイント最下位 🍑 義兄弟 → 点を山分け`;
+      return 'ポイント最下位が義兄弟を選ぶ → 点を山分け';
     case 'tribute':
-      return `${a}🥇 ⟵ ${e.per}点ずつ`;
+      return `${a}1位に全員から${e.per}点`;
     case 'genji':
-      return `🧑${a}🥇 → 🧑${ATTR_ICON[e.also]}×${e.per}`;
+      return `${a}1位の子のクラス ${ATTR_ICON[e.also]}の子1人 +${e.per}`;
     case 'kaguya':
-      return `🌙 ⟵ ${KAGUYA_TREASURES.map((t) => t.icon).join('')}？ → +${e.win}`;
+      return `頼まれた宝を差し出す +${e.win}`;
     case 'benkei':
-      return `${a}${e.need}↑ → 🪓🧑　届かず−${e.lose}`;
+      return `${a}${e.need}以上 弁慶が家来に／未満 −${e.lose}`;
     case 'masterpiece':
-      return `🧑${a}🥇 → ${a}×${e.per}`;
+      return `一番の子の${a} ×${e.per}`;
     case 'printing':
-      return `📖 → ${a}なしの🧑全員 ${a}＋1`;
+      return `${a}のない子 ${a}＋1`;
     case 'plague':
-      return `🐀 → 🧑 ${a}✖️`;
+      return `1人 ${a}が数えられない`;
     case 'newworld':
-      return `${a}🥇から → ${NEW_WORLD_GOODS.map((g) => g.icon).join('')}`;
+      return `${a}の多い順に新大陸の品`;
     case 'gekokujo':
-      return `${a}🥇 ⟵${e.amount}点 ポイント🥇`;
+      return `${a}1位がポイント1位から${e.amount}点奪う`;
     case 'teppo':
-      return `全クラス ⟵ ${TEPPO_GOODS.icon}${ATTR_ICON[TEPPO_GOODS.attr]}＋1`;
+      return `全クラスに鉄砲 ${ATTR_ICON[TEPPO_GOODS.attr]}＋1`;
     case 'rakuichi':
-      return `${a}🥇 → 次のグッズ0点`;
+      return `${a}1位 次のグッズ0点`;
     case 'lottery':
-      return `全員−${e.fee} → 🎫当たり総取り`;
+      return `全員−${e.fee}　当たり総取り`;
     case 'prize':
-      return `全校の🧑${a}🥇 → +${e.win}`;
+      return `全校の${a}1位の子 +${e.win}`;
     case 'patent':
-      return `${a}🥇 ⟵ 授業1回につき${e.fee}点`;
+      return `${a}1位 授業1回につき${e.fee}点`;
     case 'expo':
       return e.steps.map(([n, w]) => `${n}種類+${w}`).join('／');
     case 'sunflower':
-      return `🧑${a}🥇 → 🖼️ → 学期末 ${a}×${e.per}`;
+      return `一番の子の${a}×${e.per}（学期末）`;
     case 'alien':
-      return '🪑 → 👽';
+      return '空席に火星人';
   }
 }
 
 export function fixedGlyph(f: FixedEvent): string {
-  return f.rule === 'test' ? `📚 − 👊🧑×${TEST_YANKEE_PENALTY}　🥇🥈🥉` : 'アイコンの数　🥇🥈🥉';
+  return f.rule === 'test' ? `📚 − 👊の子×${TEST_YANKEE_PENALTY}　順位` : 'アイコンの数　順位';
 }
 
 /** カードの一言説明（選んだとき・めくったときに出す）。式だけで足りるものは空 */

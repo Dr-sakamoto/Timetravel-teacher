@@ -160,15 +160,23 @@ function leader(s: GameState, candidates: number[]): number {
   return [...candidates].sort((x, y) => s.players[y].points - s.players[x].points)[0];
 }
 
+/** そのクラスの係をおまかせで決めて準備OKにする（CPU・通信が切れた人の代わり） */
+export function rolesAction(s: GameState, pi: number): Action {
+  const p = s.players[pi];
+  const unlock = autoUnlock(p, slotsNow(s));
+  return { type: 'setRoles', player: pi, unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
+}
+
 export function cpuAction(s: GameState): Action | null {
   const ph = s.phase;
   switch (ph.kind) {
     case 'memberDraw':
       return { type: 'drawMember' };
     case 'roles': {
-      const p = s.players[ph.player];
-      const unlock = autoUnlock(p, slotsNow(s));
-      return { type: 'setRoles', unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
+      // 係決めは一斉：まだ準備OKでないCPUのクラスから決める（CPUがみな決めていれば、まだの人のクラスを代わりに）
+      const cpu = s.players.findIndex((p, i) => p.isCpu && !ph.ready[i]);
+      const pi = cpu >= 0 ? cpu : ph.ready.indexOf(false);
+      return pi < 0 ? null : rolesAction(s, pi);
     }
     case 'draw': {
       // かぐや姫に頼まれた宝を持っていれば、先に差し出す（手番は終わらない）

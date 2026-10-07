@@ -273,14 +273,12 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
   );
 }
 
-const MEDAL = ['🥇', '🥈', '🥉'];
-
-/** 名札に浮かぶ「+5」「🥇+6」 */
+/** 名札に浮かぶ「+5」「1位 +6」 */
 function DeltaBadge({ delta, rank, points }: { delta?: number; rank?: number; points: number }) {
   if (delta === undefined || (delta === 0 && rank === undefined)) return null;
   return (
     <span className={`plate-delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`} key={`${delta}-${points}`}>
-      {rank !== undefined && MEDAL[rank]}
+      {rank !== undefined && `${rank + 1}位 `}
       {delta > 0 ? '+' : ''}
       {delta !== 0 && delta}
     </span>

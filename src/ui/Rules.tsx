@@ -50,7 +50,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
           </li>
           <li>
             <b>係</b>：1年1学期は1種だけ。学期の頭に、まだ解放していない係から好きなものを1種ずつ選んで解放し、最大{MAX_ROLE_SEATS}種。解放した係はずっと使える。1つの係に{MAX_PER_ROLE}人まで。
-            係に就いた子は、その係のアイコンが<b>2倍</b>に数えられる。学期の頭に決め直せる。
+            係に就いた子は、その係のアイコンが<b>2倍</b>に数えられる。学期の頭に<b>全クラスが一斉に</b>決め直し、全員が「準備OK」になったら手番が始まる。
             <div className="rule-roles">
               {ROLE_ORDER.map((r) => (
                 <span key={r} className="chip">

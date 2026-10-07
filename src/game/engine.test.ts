@@ -1201,11 +1201,32 @@ describe('engine', () => {
     while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
     const f = s.queue[0];
     const uid = s.players[f].students[0].uid;
-    expect(step(s, { type: 'setRoles', roles: [] })).toBe(s);
-    expect(step(s, { type: 'setRoles', roles: [{ role: 'pe', uid }], unlock: ['study'] })).toBe(s);
-    const next = step(s, { type: 'setRoles', roles: [{ role: 'study', uid }], unlock: ['study'] });
+    expect(step(s, { type: 'setRoles', player: f, roles: [] })).toBe(s);
+    expect(step(s, { type: 'setRoles', player: f, roles: [{ role: 'pe', uid }], unlock: ['study'] })).toBe(s);
+    const next = step(s, { type: 'setRoles', player: f, roles: [{ role: 'study', uid }], unlock: ['study'] });
     expect(next.players[f].unlocked).toEqual(['study']);
     expect(next.players[f].roles).toEqual([{ role: 'study', uid }]);
+  });
+
+  it('roles are set by every class at once; turns start when everyone is ready', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }, { name: 'C', isCpu: true }], 1, 11);
+    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
+    const set = (t: typeof s, pi: number) => {
+      const uid = t.players[pi].students[0].uid;
+      return step(t, { type: 'setRoles', player: pi, roles: [{ role: 'study', uid }], unlock: ['study'] });
+    };
+    // 順番は決まっていない：手番の最後の人からでも準備OKにできる
+    const last = s.queue[s.queue.length - 1];
+    let t = s.players[last].isCpu ? step(s, cpuAction(s)!) : set(s, last);
+    expect(t.phase.kind).toBe('roles');
+    if (t.phase.kind === 'roles') expect(t.phase.ready[last]).toBe(true);
+    // 準備OKの人はもう一度は決められない
+    if (!t.players[last].isCpu) expect(set(t, last)).toBe(t);
+    for (const pi of [0, 1]) if (t.phase.kind === 'roles' && !t.phase.ready[pi]) t = set(t, pi);
+    expect(t.phase.kind).toBe('roles');
+    // CPUが決めて全員そろったら手番へ
+    t = step(t, cpuAction(t)!);
+    expect(t.phase.kind).not.toBe('roles');
   });
 
   it('exchange swaps students with the same number of printed icons; the other side must have no role', () => {

@@ -71,7 +71,7 @@ export function RoleEditor({ player, year, slots, onConfirm }: Props) {
     <div className="role-editor">
       <div className="role-bar">
         <span>
-          {need > 0 && !ready ? <b>👆 🆕 をあと{need - unlock.length}つ</b> : <>👆 カード → 係の場（{MAX_PER_ROLE}人まで）</>}
+          {need > 0 && !ready ? <b>新しい係をあと{need - unlock.length}つ解放</b> : <>カード → 係の場（{MAX_PER_ROLE}人まで）</>}
         </span>
         {warn && <div className="role-warn">{warn}</div>}
         <button
@@ -83,7 +83,7 @@ export function RoleEditor({ player, year, slots, onConfirm }: Props) {
             setHeld(null);
           }}
         >
-          🤖 おまかせ
+          おまかせ
         </button>
         <button className="btn primary" disabled={!ready} onClick={() => onConfirm(roles, unlock)}>
           決定
