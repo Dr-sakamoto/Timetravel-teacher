@@ -1,5 +1,6 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
+import { kaguyaGift } from '../game/engine';
 import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, NEW_WORLD_MAP, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
@@ -27,6 +28,12 @@ export interface Pick {
   uid: string | null;
   target: number | null;
   theirUid: string | null;
+}
+
+/** かぐや姫に宝を差し出したときの点 */
+function kaguyaWinPts(): number {
+  const c = EVENT_MAP.kaguya;
+  return c.kind === 'contest' && c.effect.type === 'kaguya' ? c.effect.win : 0;
 }
 
 /** 場のカード1枚の見た目 */
@@ -347,7 +354,20 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     case 'roles':
       return <div className="say">{who} 🏷️ 係決め</div>;
     case 'draw': {
-      if (sel === null) return <div className="say">{who} 👆 1枚えらぶ</div>;
+      // かぐや姫に頼まれた宝を持っていれば、手番の中でいつでも差し出せる（手番は終わらない）
+      const gift = kaguyaGift(state, ph.player);
+      const present = gift?.goods && (
+        <button className="btn small" onClick={() => dispatch({ type: 'present' })} title="宝はなくなるが、手番は続く">
+          🌙 {gift.goods.icon}を差し出す +{kaguyaWinPts()}
+        </button>
+      );
+      if (sel === null)
+        return (
+          <div className="say">
+            {who} 👆 1枚えらぶ
+            {present && <div className="say-sub">{present}</div>}
+          </div>
+        );
       const id = state.market[sel];
       const cost = marketCost(id);
       const p = state.players[ph.player];
@@ -369,6 +389,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             <button className="btn primary" disabled={!ok} onClick={() => dispatch({ type: 'take', slot: sel })}>
               {label}
             </button>
+            {present}
           </div>
         </div>
       );

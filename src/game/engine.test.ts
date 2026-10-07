@@ -5,7 +5,7 @@ import { BENKEI, CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
-import { MONTHS, canTake, currentEra, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
+import { MONTHS, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
@@ -634,34 +634,37 @@ describe('engine', () => {
       expect(role.delta).toEqual([3, 0, 0]);
     });
 
-    it('kaguya: Kaguya stays until the term ends and asks each class for a different treasure', () => {
-      // クラス0は5つの宝を全部装備した子がいるので、頼まれた宝をすぐに差し出す（宝は消えて+5）
+    it('kaguya: Kaguya stays until the term ends; each class may present its own treasure on its turn for +5', () => {
+      // クラス0は5つの宝を全部装備している。来ただけでは差し出さない（差し出すかどうかは手番で選ぶ）
       const holders = KAGUYA_TREASURES.map((g, k) => ({ ...mk(`t${k}`, ['study', g.attr]), goods: { id: g.id, name: g.name, icon: g.icon, attr: g.attr } }));
       const r = run('kaguya', [holders, [mk('b', ['art'])], [mk('c', ['charm'])]]);
-      expect(r.delta).toEqual([5, 0, 0]);
+      expect(r.delta).toEqual([0, 0, 0]);
       const asks = r.after.kaguya!;
-      expect(asks[0]).toBeNull();
-      expect(asks[1]).not.toBe(asks[2]);
-      expect(KAGUYA_TREASURES.map((g) => g.id)).toContain(asks[1]);
-      const left = r.after.players[0].students.filter((x) => x.goods);
-      expect(left).toHaveLength(KAGUYA_TREASURES.length - 1);
-      const gave = r.after.players[0].students.find((x) => x.uid.startsWith('t') && !x.goods)!;
-      expect(gave.attrs).toEqual(['study']);
-      // あとから頼まれた宝を装備すると、そのまま差し出す（グッズ代2点を払って+5）
+      expect(new Set(asks).size).toBe(3);
+      expect(asks.every((id) => KAGUYA_TREASURES.some((g) => g.id === id))).toBe(true);
+      expect(r.after.players[0].students.filter((x) => x.goods)).toHaveLength(KAGUYA_TREASURES.length);
+      // 手番で差し出す：宝は消えて+5、手番はそのまま続く
       const t = structuredClone(r.after);
-      t.phase = { kind: 'draw', player: 1 };
-      t.market[0] = asks[1]!;
-      const eq = step(step(t, { type: 'take', slot: 0 }), { type: 'equip', uid: 'b' });
-      expect(eq.players[1].points - t.players[1].points).toBe(5 - 2);
-      expect(eq.players[1].students.find((x) => x.uid === 'b')!.goods).toBeUndefined();
-      expect(eq.kaguya![1]).toBeNull();
-      // ほかのクラスに頼まれた宝なら、ふつうのグッズとして装備する
+      t.phase = { kind: 'draw', player: 0 };
+      expect(kaguyaGift(t, 0)?.goods?.id).toBe(asks[0]);
+      const given = step(t, { type: 'present' });
+      expect(given.players[0].points - t.players[0].points).toBe(5);
+      expect(given.kaguya![0]).toBeNull();
+      const gave = given.players[0].students.find((x) => x.uid.startsWith('t') && !x.goods)!;
+      expect(gave.attrs).toEqual(['study']);
+      expect(given.phase.kind).toBe('result');
+      const back = step(given, { type: 'continue' });
+      expect(back.phase).toEqual({ kind: 'draw', player: 0 });
+      // 2回は差し出せない。頼まれた宝を持っていないクラスも差し出せない
+      expect(step(back, { type: 'present' })).toBe(back);
       const u = structuredClone(r.after);
       u.phase = { kind: 'draw', player: 1 };
-      u.market[0] = asks[2]!;
-      const other = step(step(u, { type: 'take', slot: 0 }), { type: 'equip', uid: 'b' });
-      expect(other.players[1].students.find((x) => x.uid === 'b')!.goods?.id).toBe(asks[2]);
-      expect(other.kaguya![1]).toBe(asks[1]);
+      expect(step(u, { type: 'present' })).toBe(u);
+      // 頼まれた宝を装備しても、勝手には差し出さない（あとで差し出せる）
+      u.market[0] = asks[1]!;
+      const eq = step(step(u, { type: 'take', slot: 0 }), { type: 'equip', uid: 'b' });
+      expect(eq.players[1].students.find((x) => x.uid === 'b')!.goods?.id).toBe(asks[1]);
+      expect(eq.kaguya![1]).toBe(asks[1]);
       // 学期の区切りで月へ帰る
       let v = r.after;
       for (let n = 0; n < 2000 && v.phase.kind !== 'roles'; n++) v = step(v, cpuAction(v)!);
