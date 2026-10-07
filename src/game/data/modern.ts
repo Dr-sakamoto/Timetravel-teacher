@@ -56,7 +56,7 @@ export const ARCHETYPES: Archetype[] = [
   a('influencer', '人気インフルエンサー', '📱', 'R', 7, '=ccc', 'フォロワー50万人。'),
   a('banchou', '伝説の番長', '🔱', 'SR', 7, '=ff', '隣町まで名前が知れ渡っている。'),
   a('olympian', 'オリンピック候補', '🏅', 'SR', 9, '=sppp', '練習で授業をよく休む。'),
-  a('genius', '飛び級の天才', '🧠', 'SR', 10, '=ssac', '実はまだ10歳。'),
+  a('genius', '飛び級の天才', '🧠', 'SR', 10, '=ssaa', '実はまだ10歳。'),
 ];
 
 export const ARCHETYPE_MAP: Record<string, Archetype> = Object.fromEntries(ARCHETYPES.map((a) => [a.id, a]));
