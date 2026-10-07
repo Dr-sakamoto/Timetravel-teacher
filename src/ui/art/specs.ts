@@ -87,12 +87,13 @@ export const ART: Record<string, ArtSpec> = {
   yukimura: { skin: SKIN.fair, outfit: 'yoroi', c1: '#d23a2a', c2: '#2b2b2b', hat: 'kabuto', hatColor: '#d23a2a', crest: 'antler', expr: 'angry', prop: 'spear' },
   hanzo: { skin: SKIN.fair, outfit: 'ninja', c1: '#2e3440', c2: '#7b5ea7', hat: 'ninja', hatColor: '#2e3440', expr: 'cool', prop: 'shuriken' },
 
-  // ---- 江戸・幕末 ----
-  ryoma: { skin: SKIN.fair, back: 'tail', hair: 'messy', hairColor: black, outfit: 'kimono', c1: '#2b2b2b', c2: '#5a5a5a', expr: 'grin', prop: 'pistol' },
-  musashi: { skin: SKIN.tan, back: 'shoulder', hair: 'messy', hairColor: black, outfit: 'kimono', c1: '#7a5a3a', c2: '#2b2b2b', beard: 'stubble', beardColor: black, expr: 'cool', prop: 'twoswords' },
-  hijikata: { skin: SKIN.fair, hair: 'side', hairColor: black, outfit: 'haori', expr: 'cool', prop: 'katana' },
+  // ---- 江戸 ----
   hokusai: { skin: SKIN.fair, hair: 'sides', hairColor: grey, outfit: 'kimono', c1: '#5a6a7a', c2: '#2b2b2b', expr: 'happy', acc: ['old'], prop: 'wave' },
-  okita: { skin: SKIN.pale, back: 'ponytail', hair: 'short', hairColor: black, outfit: 'haori', expr: 'smile', prop: 'katana' },
+  musashi: { skin: SKIN.tan, back: 'shoulder', hair: 'messy', hairColor: black, outfit: 'kimono', c1: '#7a5a3a', c2: '#2b2b2b', beard: 'stubble', beardColor: black, expr: 'cool', prop: 'twoswords' },
+  basho: { skin: SKIN.fair, outfit: 'robe', c1: '#4a4a3a', c2: '#2b2b2b', hat: 'monkhood', hatColor: '#3a3a44', expr: 'calm', acc: ['old'], prop: 'brush' },
+  inotadataka: { skin: SKIN.tan, hair: 'topknot', hairColor: grey, outfit: 'haori', c1: '#3a5a8c', c2: '#2b2b2b', expr: 'smile', acc: ['old'], prop: 'scroll' },
+  yoshimune: { skin: SKIN.fair, hair: 'topknot', hairColor: black, outfit: 'kimono', c1: '#2c3e66', c2: '#f2c94c', expr: 'cool', prop: 'sensu' },
+  sugita: { skin: SKIN.fair, outfit: 'haori', c1: '#5a4a3a', c2: '#2b2b2b', expr: 'calm', acc: ['old', 'round'], prop: 'book' },
 
   // ---- 近代 ----
   einstein: { skin: SKIN.fair, back: 'wild', hairColor: white, outfit: 'suit', c1: '#8a8f98', c2: '#3a3a44', beard: 'mustache', beardColor: white, expr: 'tongue', acc: ['old'] },
@@ -141,7 +142,6 @@ export const ART: Record<string, ArtSpec> = {
   sukeban: { back: 'long', hair: 'mid', hairColor: '#8a4a2a', outfit: 'sailor', c1: '#222', c2: '#c0392b', expr: 'cool', acc: ['mask'], prop: 'yoyo' },
   furyo: { hair: 'spiky', hairColor: blond, outfit: 'longran', c1: '#f6f4ee', acc: ['plaster'], expr: 'angry', prop: 'fist' },
   bosozoku: { hair: 'pompadour', hairColor: '#8a4a2a', outfit: 'tokko', hat: 'hachimaki', hatColor: '#e5534b', expr: 'shout' },
-  returnee: { back: 'long', hair: 'mid', hairColor: brown, outfit: 'blazer', c1: '#2c3e66', c2: '#2f7fd8', expr: 'smile', prop: 'plane' },
   childstar: { back: 'bob', hair: 'short', hairColor: '#7a4e2e', outfit: 'dress', c1: '#f59ac2', c2: '#fff', acc: ['shadesup'], expr: 'wink', prop: 'clapper' },
   topscore: { hair: 'side', hairColor: black, outfit: 'gakuran', hat: 'hachimaki', hatColor: '#e5534b', acc: ['glasses'], expr: 'angry', prop: 'pencil' },
   esports: { hair: 'messy', hairColor: '#3a6ad0', outfit: 'hoodie', c1: '#2b2b2b', acc: ['headset'], expr: 'cool', prop: 'gamepad' },
