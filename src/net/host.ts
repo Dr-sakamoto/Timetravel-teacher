@@ -1,6 +1,6 @@
 import type Peer from 'peerjs';
 import type { DataConnection } from 'peerjs';
-import { makePeer } from './peer';
+import { backoff, makePeer } from './peer';
 import { cpuAction } from '../game/ai';
 import { calendarLabel, newGame, step } from '../game/engine';
 import { SAVE_VERSION } from '../game/saveVersion';
@@ -54,6 +54,9 @@ export class HostRoom {
   private lastSeen = new Map<string, number>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private closed = false;
+  /** 通信サーバーへのつなぎ直しを予約しているか */
+  private retrying: ReturnType<typeof setTimeout> | null = null;
+  private serverTries = 0;
   snap: HostSnap;
 
   constructor(
@@ -72,33 +75,76 @@ export class HostRoom {
     }
     this.open(0);
     this.timer = setInterval(() => this.checkAlive(), 2000);
+    document.addEventListener('visibilitychange', this.onWake);
+    window.addEventListener('online', this.onWake);
   }
+
+  /** スマホが画面に戻った時・電波が戻った時は、すぐ通信サーバーとのつながりを確かめる */
+  private onWake = () => {
+    if (document.visibilityState === 'visible') this.checkServer(true);
+  };
 
   private open(tries: number) {
     if (this.closed) return;
+    this.peer?.destroy();
     const peer = makePeer(PEER_PREFIX + this.snap.code);
     this.peer = peer;
-    peer.on('open', () => this.set({ status: 'open', error: undefined }));
+    peer.on('open', () => {
+      this.serverTries = 0;
+      this.set({ status: 'open', error: undefined });
+    });
     peer.on('connection', (c) => this.accept(c));
     // 通信が切れたら（スマホがスリープした時など）つなぎ直す
     peer.on('disconnected', () => {
-      if (!this.closed && !peer.destroyed) setTimeout(() => !peer.destroyed && peer.reconnect(), 1000);
+      if (peer === this.peer) this.retryServer();
     });
     peer.on('error', (e) => {
+      if (peer !== this.peer) return;
       const type = (e as { type?: string }).type;
       if (type === 'unavailable-id') {
-        // 読み込み直した直後は、前のIDがまだ残っていることがある
+        // 読み込み直した直後は、前のIDがまだ残っていることがある（サーバーが前の接続を忘れるまで待つ）
+        this.peer = null;
+        if (this.retrying) clearTimeout(this.retrying);
+        this.retrying = null;
         peer.destroy();
-        if (tries < 6) setTimeout(() => this.open(tries + 1), 2500);
+        if (tries < 12) setTimeout(() => this.open(tries + 1), 2500);
         else this.set({ status: 'error', error: 'この部屋番号は使われています。ルームを作り直してください' });
         return;
       }
-      if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
-        if (!this.snap.state) this.set({ status: 'error', error: '通信サーバーにつながりません。電波を確認してください' });
+      if (type === 'browser-incompatible') {
+        this.set({ status: 'error', error: 'このブラウザは通信対戦に対応していません' });
         return;
       }
-      if (type === 'browser-incompatible') this.set({ status: 'error', error: 'このブラウザは通信対戦に対応していません' });
+      if (type === 'peer-unavailable' || type === 'webrtc') return;
+      // 通信サーバーにつながらない：あきらめずにつなぎ直す
+      if (this.snap.status === 'open') this.set({ status: 'opening' });
+      this.retryServer();
     });
+  }
+
+  /** 通信サーバーへのつなぎ直しを予約する（同じIDのまま。だめならIDを取り直す） */
+  private retryServer() {
+    if (this.closed || this.retrying) return;
+    const wait = backoff(this.serverTries++);
+    if (this.serverTries >= 5 && !this.snap.state && this.snap.status !== 'error')
+      this.set({ status: 'opening', error: '通信サーバーにつながりにくくなっています。つなぎ直しています…' });
+    this.retrying = setTimeout(() => {
+      this.retrying = null;
+      const peer = this.peer;
+      if (this.closed || !peer) return;
+      if (peer.open) return;
+      if (peer.destroyed) this.open(0);
+      else if (peer.disconnected) peer.reconnect();
+    }, wait);
+  }
+
+  /** 通信サーバーから切れたままになっていないか（切れていたらつなぎ直す） */
+  private checkServer(now = false) {
+    const peer = this.peer;
+    if (this.closed || !peer || peer.open || this.retrying) return;
+    if (!peer.destroyed && !peer.disconnected) return; // 最初の接続中
+    if (now) this.serverTries = 0;
+    this.retryServer();
   }
 
   private set(p: Partial<HostSnap>) {
@@ -197,6 +243,7 @@ export class HostRoom {
 
   /** つながっているかどうかを見直す（変わっていたら全員に知らせる） */
   private checkAlive() {
+    this.checkServer();
     const now = Date.now();
     let changed = false;
     const seats = this.snap.lobby.seats.map((s) => {
@@ -317,6 +364,9 @@ export class HostRoom {
     this.closed = true;
     for (const c of this.conns.values()) this.sendTo(c, { t: 'closed' });
     if (this.timer) clearInterval(this.timer);
+    if (this.retrying) clearTimeout(this.retrying);
+    document.removeEventListener('visibilitychange', this.onWake);
+    window.removeEventListener('online', this.onWake);
     // 「閉じました」が届くのを少し待ってから切る
     const peer = this.peer;
     setTimeout(() => peer?.destroy(), 300);

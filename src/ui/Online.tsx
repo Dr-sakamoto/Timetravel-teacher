@@ -199,7 +199,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
       {snap.status === 'error' ? (
         <p className="online-warn">{snap.error}</p>
       ) : snap.status === 'opening' ? (
-        <p className="online-lead">通信サーバーにつないでいます…</p>
+        <p className="online-lead">{snap.error ?? '通信サーバーにつないでいます…'}</p>
       ) : (
         <>
           <ShareCode code={snap.code} />
@@ -318,7 +318,13 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
           </section>
         </>
       ) : (
-        <p className="online-lead">{snap.status === 'reconnecting' ? 'つなぎ直しています…' : 'ルームに入っています…'}</p>
+        <p className="online-lead">
+          {snap.status === 'reconnecting'
+            ? 'つなぎ直しています…'
+            : snap.stage === 'server'
+              ? '通信サーバーにつないでいます…'
+              : `ルーム ${code} に入っています…`}
+        </p>
       )}
       <div className="actions">
         <button className="btn ghost" onClick={onExit}>
