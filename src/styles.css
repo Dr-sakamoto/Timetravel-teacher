@@ -3256,10 +3256,10 @@ body:has(.title-screen) {
   z-index: 2;
   pointer-events: none;
 }
-/* 新大陸の品を選んでいる人 */
-.new-world .opp.picking::after,
-.new-world .playmat.picking::after {
-  content: '🌎 選んでいる';
+/* 配られた品（新大陸の品・鉄砲）を装備させる子を選んでいる人 */
+.gift-pick .opp.picking::after,
+.gift-pick .playmat.picking::after {
+  content: '🎁 選んでいる';
 }
 /* ゲリラのあと次に手番をする人 */
 .opp.up-next:not(.picking)::after,
@@ -3320,4 +3320,27 @@ body:has(.title-screen) {
 .vote-option.selected {
   background: rgba(255, 255, 255, 0.22);
   transform: translateY(-2px);
+}
+
+/* ピラミッド（古代エジプトの学期だけ場の横に残る）：イベントなのでゲリラと同じ紫。積んだ石をクラスの色で横に積み上げる */
+.mcard.pyramid {
+  background: linear-gradient(145deg, #c9a2ff, #6a2fb0);
+}
+.mcard.pyramid.done {
+  filter: saturate(1.3);
+}
+.pyramid-bar {
+  display: flex;
+  width: 84%;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+.pyramid-bar > span {
+  height: 100%;
+}
+.mcard.pyramid::before {
+  background: #eadbff;
 }

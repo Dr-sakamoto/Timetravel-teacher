@@ -1,11 +1,10 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { kaguyaGift } from '../game/engine';
-import { canTake, currentEra, inGuerrilla, marketCost, nextTurnPlayer, previewStudent, voteTargets } from '../game/engine';
-import { EVENT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, NEW_WORLD_MAP, cardGlyph, shortRule } from '../game/data/events';
+import { canBuild, canTake, currentEra, kaguyaGift, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, previewStudent, voteTargets } from '../game/engine';
+import { EVENT_MAP, GIFT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
-import { ATTR_ICON, type Action, type GameState, type Student } from '../game/types';
+import { ATTR_ICON, type Action, type GameState, type Player, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
 import { TcgCard } from './TcgCard';
 import { KaguyaStay } from './KaguyaStay';
@@ -37,8 +36,8 @@ function kaguyaWinPts(): number {
 }
 
 /** 場のカード1枚の見た目 */
-function MarketCard({ id, selected, dim, onClick }: { id: string; selected: boolean; dim: boolean; onClick?: () => void }) {
-  const cost = marketCost(id);
+function MarketCard({ id, selected, dim, onClick, buyer }: { id: string; selected: boolean; dim: boolean; onClick?: () => void; buyer?: Player | null }) {
+  const cost = marketCost(id, buyer ?? undefined);
   const costLabel = cost > 0 ? `${cost}点` : '無料';
   if (id.startsWith('person:')) {
     return (
@@ -60,6 +59,35 @@ function MarketCard({ id, selected, dim, onClick }: { id: string; selected: bool
     </button>
   );
 }
+
+/** 場の横に残るピラミッド（選ぶと🏃の数だけ石を積む）。積んだ石をクラスの色で積み上げて見せる */
+function PyramidCard({ state, selected, dim, onClick }: { state: GameState; selected: boolean; dim: boolean; onClick?: () => void }) {
+  const py = state.pyramid!;
+  const c = pyramidCard(state)!;
+  const sum = py.stones.reduce((a, x) => a + x, 0);
+  return (
+    <button
+      className={`mcard pyramid ${py.done ? 'done' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`}
+      onClick={onClick}
+      disabled={!onClick}
+      title={`${c.name}：${state.players.map((p, i) => `${p.name} ${py.stones[i]}`).join('・')}`}
+    >
+      <span className="mcard-icon">{c.icon}</span>
+      <span className="mcard-name">{py.done ? '完成！' : 'ピラミッド'}</span>
+      <span className="pyramid-bar">
+        {state.players.map((p, i) => (
+          <span key={i} style={{ width: `${(Math.min(py.stones[i], py.need) / py.need) * 100}%`, background: p.color }} />
+        ))}
+      </span>
+      <span className="mcard-name">
+        🧱{Math.min(sum, py.need)}/{py.need}
+      </span>
+    </button>
+  );
+}
+
+/** ピラミッドを選んでいるときの sel の値（場のカードの位置と重ならない） */
+const PYRAMID_SEL = -1;
 
 /** 卓の中央：山札・場のカード・捨て札・めくったカードと手番の操作 */
 export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, side }: Props) {
@@ -111,6 +139,7 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
                 selected={selected === i}
                 dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
                 onClick={canPick ? () => setSel(i) : undefined}
+                buyer={actor}
               />
             ))}
             {/* ゲリラ中：補充しようとした場所に、山札からめくれたゲリラを示す */}
@@ -121,6 +150,14 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
                   {i === 0 && <span className="mcard-name">イベント</span>}
                 </div>
               ))}
+            {state.pyramid && (
+              <PyramidCard
+                state={state}
+                selected={selected === PYRAMID_SEL}
+                dim={!!canPick && ph.kind === 'draw' && !canBuild(state, ph.player)}
+                onClick={canPick ? () => setSel(PYRAMID_SEL) : undefined}
+              />
+            )}
           </div>
         )}
         <div className="piles">
@@ -290,22 +327,23 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     );
   }
 
-  // 新大陸の品もゲリラ：装備させる子をタップしてから品を選ぶ
-  if (ph.kind === 'newWorld') {
+  // 品を配るのもゲリラ（新大陸の品・鉄砲）：装備させる子をタップしてから品を選ぶ
+  if (ph.kind === 'gift') {
     const st = state.players[ph.player].students.find((x) => x.uid === pick.uid);
+    const card = EVENT_MAP[ph.card];
     return (
       <div className="say guerrilla-say">
         <CutIn />
         <div className="say-sub">
-          🌎 新大陸の品：{who} のクラスが{cpuBusy ? '選んでいます…' : <>装備させる子をタップ {chosen(st)} → 品を選ぶ</>}
-          {ph.got.length > 0 && <small>（{ph.got.map((g) => NEW_WORLD_MAP[g.item].icon).join('')} 受け取りずみ）</small>}
+          {card.icon} {card.name}：{who} のクラスが{cpuBusy ? '選んでいます…' : <>装備させる子をタップ {chosen(st)} → 品を選ぶ</>}
+          {ph.got.length > 0 && <small>（{ph.got.map((g) => GIFT_MAP[g.item].icon).join('')} 受け取りずみ）</small>}
         </div>
         <div className="say-sub">
           {!cpuBusy &&
             ph.items.map((id) => {
-              const g = NEW_WORLD_MAP[id];
+              const g = GIFT_MAP[id];
               return (
-                <button key={id} className="btn primary" disabled={!pick.uid} onClick={() => pick.uid && dispatch({ type: 'newWorld', item: id, uid: pick.uid })} title={`${g.name}（${ATTR_ICON[g.attr]}＋1）`}>
+                <button key={id} className="btn primary" disabled={!pick.uid} onClick={() => pick.uid && dispatch({ type: 'gift', item: id, uid: pick.uid })} title={`${g.name}（${ATTR_ICON[g.attr]}＋1）`}>
                   {g.icon} {g.name} {ATTR_ICON[g.attr]}＋1
                 </button>
               );
@@ -368,9 +406,27 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             {present && <div className="say-sub">{present}</div>}
           </div>
         );
+      if (sel === PYRAMID_SEL) {
+        const c = pyramidCard(state);
+        const ok = canBuild(state, ph.player);
+        const n = attrScore(state.players[ph.player], 'sports').total;
+        return (
+          <div className="say">
+            <div className="effect">
+              {c && cardGlyph(c)}
+              <div className="effect-say">{c && shortRule(c)}</div>
+            </div>
+            <div className="say-sub">
+              <button className="btn primary" disabled={!ok} onClick={() => dispatch({ type: 'build' })}>
+                {ok ? `🧱 石を${n}個積む` : state.pyramid?.done ? '🔺 完成ずみ' : '🙅 🏃がいない'}
+              </button>
+            </div>
+          </div>
+        );
+      }
       const id = state.market[sel];
-      const cost = marketCost(id);
       const p = state.players[ph.player];
+      const cost = marketCost(id, p);
       const ok = canTake(state, ph.player, sel);
       const card = id.startsWith('person:') ? null : EVENT_MAP[id];
       const gainNow = card?.kind === 'normal' ? attrScore(p, card.attr).total : null;
@@ -458,7 +514,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         <div className="say">
           {c.icon} 装備する子をタップ（{attr}＋1）
           <div className="say-sub">{chosen(st)}</div>
-          {pair(() => dispatch({ type: 'equip', uid: null }), `${c.icon} 装備 −${marketCost(ph.card)}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
+          {pair(() => dispatch({ type: 'equip', uid: null }), `${c.icon} 装備 −${marketCost(ph.card, state.players[ph.player])}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
         </div>
       );
     }
@@ -499,7 +555,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             {canContinue ? (
               <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
                 {/* 手番の終わりに場を補充する（ここでゲリラがめくれることがある）と分かるように */}
-                {ph.ctx === 'turn' && ph.player !== null ? '🃏 場を補充 ▶' : '次へ ▶'}
+                {ph.ctx === 'turn' && state.market.length < MARKET_SIZE ? '🃏 場を補充 ▶' : '次へ ▶'}
               </button>
             ) : (
               <div className="say-sub">⏳ {who}</div>

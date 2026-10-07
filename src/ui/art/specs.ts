@@ -44,9 +44,9 @@ export const ART: Record<string, ArtSpec> = {
   // ---- 古代エジプト ----
   cleopatra: { skin: SKIN.tan, back: 'egypt', hair: 'patsun', hairColor: black, outfit: 'egypt', c1: '#3f7fd0', hat: 'diadem', acc: ['earring'], expr: 'calm', liner: true },
   tut: { skin: SKIN.tan, outfit: 'egypt', c1: '#3f7fd0', hat: 'nemes', hatColor: '#2f5fb3', expr: 'smile', liner: true },
-  imhotep: { skin: SKIN.tan, outfit: 'egypt', c1: '#35a37a', expr: 'calm', prop: 'setsquare', acc: ['old'] },
+  ramesses: { skin: SKIN.tan, outfit: 'egypt', c1: '#d14b3c', hat: 'nemes', hatColor: '#d9a441', expr: 'cool', liner: true, prop: 'spear' },
+  khufu: { skin: SKIN.tan, outfit: 'egypt', c1: '#35a37a', hat: 'nemes', hatColor: '#35a37a', beard: 'goatee', beardColor: black, expr: 'calm', liner: true, prop: 'brick' },
   nefertiti: { skin: SKIN.tan, outfit: 'egypt', c1: '#d14b3c', hat: 'nefercrown', hatColor: '#3566b8', acc: ['earring'], expr: 'calm', liner: true },
-  mason: { skin: SKIN.brown, outfit: 'bare', c1: '#f6f1e4', hat: 'headcloth', hatColor: '#f6f1e4', expr: 'grin', prop: 'brick', acc: ['sweat'] },
 
   // ---- ギリシャ・ローマ ----
   alexander: { skin: SKIN.fair, hair: 'curly', hairColor: blond, outfit: 'cuirass', c1: '#d9a441', c2: '#c0392b', expr: 'cool', prop: 'sword' },
@@ -86,7 +86,6 @@ export const ART: Record<string, ArtSpec> = {
   ieyasu: { skin: SKIN.fair, hair: 'topknot', hairColor: black, outfit: 'kimono', c1: '#6b4a2a', c2: '#2b2b2b', expr: 'calm', prop: 'sensu' },
   yukimura: { skin: SKIN.fair, outfit: 'yoroi', c1: '#d23a2a', c2: '#2b2b2b', hat: 'kabuto', hatColor: '#d23a2a', crest: 'antler', expr: 'angry', prop: 'spear' },
   hanzo: { skin: SKIN.fair, outfit: 'ninja', c1: '#2e3440', c2: '#7b5ea7', hat: 'ninja', hatColor: '#2e3440', expr: 'cool', prop: 'shuriken' },
-  keiji: { skin: SKIN.fair, back: 'tail', hair: 'spiky', hairColor: '#8a3a2a', outfit: 'kimono', c1: '#e5534b', c2: '#f2c94c', expr: 'grin', prop: 'kiseru' },
 
   // ---- 江戸・幕末 ----
   ryoma: { skin: SKIN.fair, back: 'tail', hair: 'messy', hairColor: black, outfit: 'kimono', c1: '#2b2b2b', c2: '#5a5a5a', expr: 'grin', prop: 'pistol' },

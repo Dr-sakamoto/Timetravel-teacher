@@ -47,7 +47,10 @@ export interface SwingCard {
  *   plunder   … 白亜紀「Xが一番多いクラスが、一番少ないクラスから amount 点奪う」
  *   disaster  … 白亜紀「全クラス −lose。Xを持つ子1人につき +per」
  *   egg       … 白亜紀「Xが一番多いクラス（1クラスだけ）の空いた席に卵が置かれ、そのクラスの次の手番の始めに恐竜が孵る」
- *   together  … エジプト「全クラスのXの合計が need×クラス数 以上なら全クラス +win（Xが一番少ないクラスだけ0）、届かなければ全クラス −lose」
+ *   pyramid   … エジプト「山札には入らず、学期のあいだ場の横に残る。手番で選ぶと、クラスのXの数だけ石を積む（その手番は点なし）。
+ *               全クラスの石が need×クラス数 に届いたら完成：自分のクラスが積んだ石が steps[i][0] 以上なら +steps[i][1]（届いた一番上の段だけ）。学期中に完成しなければむだになる」
+ *   scribe    … エジプト「Xと also を両方持つ子（書記）1人につき +per」
+ *   burial    … エジプト「Xを持っていて、グッズを装備している子1人につき +per（王や貴族があの世へ持っていく副葬品）」
  *   arena     … ギリシャ「各クラスの、Xと also の合計が一番多い子が闘技場で戦う：1位 +win、負けたクラス（出せる子がいないクラスも）−lose」
  *   dialogue  … ギリシャ「各クラスのXが一番多い子が代表になってソクラテス（強さ need）と対話：代表のXが need 以上なら +win、届かない（代表がいない）と論破されて −lose」
  *   ostracism … ギリシャ「全クラスが自分以外のクラスに秘密で投票し、票が一番多いクラスが、係に就いていない子を1人転校させる」
@@ -60,7 +63,9 @@ export interface SwingCard {
  *   printing  … 中世「Xを持っていない子全員のXが1つ増える（全員持っていれば何も起こらない）」
  *   plague    … 中世「各クラスの係に就いていない子1人（ランダム）がペストにかかる。学期の区切りまでXを数えない」
  *   newworld  … 中世「Xの多いクラスから順に、新大陸の品を1つと、それを装備させる子（グッズのない子）を選ぶ。品は早い者勝ち」
- *   gekokujo  … 戦国「Xが一番多いクラスが、ポイントが一番多いクラスから amount 点奪う」
+ *   gekokujo  … 戦国「Xが一番多いクラスが、ポイントが一番多いクラスから amount 点奪う」（桶狭間の戦い）
+ *   teppo     … 戦国「全クラスに鉄砲（種子島）が1丁ずつ届き、クラスごとにグッズのない子1人を選んで装備させる」
+ *   rakuichi  … 戦国「Xが一番多いクラス（1クラスだけ）は、次に取るグッズ1つがタダになる」
  *   lottery   … 江戸「全クラスが fee 点ずつ出し、くじで当たった1クラスが総取り」
  *   prize     … 近代「全校でXが一番多い子が受賞し、その子のクラスに +win」
  *   elect     … 現代「全校でXが一番多い子が当選し、Xが1つ増える」（同点なら全員）
@@ -79,7 +84,9 @@ export type EraEffect =
   | { type: 'plunder'; amount: number }
   | { type: 'disaster'; lose: number; per: number }
   | { type: 'egg' }
-  | { type: 'together'; need: number; win: number; lose: number }
+  | { type: 'pyramid'; need: number; steps: [stones: number, win: number][] }
+  | { type: 'scribe'; also: Attr; per: number }
+  | { type: 'burial'; per: number }
   | { type: 'arena'; also: Attr; win: number; lose: number }
   | { type: 'dialogue'; need: number; win: number; lose: number }
   | { type: 'ostracism' }
@@ -93,6 +100,8 @@ export type EraEffect =
   | { type: 'plague' }
   | { type: 'newworld' }
   | { type: 'gekokujo'; amount: number }
+  | { type: 'teppo' }
+  | { type: 'rakuichi' }
   | { type: 'lottery'; fee: number }
   | { type: 'prize'; win: number }
   | { type: 'alien' };
@@ -111,6 +120,8 @@ export interface ContestCard {
   icon: string;
   /** 競うアイコン（'all' は全種類のアイコンの合計。優遇なしの現代用） */
   attr: Attr | 'all';
+  /** あれば attr と合わせて数えるアイコン（戦国の合戦は👑＋👊） */
+  also?: Attr;
   era: EraId;
   effect: EraEffect;
   desc: string;
@@ -186,9 +197,10 @@ export function personCost(icons: number): number {
 /** グッズ・サイボーグ化を取るのに払うクラスポイント */
 export const GOODS_COST = 2;
 
-/** 場から取れるカードのコスト（授業とクラス替えは無料） */
-export function eventCost(c: EventCard): number {
-  return c.kind === 'goods' || c.kind === 'cyborg' ? GOODS_COST : 0;
+/** 場から取れるカードのコスト（授業とクラス替えは無料）。freeGoods（楽市楽座）があればグッズはタダ */
+export function eventCost(c: EventCard, freeGoods = false): number {
+  if (c.kind === 'goods') return freeGoods ? 0 : GOODS_COST;
+  return c.kind === 'cyborg' ? GOODS_COST : 0;
 }
 
 /** ゲリラ：場に並べようとめくった瞬間に、その場で起こるカード（だれも避けられない） */
@@ -233,7 +245,7 @@ export const GOODS_CARDS: GoodsCard[] = [
   G('g_fang', 'ティラノサウルスの牙', '🦷', 'fight', 'cretaceous'),
   G('g_amber', '琥珀', '🟠', 'art', 'cretaceous'),
   G('g_mask', 'ツタンカーメンの黄金のマスク', '🎭', 'charm', 'egypt'),
-  G('g_sandal', 'ツタンカーメンのサンダル', '🩴', 'sports', 'egypt'),
+  G('g_sledge', 'ピラミッドの石運びそり', '🛷', 'sports', 'egypt'),
   G('g_olive', 'オリンピアのオリーブ冠', '🌿', 'sports', 'greece'),
   G('g_republic', 'プラトンの『国家』', '📜', 'study', 'greece'),
   G('g_sunzi', '『孫子』の兵法書', '🎋', 'study', 'china'),
@@ -245,7 +257,7 @@ export const GOODS_CARDS: GoodsCard[] = [
   G('g_ryunotama', '龍の首の珠', '🐉', 'fight', 'heian'),
   G('g_chisel', 'ミケランジェロのノミ', '🔨', 'art', 'europe'),
   G('g_copernicus', 'コペルニクスの『天球回転論』', '📙', 'study', 'europe'),
-  G('g_tanegashima', '種子島（火縄銃）', '🔫', 'fight', 'sengoku'),
+  G('g_tonbogiri', '本多忠勝の蜻蛉切', '🔱', 'fight', 'sengoku'),
   G('g_hyotan', '秀吉の千成瓢箪', '🍶', 'charm', 'sengoku'),
   G('g_fugaku', '北斎の『富嶽三十六景』', '🗻', 'art', 'edo'),
   G('g_ryoteisha', '伊能忠敬の量程車', '🛞', 'sports', 'edo'),
@@ -265,6 +277,12 @@ export const NEW_WORLD_MAP: Record<string, GoodsCard> = Object.fromEntries(NEW_W
 
 /** かぐや姫が頼む5つの宝（竹取物語の難題）＝平安のグッズ。くじで各クラスに1つずつ、重ならないように頼む */
 export const KAGUYA_TREASURES: GoodsCard[] = GOODS_CARDS.filter((g) => g.era === 'heian');
+
+/** 鉄砲伝来で全クラスに1丁ずつ届く鉄砲（山札には入らない。装備するとグッズと同じく👊＋1） */
+export const TEPPO_GOODS: GoodsCard = G('g_tanegashima', '種子島（火縄銃）', '🔫', 'fight');
+
+/** イベントで配られる品（新大陸の品・鉄砲）。山札のグッズとは別 */
+export const GIFT_MAP: Record<string, GoodsCard> = { ...NEW_WORLD_MAP, [TEPPO_GOODS.id]: TEPPO_GOODS };
 
 /** サイボーグ化（未来の学期だけ山札に入る） */
 export const CYBORG_CARDS: CyborgCard[] = [{ id: 'cyborg', kind: 'cyborg', name: 'サイボーグ化', icon: '🦾', era: 'future', count: 1 }];
@@ -308,9 +326,11 @@ export const ERA_CARDS: ContestCard[] = [
   C('trex_hunt', 'ティラノサウルスの狩り', '🦖', 'fight', { type: 'plunder', amount: 8 }, '強い者が、一番弱い者を狩っていく。', 'cretaceous', 1),
   C('migration', '大移動', '🦕', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, 'パラサウロロフスの群れが大地を渡る。群れを守り切れるか。', 'cretaceous', 1),
   C('egg_theft', 'オヴィラプトルの卵泥棒', '🥚', 'sports', { type: 'egg' }, '一番すばしこいクラスが、恐竜の卵をこっそり持ち帰る。何が孵るかはお楽しみ。', 'cretaceous', 1),
-  // 古代エジプト：🏃👑。全クラスで1つのピラミッドを積む（サボったクラスは分け前なし）
-  C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'together', need: 6, win: 6, lose: 3 }, '全クラス総出で石を積む。完成すれば全員にほうび、サボったクラスは分け前なし。', 'egypt'),
-  C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'heads', per: 2 }, 'ファラオに気に入られる子が多いほど、クラスの株が上がる。', 'egypt'),
+  // 古代エジプト：🏃👑。ピラミッドは場の横に残り、みんなで少しずつ積む。ナイルの氾濫のあとは大豊作。書記はえらい役人、ミイラの副葬品は王や貴族のもの
+  C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'pyramid', need: 7, steps: [[7, 20], [14, 30]] }, '学期のあいだ、みんなで少しずつ石を積む。働く人はパンとビールを給料にもらっていた。完成すれば、たくさん積んだクラスほど大きなほうび。学期が終わるまでに完成しなければ、積んだ石はむだになる。', 'egypt', 1),
+  C('nile', 'ナイルの氾濫', '🌊', 'sports', { type: 'heads', per: 2 }, '毎年夏、ナイル川があふれて畑に黒い土を運ぶ。水が引いたら大豊作。畑で働く子が多いほど、たくさんとれる。', 'egypt', 1),
+  C('hieroglyph', 'ヒエログリフ', '👁️', 'charm', { type: 'scribe', also: 'study', per: 3 }, '絵のような文字で、石や紙（パピルス）に書き残す。読み書きができる書記は、王に仕えるえらい役人だった。', 'egypt', 1),
+  C('mummy', 'ミイラづくり', '⚱️', 'charm', { type: 'burial', per: 4 }, '70日かけてミイラをつくり、あの世で使う宝物（副葬品）といっしょにお墓に納める。りっぱなお墓に宝物を入れてもらえたのは、王や貴族だけ。', 'egypt', 1),
   // ギリシャ・ローマ：🏃📚。オリンピックは負けても減点なし、剣闘は負けると減点。陶片追放は秘密投票で1クラスだけ転校
   C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 12, second: 5, lose: 0 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。参加することに意義がある。', 'greece', 1),
   C('colosseum', 'コロッセオの剣闘', '⚔️', 'sports', { type: 'arena', also: 'fight', win: 12, lose: 4 }, '各クラスの一番の剣闘士が闘技場へ。勝てば喝采、負ければ大恥。', 'greece', 1),
@@ -329,9 +349,11 @@ export const ERA_CARDS: ContestCard[] = [
   C('printing', '活版印刷', '📘', 'study', { type: 'printing' }, 'グーテンベルクの印刷機で、本が安く刷れるようになった。本を読んだことのない子も、みんな学び始める。', 'europe', 1),
   C('plague', 'ペストの大流行', '🐀', 'sports', { type: 'plague' }, 'ネズミが運ぶ黒い病がヨーロッパ中に広がった。かかった子は学期が終わるまで寝込んで走れない。', 'europe', 1),
   C('columbus', 'コロンブスの新大陸到達', '🌎', 'study', { type: 'newworld' }, '1492年、大西洋の向こうに新しい大陸が見つかった。見たこともない品が、物知りのクラスから順に届く。', 'europe', 1),
-  // 戦国：👊👑。人望を集めたクラスが、天下を握るクラスを引きずり下ろす
-  C('sekigahara', '関ヶ原の戦い', '⚔️', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '天下分け目の大合戦。勝てば大出世、負ければ大損。', 'sengoku'),
-  C('gekokujo', '下剋上', '🏯', 'charm', { type: 'gekokujo', amount: 8 }, '人望を集めた者が、天下を握る者を引きずり下ろす。', 'sengoku'),
+  // 戦国：👑👊。合戦は👑と👊を合わせて数える。鉄砲はどのクラスにも届き、楽市楽座では人望のあるクラスにグッズがタダで届く
+  { ...C('okehazama', '桶狭間の戦い', '🌧️', 'charm', { type: 'gekokujo', amount: 8 }, '大雨の中の奇襲。勢いに乗ったクラスが、天下に一番近い大大名・今川義元の本陣を討つ。', 'sengoku', 1), also: 'fight' },
+  { ...C('sekigahara', '関ヶ原の戦い', '⚔️', 'charm', { type: 'battle', win: 15, second: 5, lose: 10 }, '天下分け目の大合戦。味方を集めた人望と腕っぷしで、東軍と西軍がぶつかる。', 'sengoku', 1), also: 'fight' },
+  C('teppo', '鉄砲伝来', '🔫', 'fight', { type: 'teppo' }, '1543年、種子島に流れ着いたポルトガル人が鉄砲を伝えた。どのクラスにも1丁ずつ届く。', 'sengoku', 1),
+  C('rakuichi', '楽市楽座', '🪙', 'charm', { type: 'rakuichi' }, '城下町で誰でも自由に商売ができるようになった。人望を集めたクラスには、商人が品をタダで持ってくる。', 'sengoku', 1),
   // 江戸・幕末：🎨🏃。運だけの富くじ
   C('tomikuji', '富くじ', '🎫', 'all', { type: 'lottery', fee: 3 }, '江戸の町じゅうが熱狂した宝くじ。当たれば総取り。', 'edo'),
   C('ino', '伊能忠敬の日本地図測量', '🗾', 'sports', { type: 'heads', per: 2 }, '日本中を歩いて測る。歩ける子が多いほど地図が早くできる。', 'edo'),
@@ -406,9 +428,15 @@ export function cardRule(c: EventCard): string {
   }
 }
 
+/** 時代イベントで数えるアイコンの書き方（'all' は「アイコン」、合わせて数えるなら「👑＋👊」） */
+function attrLabel(c: ContestCard): string {
+  if (c.attr === 'all') return 'アイコン';
+  return c.also ? `${ATTR_ICON[c.attr]}＋${ATTR_ICON[c.also]}` : ATTR_ICON[c.attr];
+}
+
 /** 時代イベントの効果の説明文（1文） */
 export function eraEffectRule(c: ContestCard): string {
-  const a = c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr];
+  const a = attrLabel(c);
   const e = c.effect;
   switch (e.type) {
     case 'heads':
@@ -435,8 +463,12 @@ export function eraEffectRule(c: ContestCard): string {
       return `各クラスの${a}が一番多い子が代表でソクラテスと対話：${a}${e.need}以上なら+${e.win}、足りないと論破されて−${e.lose}`;
     case 'plunder':
       return `${a}が一番多いクラスが、一番少ないクラスから${e.amount}点奪う`;
-    case 'together':
-      return `全クラスの${a}の合計が${e.need}×クラス数以上なら全クラス+${e.win}（${a}が一番少ないクラスは0）、届かなければ全クラス−${e.lose}`;
+    case 'pyramid':
+      return `手番で選ぶと、クラスの${a}の数だけ石を積む（その手番は点なし）。全クラスで${e.need}×クラス数に届いたら完成：積んだ石が${e.steps.map(([n, w]) => `${n}個以上で+${w}`).join('、')}。学期中に完成しなければむだ`;
+    case 'scribe':
+      return `${a}と${ATTR_ICON[e.also]}を両方持つ子（書記）1人につき+${e.per}`;
+    case 'burial':
+      return `${c.attr === 'all' ? '' : `${a}を持っていて、`}グッズを装備している子1人につき+${e.per}`;
     case 'ostracism':
       return '全クラスがほかのクラスに秘密で投票し、票が一番多いクラスが1人転校させる';
     case 'upgrade':
@@ -459,6 +491,10 @@ export function eraEffectRule(c: ContestCard): string {
       return `${a}の多いクラスから順に新大陸の品（${NEW_WORLD_GOODS.map((g) => g.icon + ATTR_ICON[g.attr]).join('')}）を1つ選び、グッズを持っていない子1人に装備（早い者勝ち）`;
     case 'gekokujo':
       return `${a}が一番多いクラスが、ポイントが一番多いクラスから${e.amount}点奪う`;
+    case 'teppo':
+      return `全クラスに鉄砲（${TEPPO_GOODS.icon}${ATTR_ICON[TEPPO_GOODS.attr]}＋1）が1丁ずつ届き、グッズを持っていない子1人に装備`;
+    case 'rakuichi':
+      return `${a}が一番多いクラスは、次に取るグッズ1つがタダ`;
     case 'lottery':
       return `全クラスが${e.fee}点ずつ出し、くじで当たった1クラスが総取り`;
     case 'prize':
@@ -503,7 +539,7 @@ export function cardGlyph(c: EventCard): string {
 }
 
 function contestGlyph(c: ContestCard): string {
-  const a = c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr];
+  const a = attrLabel(c);
   const e = c.effect;
   switch (e.type) {
     case 'heads':
@@ -530,8 +566,12 @@ function contestGlyph(c: ContestCard): string {
       return `🧑${a}🥇 vs 🧔${e.need}　+${e.win}／−${e.lose}`;
     case 'plunder':
       return `${a}🥇 ⟵${e.amount}点 ${a}最下位`;
-    case 'together':
-      return `みんなの${a} ${e.need}×クラス数↑ +${e.win}／−${e.lose}`;
+    case 'pyramid':
+      return `${a} → 🧱 → 🔺完成で ${e.steps.map(([n, w]) => `🧱${n}↑+${w}`).join('／')}`;
+    case 'scribe':
+      return `🧑${a}${ATTR_ICON[e.also]} → +${e.per}ずつ`;
+    case 'burial':
+      return `🧑${c.attr === 'all' ? '' : a}💍 → +${e.per}ずつ`;
     case 'ostracism':
       return '🗳️ 票🥇のクラス → 👋🧑';
     case 'upgrade':
@@ -554,6 +594,10 @@ function contestGlyph(c: ContestCard): string {
       return `${a}🥇から → ${NEW_WORLD_GOODS.map((g) => g.icon).join('')}`;
     case 'gekokujo':
       return `${a}🥇 ⟵${e.amount}点 ポイント🥇`;
+    case 'teppo':
+      return `全クラス ⟵ ${TEPPO_GOODS.icon}${ATTR_ICON[TEPPO_GOODS.attr]}＋1`;
+    case 'rakuichi':
+      return `${a}🥇 → 次のグッズ0点`;
     case 'lottery':
       return `全員−${e.fee} → 🎫当たり総取り`;
     case 'prize':
