@@ -775,6 +775,8 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
   const worst = Math.min(...values);
   /** 結果に並べる子 */
   const moved: Student[] = [];
+  /** moved のうち、よそから転入してきた子（ほかはそのクラスにいたまま光るだけ） */
+  const joined: string[] = [];
   const name = (x: Student) => x.name;
   /** 起きたこと（ログに残し、めくったカードの横に一言で出す） */
   const said: string[] = [];
@@ -1022,6 +1024,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       const st = fromPoolId(s, KONGMING.id, joinedLabel(s));
       addStudent(s, ps[to], st);
       moved.push(st);
+      joined.push(st.uid);
       rows[to].uids = [st.uid];
       rows[to].note = '孔明が転入';
       tell(`${ps[to].name}のクラスに、軍師の${name(st)}がやってきた！`, to);
@@ -1110,6 +1113,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       const st = fromCard(s, BENKEI.id, joinedLabel(s));
       ps[to].students.push(st);
       moved.push(st);
+      joined.push(st.uid);
       rows[to].note = '弁慶が家来に';
       rows[to].uids = [...(rows[to].uids ?? []), st.uid];
       tell(`${ps[to].name}のクラスが弁慶を倒した！${name(st)}が家来になって転入した。`, to);
@@ -1282,6 +1286,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         const st = fromPoolId(s, pick(s, cands), joinedLabel(s));
         addStudent(s, p, st);
         moved.push(st);
+        joined.push(st.uid);
         rows[i].note = '転入';
         rows[i].uids = [st.uid];
         tell(`${p.name}のクラスに、タイムマシンで${name(st)}がやってきた！`, i);
@@ -1369,7 +1374,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       break;
     }
   }
-  const result = eraResult(s, c, rows, { students: moved });
+  const result = eraResult(s, c, rows, { students: moved, inUids: joined });
   // 何も起きなかったときはカードの効果を出す
   return said.length ? { ...result, say: said.join(' ') } : result;
 }
@@ -1397,7 +1402,7 @@ function resolveInvasion(s: GameState, c: ContestCard): EventResult {
     return { player: i, delta: 0, note: '火星人が転入', uids: [st.uid] };
   });
   log(s, `【${c.name}】 空席のあるクラスにエイリアンが転入した。`);
-  return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows, students: aliens.slice(0, 1) };
+  return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows, students: aliens.slice(0, 1), inUids: aliens.slice(0, 1).map((x) => x.uid) };
 }
 
 /** かぐや姫に頼まれた宝を装備した子（いなければ null）。手番でこの子の宝を差し出せる */
@@ -1804,7 +1809,7 @@ function buyPerson(s: GameState, pi: number, slot: number, gone?: Student) {
   addStudent(s, p, st);
   log(s, `${p.name}のクラスに${st.name}が転入！（−${cost}点）`, pi);
   const desc = `${st.name}がやってきた！（−${cost}点）${gone ? ` 入れ替わりに${gone.name}が転校していった。` : ''}`;
-  setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc, rows: [{ player: pi, delta: -cost, note: 'スカウト' }], students: gone ? [st, gone] : [st], outUids: gone ? [gone.uid] : undefined }, 'turn');
+  setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc, rows: [{ player: pi, delta: -cost, note: 'スカウト' }], students: gone ? [st, gone] : [st], inUids: [st.uid], outUids: gone ? [gone.uid] : undefined }, 'turn');
 }
 
 /** 手番：場のカードを1枚取る */
@@ -2004,7 +2009,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: `${mine.name}と${theirs.name}（${to.name}）を入れ替えた`, rows: [], students: [theirs, mine], outUids: [mine.uid] },
+        { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: `${mine.name}と${theirs.name}（${to.name}）を入れ替えた`, rows: [], students: [theirs, mine], inUids: [theirs.uid], outUids: [mine.uid] },
         'turn',
       );
       return s;

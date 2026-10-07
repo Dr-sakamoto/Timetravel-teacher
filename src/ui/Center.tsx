@@ -607,6 +607,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     case 'result': {
       const r = ph.result;
       const out = new Set(r.outUids ?? []);
+      const joined = new Set(r.inUids ?? []);
       return (
         <div className="reveal">
           <div className="reveal-card">
@@ -632,23 +633,26 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
               <div className="deal">
                 {/* 何人いても卓からはみ出さないように、見せるのは4人まで */}
                 {r.students.slice(0, DEAL_MAX).map((s) => (
-                  <div key={s.uid} className={`deal-card ${out.has(s.uid) ? 'out' : 'in'}`}>
+                  <div key={s.uid} className={`deal-card ${out.has(s.uid) ? 'out' : joined.has(s.uid) ? 'in' : ''}`}>
                     <TcgCard student={s} size="mini" />
-                    <span className="deal-mark">{out.has(s.uid) ? '転校' : '転入'}</span>
+                    {/* 札は転入・転校した子だけ（イベントで光っただけの子には付けない） */}
+                    {(out.has(s.uid) || joined.has(s.uid)) && <span className="deal-mark">{out.has(s.uid) ? '転校' : '転入'}</span>}
                   </div>
                 ))}
                 {r.students.length > DEAL_MAX && <span className="deal-more">ほか{r.students.length - DEAL_MAX}人</span>}
               </div>
             )}
-            {ph.ctx === 'turn' && ph.player === null && <NextTurn state={state} />}
-            {canContinue ? (
-              <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
-                {/* 手番の終わりに場を補充する（ここでゲリラがめくれることがある）と分かるように */}
-                {ph.ctx === 'turn' && state.market.length < MARKET_SIZE ? '場を補充 ▶' : '次へ ▶'}
-              </button>
-            ) : (
-              <div className="say-sub">{who} を待っています</div>
-            )}
+            <div className="reveal-foot">
+              {ph.ctx === 'turn' && ph.player === null && <NextTurn state={state} inline />}
+              {canContinue ? (
+                <button className="btn primary" onClick={() => dispatch({ type: 'continue' })}>
+                  {/* 手番の終わりに場を補充する（ここでゲリラがめくれることがある）と分かるように */}
+                  {ph.ctx === 'turn' && state.market.length < MARKET_SIZE ? '場を補充 ▶' : '次へ ▶'}
+                </button>
+              ) : (
+                <span>{who} を待っています</span>
+              )}
+            </div>
           </div>
         </div>
       );

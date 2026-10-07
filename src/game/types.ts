@@ -125,6 +125,8 @@ export interface EventResult {
   rows: ResultRow[];
   lines?: string[];
   students?: Student[];
+  /** students のうち、よそからクラスに入ってきた子（「転入」の札を付ける。ほかの子は光らせるだけ） */
+  inUids?: string[];
   /** students のうち、クラスから出ていった子（見た目で「出ていった」と分かるようにする） */
   outUids?: string[];
 }
