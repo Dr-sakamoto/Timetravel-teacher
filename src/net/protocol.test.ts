@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cpuAction } from '../game/ai';
 import { newGame, step } from '../game/engine';
 import type { GameState } from '../game/types';
+import { connectTimeout } from './guest';
 import { canAct, waitingOn } from './protocol';
 
 function game(): GameState {
@@ -81,5 +82,13 @@ describe('通信対戦：操作してよい人', () => {
     }
     expect(JSON.stringify(s).length).toBeLessThan(1_000_000);
     console.log('state bytes', JSON.stringify(s).length);
+  });
+});
+
+describe('通信対戦：つなぎ直すまでの待ち時間', () => {
+  it('通信サーバーが速ければ早めに、遅ければ長めに待つ', () => {
+    expect(connectTimeout(500)).toBe(9000);
+    expect(connectTimeout(6000)).toBe(20000);
+    expect(connectTimeout(20000)).toBe(30000);
   });
 });

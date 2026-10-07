@@ -18,9 +18,16 @@ export interface GuestSnap {
   seats: Seat[];
 }
 
-/** 通信サーバーにつながるまで・部屋を作った人とつながるまで、これだけ待ったらやり直す（混んでいる時は10秒以上かかることもあるので長めに） */
+/** 通信サーバーにつながるまで、これだけ待ったらやり直す（混んでいる時は10秒以上かかることもあるので長めに） */
 const SERVER_TIMEOUT_MS = 25000;
-const CONNECT_TIMEOUT_MS = 25000;
+
+/**
+ * 部屋を作った人とつながるまで待つ時間。通信サーバーが速ければ短く、遅ければ長く待つ
+ * （部屋を作った人が読み込み直した直後は、前の接続にむだにつなぎに行って返事が来ないことがあるので、速い時は早めにやり直す）
+ */
+export function connectTimeout(serverOpenMs: number): number {
+  return Math.min(30000, 8000 + 2 * serverOpenMs);
+}
 
 /** 参加した人の端末：操作を部屋を作った人に送り、配られた状態を映す */
 export class GuestRoom {
@@ -32,6 +39,8 @@ export class GuestRoom {
   private cid = clientId();
   private everJoined = false;
   private serverSince = 0;
+  /** 通信サーバーにつながるまでにかかった時間 */
+  private serverOpenMs = 0;
   private connectingSince = 0;
   private serverTries = 0;
   /** 部屋が見つからなかった回数（部屋を作った人がつなぎ直している最中のこともあるので、すぐにはあきらめない） */
@@ -84,6 +93,7 @@ export class GuestRoom {
     peer.on('open', () => {
       if (peer !== this.peer) return;
       this.serverTries = 0;
+      this.serverOpenMs = Date.now() - this.serverSince;
       // 通信サーバーにつなぎ直しただけで、部屋を作った人とはつながったままなら何もしない
       if (!this.conn?.open) this.connect();
     });
@@ -117,8 +127,10 @@ export class GuestRoom {
   private retryServer() {
     this.later(backoff(this.serverTries++), () => {
       const peer = this.peer;
-      if (peer && !peer.destroyed && peer.disconnected) peer.reconnect();
-      else if (!peer?.open) this.openPeer();
+      if (peer && !peer.destroyed && peer.disconnected) {
+        this.serverSince = Date.now();
+        peer.reconnect();
+      } else if (!peer?.open) this.openPeer();
     });
   }
 
@@ -204,7 +216,7 @@ export class GuestRoom {
     } else if (!peer.open) {
       // 通信サーバーからの返事が来ない：作り直す
       if (force || now - this.serverSince > SERVER_TIMEOUT_MS) this.openPeer();
-    } else if (now - this.connectingSince > (force ? 3000 : CONNECT_TIMEOUT_MS)) {
+    } else if (now - this.connectingSince > (force ? 3000 : connectTimeout(this.serverOpenMs))) {
       // 部屋を作った人とつながらない：もう一度つなぐ
       this.connect();
     }

@@ -32,7 +32,7 @@ function iceServers(): RTCIceServer[] {
  */
 function options(): PeerOptions {
   const env = import.meta.env;
-  const base: PeerOptions = { config: { iceServers: iceServers(), iceCandidatePoolSize: 4 } };
+  const base: PeerOptions = { config: { iceServers: iceServers() } };
   if (!env.VITE_PEER_HOST) return base;
   return {
     ...base,
