@@ -466,7 +466,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       // 係決めは一斉：だれが準備OKかを並べる
       return (
         <div className="say">
-          係決め（みんな一斉に）
+          係決め
           <div className="say-sub roles-ready">
             {state.players.map((p, i) => (
               <span key={i} className={`pick-chip ${ph.ready[i] ? 'ready' : ''}`} style={{ borderColor: p.color }}>

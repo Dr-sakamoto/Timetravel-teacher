@@ -20,8 +20,6 @@ interface Props {
   drop?: string;
 }
 
-const RARITY_MARK = { N: '●', R: '◆', SR: '★', SSR: '✦' } as const;
-
 /** TCG風の生徒カード：中央にイラスト、下段に属性アイコン（重なるほど強い） */
 export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onClick, onPointerDown, drop }: Props) {
   // 古いセーブデータの生徒は art を持たないので、歴史カードはIDから引き、現代の生徒は絵文字で出す
@@ -66,7 +64,6 @@ export function TcgCard({ student, owner, size = 'full', selected, lit, dim, onC
             </span>
           ))}
         </div>
-        {size === 'full' && <div className="tcg-foot">{RARITY_MARK[student.rarity]} {student.rarity}</div>}
       </div>
       {student.goods && (
         <div className="tcg-goods" title={`${student.goods.name}（${ATTR_ICON[student.goods.attr]}＋1）`}>

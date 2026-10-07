@@ -3,7 +3,7 @@ import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
 import { BENKEI, CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
-import { ERA_CARDS, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
+import { ERA_CARDS, EVENT_MAP, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
 import { MONTHS, canBuild, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
@@ -1208,6 +1208,27 @@ describe('engine', () => {
     const next = step(s, { type: 'setRoles', player: f, roles: [{ role: 'study', uid }], unlock: ['study'] });
     expect(next.players[f].unlocked).toEqual(['study']);
     expect(next.players[f].roles).toEqual([{ role: 'study', uid }]);
+  });
+
+  it('each term deals exactly 2 era events, placed shallow enough to be drawn during the term', () => {
+    for (const n of [2, 5]) {
+      let s = newGame(Array.from({ length: n }, (_, i) => ({ name: `P${i}`, isCpu: true })), 3, 21 + n);
+      let terms = 0;
+      for (let i = 0; i < 20000 && s.phase.kind !== 'gameOver'; i++) {
+        if (s.phase.kind === 'roles' && s.phase.ready.every((r) => !r)) {
+          const era = s.eventDeck.flatMap((id, k) => (!id.startsWith('person:') && EVENT_MAP[id].kind === 'contest' ? [s.eventDeck.length - 1 - k] : []));
+          expect(era).toHaveLength(2);
+          const term = termOfMonth(MONTHS[s.monthIdx]);
+          const months = MONTHS.slice(s.monthIdx).filter((m) => termOfMonth(m) === term).length;
+          // 深さ（次にめくるのが0）が手番の数より浅い
+          for (const d of era) expect(d).toBeLessThan(n * months);
+          terms++;
+        }
+        s = step(s, cpuAction(s)!);
+        while (s.phase.kind === 'roles' && !s.phase.ready.every((r) => !r)) s = step(s, cpuAction(s)!);
+      }
+      expect(terms).toBe(9);
+    }
   });
 
   it('roles are set by every class at once; turns start when everyone is ready', () => {
