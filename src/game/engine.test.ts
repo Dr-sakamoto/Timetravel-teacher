@@ -4,7 +4,7 @@ import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, role
 import { CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
-import { ARCHETYPES, MODERN_POOL } from './data/modern';
+import { ARCHETYPES, MODERN_POOL, STARTER_POOL } from './data/modern';
 import { MONTHS, canTake, currentEra, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
 
@@ -253,6 +253,16 @@ describe('engine', () => {
     const ids = s.players.flatMap((p) => p.students.map((x) => x.cardId));
     expect(ids.every((id) => id && !s.starters.includes(id) && !MODERN_POOL.includes(id))).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('the starting pile has a little fewer students with the same icon twice (📚📚・🏃🏃 …)', () => {
+    const copies = (id: string) => STARTER_POOL.filter((x) => x.startsWith(`m:${id}#`)).length;
+    for (const a of ARCHETYPES.filter((x) => x.rarity === 'N')) {
+      const icons = parseAttrs(a.attrs);
+      const double = icons.length === 2 && icons[0] === icons[1];
+      expect(copies(a.id), a.id).toBe(double ? 2 : 3);
+    }
+    expect(new Set(STARTER_POOL).size).toBe(STARTER_POOL.length);
   });
 
   it('every figure and transfer student has a different set of icons', () => {

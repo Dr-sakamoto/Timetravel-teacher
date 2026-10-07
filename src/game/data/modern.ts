@@ -51,7 +51,7 @@ export const ARCHETYPES: Archetype[] = [
   // 転校生限定（現代）
   a('returnee', '帰国子女', '✈️', 'R', 4, '=ssc', '英語の発音がネイティブ。'),
   a('childstar', '天才子役', '🎬', 'R', 6, '=ac', 'ドラマ撮影で早退しがち。'),
-  a('topscore', '全国模試1位', '🥇', 'R', 9, '=sss', '塾を3つ掛け持ち。'),
+  a('topscore', '全国模試1位', '🥇', 'R', 9, '=ss', '塾を3つ掛け持ち。'),
   a('esports', 'eスポーツ選手', '🕹️', 'R', 6, '=saa', '反射神経はプロ級。'),
   a('influencer', '人気インフルエンサー', '📱', 'R', 7, '=ccc', 'フォロワー50万人。'),
   a('banchou', '伝説の番長', '🔱', 'SR', 7, '=ff', '隣町まで名前が知れ渡っている。'),
@@ -61,8 +61,11 @@ export const ARCHETYPES: Archetype[] = [
 
 export const ARCHETYPE_MAP: Record<string, Archetype> = Object.fromEntries(ARCHETYPES.map((a) => [a.id, a]));
 
-/** 初期メンバー用の山：普通の生徒（N）を2枚ずつ。カードIDは 'm:<アーキタイプ>#<番号>' */
-export const STARTER_POOL: string[] = ARCHETYPES.filter((a) => a.rarity === 'N').flatMap((a) => [1, 2].map((i) => `m:${a.id}#${i}`));
+/** 同じアイコンが2個並んだ普通の生徒（📚📚・🏃🏃など）か */
+const isDouble = (a: Archetype) => /^=(.)\1$/.test(a.attrs);
+
+/** 初期メンバー用の山：普通の生徒（N）を3枚ずつ。同じアイコンが2個並んだ子は少し強いので2枚ずつ。カードIDは 'm:<アーキタイプ>#<番号>' */
+export const STARTER_POOL: string[] = ARCHETYPES.filter((a) => a.rarity === 'N').flatMap((a) => (isDouble(a) ? [1, 2] : [1, 2, 3]).map((i) => `m:${a.id}#${i}`));
 
 /** 現代の学期のカードプール：転校生限定の生徒（R以上）を1枚ずつ。スタート以降に現代から来るのはこの子たちだけ */
 export const MODERN_POOL: string[] = ARCHETYPES.filter((a) => a.rarity !== 'N').map((a) => `m:${a.id}#1`);
