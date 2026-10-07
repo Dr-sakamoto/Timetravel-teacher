@@ -40,6 +40,7 @@ import {
 } from './data/events';
 import { ARCHETYPE_MAP, BOY_NAMES, GIRL_NAMES, MODERN_POOL, STARTER_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
 import { ROLES } from './data/roles';
+import { SAVE_VERSION } from './saveVersion';
 import {
   type Action,
   type Attr,
@@ -115,7 +116,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
   const s: GameState = {
-    version: 26,
+    version: SAVE_VERSION,
     yearEras: [],
     eraDeck: [],
     rng: seed | 0,
