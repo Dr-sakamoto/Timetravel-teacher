@@ -875,7 +875,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       }
       break;
     }
-    // 三国志：ポイントが一番多いクラス（1クラスだけ）が追いかける。ほかの各クラスはXが一番多い子1人が橋に立ち、need 以上なら追い返して +win、足りなければ take 点取られる
+    // 三国志：ポイントが一番多いクラス（1クラスだけ）が追いかける。ほかの各クラスはXが一番多い子1人が橋に立ち、need 以上なら追いかけるクラスから take 点奪う。足りなければ −lose（追いかけるクラスは得をしない）
     case 'bridge': {
       if (c.attr === 'all') break;
       const a = c.attr;
@@ -894,14 +894,14 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         rows[i].count = guard?.pts ?? 0;
         rows[i].uids = guard ? [guard.student.uid] : [];
         if (guard && guard.pts >= e.need) {
-          add(i, e.win);
+          add(i, e.take);
+          add(chaser, -e.take);
           guard.student.mvp++;
           moved.push(guard.student);
           rows[i].note = '一喝で追い返した';
-          tell(`${p.name}のクラスの${name(guard.student)}が橋の上で一喝！追っ手が止まった。`, i);
+          tell(`${p.name}のクラスの${name(guard.student)}が橋の上で一喝！${ps[chaser].name}のクラスの追っ手が逃げ出した。`, i);
         } else {
-          add(i, -e.take);
-          add(chaser, e.take);
+          add(i, -e.lose);
           rows[i].note = guard ? '突破された' : '守る子なし';
         }
       });

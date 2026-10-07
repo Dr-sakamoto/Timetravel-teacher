@@ -750,11 +750,12 @@ describe('engine', () => {
     });
 
     it('changban: the class with the most points gives chase; each other class holds the bridge with its best 👊 student', () => {
-      // A が一番ポイントが多い。B は👊2の子で追い返して +5、C は👊1しかいないので A に3点取られる
+      // A が一番ポイントが多い。B は👊2の子で追い返して A から4点奪う。C は👊1しかいないので −2（A は得をしない）
       const r = run('changban', [[mk('a', ['study'])], [mk('b', ['fight', 'fight']), mk('b2', ['fight'])], [mk('c', ['fight'])]], [20, 10, 10]);
-      expect(r.delta).toEqual([3, 5, -3]);
-      // 👊を持つ子がいないクラスも取られる
-      expect(run('changban', [[], [mk('b', ['study'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([3, -3, 5]);
+      expect(r.delta).toEqual([-4, 4, -2]);
+      // 👊を持つ子がいないクラスも −2。2クラスとも追い返せば、追いかけるクラスは2回奪われる
+      expect(run('changban', [[], [mk('b', ['study'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([-4, -2, 4]);
+      expect(run('changban', [[], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([-8, 4, 4]);
       // ポイントの一番が並べば、にらみ合いで何も起こらない
       expect(run('changban', [[], [mk('b', ['study'])], []]).delta).toEqual([0, 0, 0]);
     });
