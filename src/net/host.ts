@@ -3,6 +3,7 @@ import type { DataConnection } from 'peerjs';
 import { makePeer } from './peer';
 import { cpuAction } from '../game/ai';
 import { calendarLabel, newGame, step } from '../game/engine';
+import { SAVE_VERSION } from '../game/saveVersion';
 import type { Action, GameState } from '../game/types';
 import { canAct, waitingOn, MAX_SEATS, PEER_PREFIX, TIMEOUT_MS, type Lobby, type Seat, type ToGuest, type ToHost } from './protocol';
 
@@ -32,7 +33,7 @@ export function loadHostSave(): HostSave | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as HostSave;
-    return s.state?.version === 26 && s.state.phase.kind !== 'gameOver' ? s : null;
+    return s.state?.version === SAVE_VERSION && s.state.phase.kind !== 'gameOver' ? s : null;
   } catch {
     return null;
   }
