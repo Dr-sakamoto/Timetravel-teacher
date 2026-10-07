@@ -29,6 +29,7 @@ import {
   shortRule,
   type ContestCard,
   type EraEffect,
+  type EventCard,
   type FixedEvent,
   type GoodsCard,
   type NormalCard,
@@ -278,6 +279,8 @@ function buildDeck(s: GameState): string[] {
     const only = cardEra(e);
     if (only && only !== era) continue;
     if ('odds' in e && e.odds !== undefined && rand(s) >= e.odds) continue;
+    // ピラミッドは山札に入らず、場の横に残る（setupPyramid）
+    if (isPyramidCard(e)) continue;
     for (let i = 0; i < e.count; i++) deck.push(e.id);
   }
   const figures = shuffle(s, [...s.pools[era]]).slice(0, PERSON_CARDS_PER_TERM);
@@ -309,7 +312,68 @@ function startTerm(s: GameState, first = false) {
   s.discard = [];
   s.market = [];
   fillMarket(s);
+  setupPyramid(s);
   s.phase = { kind: 'roles', player: s.queue[0] };
+}
+
+// ---------- ピラミッド（古代エジプトの学期だけ、場の横に残る） ----------
+
+/** 場の横に残るピラミッドのカード（ギザの大ピラミッド建設） */
+export function isPyramidCard(c: EventCard): c is ContestCard & { effect: Extract<EraEffect, { type: 'pyramid' }> } {
+  return c.kind === 'contest' && c.effect.type === 'pyramid';
+}
+
+/** 今学期の時代のピラミッドのカード（なければ undefined） */
+export function pyramidCard(s: GameState): (ContestCard & { effect: Extract<EraEffect, { type: 'pyramid' }> }) | undefined {
+  const era = ERAS[currentEra(s)].id;
+  return ALL_EVENT_CARDS.filter(isPyramidCard).find((c) => c.era === era);
+}
+
+/** 学期の頭：前の学期のピラミッドは（完成していなくても）なくなり、ピラミッドのある時代なら新しく建て始める */
+function setupPyramid(s: GameState) {
+  const old = s.pyramid;
+  if (old && !old.done && old.stones.some((x) => x > 0)) log(s, `ピラミッドは完成しないまま学期が終わった。積んだ石はむだになった。`);
+  delete s.pyramid;
+  const c = pyramidCard(s);
+  if (c) s.pyramid = { stones: s.players.map(() => 0), need: c.effect.need * s.players.length, done: false };
+}
+
+/** 今ピラミッドに石を積めるか（手番で、完成前で、🏃を持つ子がいる） */
+export function canBuild(s: GameState, pi: number): boolean {
+  return s.phase.kind === 'draw' && s.phase.player === pi && !!s.pyramid && !s.pyramid.done && attrScore(s.players[pi], 'sports').total > 0;
+}
+
+/** 積んだ石の数に応じたほうび（届いた一番上の段。足切りに届かなければ0） */
+export function pyramidReward(steps: [number, number][], stones: number): number {
+  return steps.reduce((best, [n, w]) => (stones >= n ? Math.max(best, w) : best), 0);
+}
+
+/** ピラミッドに石を積む。届いたら完成して、積んだクラスにほうび */
+function build(s: GameState, pi: number) {
+  const c = pyramidCard(s)!;
+  const py = s.pyramid!;
+  const p = s.players[pi];
+  const sc = attrScore(p, c.attr);
+  py.stones[pi] += sc.total;
+  sc.holders.forEach((h) => h.mvp++);
+  const sum = py.stones.reduce((a, x) => a + x, 0);
+  log(s, `${p.name}のクラスがピラミッドに石を${sc.total}個積んだ。（${sum}／${py.need}）`, pi);
+  const base = { title: c.name, icon: c.icon, art: c.id, attr: c.attr, tone: 'era' as const, era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c) };
+  if (sum < py.need) {
+    setResult(s, pi, { ...base, say: `石を${sc.total}個積んだ。完成まであと${py.need - sum}個。`, rows: [{ player: pi, count: sc.total, delta: 0, note: `🧱${sc.total}`, uids: sc.holders.map((h) => h.uid) }] }, 'turn');
+    return;
+  }
+  // 完成：積んだ石が届いた一番上の段のほうび（足切りに届かないクラスは0）
+  py.done = true;
+  const rows: ResultRow[] = s.players.map((q, i) => {
+    const n = py.stones[i];
+    const delta = pyramidReward(c.effect.steps, n);
+    q.points += delta;
+    return { player: i, count: n, delta, note: n === 0 ? '積まず' : delta ? `🧱${n}` : `🧱${n} 足りず`, uids: i === pi ? sc.holders.map((h) => h.uid) : [] };
+  });
+  const say = `ピラミッド完成！ 最後の石を積んだのは${p.name}のクラス。`;
+  log(s, say, pi);
+  setResult(s, pi, { ...eraResult(s, c, rows), ...base, say }, 'turn');
 }
 
 function startTurns(s: GameState) {
@@ -701,6 +765,44 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
           scores[i].holders.forEach((h) => h.mvp++);
         }
       });
+      break;
+    }
+    // エジプト：Xと also を両方持つ子（書記）1人につき +per
+    case 'scribe': {
+      const a = c.attr;
+      const scribes = ps.map((p) => p.students.filter((x) => a !== 'all' && counted(x).includes(a) && counted(x).includes(e.also)));
+      scribes.forEach((f, i) => {
+        add(i, f.length * e.per);
+        rows[i].count = f.length;
+        rows[i].uids = f.map((x) => x.uid);
+        rows[i].note = f.length ? `書記${f.length}人` : '書記なし';
+        f.forEach((x) => x.mvp++);
+      });
+      const most = Math.max(...scribes.map((f) => f.length));
+      if (most > 0) {
+        const i = scribes.findIndex((f) => f.length === most);
+        moved.push(...scribes[i]);
+        tell(`${ps[i].name}のクラスの書記${most}人が、ヒエログリフを書き残した。`, i);
+      }
+      break;
+    }
+    // エジプト：Xを持っていて、グッズを装備している子1人につき +per（副葬品）
+    case 'burial': {
+      const a = c.attr;
+      const rich = ps.map((p) => p.students.filter((x) => x.goods && (a === 'all' || counted(x).includes(a))));
+      rich.forEach((f, i) => {
+        add(i, f.length * e.per);
+        rows[i].count = f.length;
+        rows[i].uids = f.map((x) => x.uid);
+        rows[i].note = f.length ? `副葬品${f.length}つ` : '副葬品なし';
+        f.forEach((x) => x.mvp++);
+      });
+      const most = Math.max(...rich.map((f) => f.length));
+      if (most > 0) {
+        const i = rich.findIndex((f) => f.length === most);
+        moved.push(...rich[i]);
+        tell(`${ps[i].name}のクラスのお墓に、${rich[i].map((x) => x.goods!.icon).join('')}が納められた。`, i);
+      }
       break;
     }
     // ギリシャ：各クラスの、Xと also の合計が一番多い子が闘技場へ。1位（同点なら全員）は+win、負けたクラスと出せる子がいないクラスは−lose
@@ -1576,6 +1678,11 @@ export function step(prev: GameState, a: Action): GameState {
       takeCard(s, ph.player, a.slot);
       return s;
     }
+    case 'build': {
+      if (ph.kind !== 'draw' || !canBuild(s, ph.player)) return prev;
+      build(s, ph.player);
+      return s;
+    }
     case 'pass': {
       if (ph.kind !== 'draw' || !s.market[a.slot]) return prev;
       const id = s.market.splice(a.slot, 1)[0];
@@ -1814,7 +1921,7 @@ export function deckBreakdown(s: GameState): DeckRow[] {
     });
   };
   // 並び順を固定するため、まず今学期に入りうるカードを全部登録しておく
-  for (const e of ALL_EVENT_CARDS) if (!cardEra(e) || cardEra(e) === era.id) define(e.id);
+  for (const e of ALL_EVENT_CARDS) if ((!cardEra(e) || cardEra(e) === era.id) && !isPyramidCard(e)) define(e.id);
   for (const id of s.eventDeck) define(id).left++;
   for (const id of s.market) define(id).open++;
   for (const id of s.discard) define(id).used++;

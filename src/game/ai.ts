@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
+import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -131,6 +131,22 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
   }
 }
 
+/** ピラミッドに石を積む値打ち（完成させれば、積んだ石で届く段のほうび。完成しなければ、学期の残りで完成しそうな分だけ） */
+export function buildValue(s: GameState, pi: number): number {
+  const c = pyramidCard(s);
+  const py = s.pyramid;
+  if (!c || !py || !canBuild(s, pi)) return -Infinity;
+  const t = attrScore(s.players[pi], c.attr).total;
+  const mine = py.stones[pi] + t;
+  const sum = py.stones.reduce((a, x) => a + x, 0) + t;
+  if (sum >= py.need) return pyramidReward(c.effect.steps, mine);
+  // 学期の最後の月（7・12・3月）は完成しないかもしれない。次の段に近づいた分も少し数える
+  const odds = [7, 12, 3].includes(MONTHS[s.monthIdx]) ? 0.25 : 0.5;
+  const next = c.effect.steps.map(([n]) => n).find((n) => n > py.stones[pi]) ?? Infinity;
+  const toward = Math.min(t, Math.max(0, next - py.stones[pi]));
+  return (pyramidReward(c.effect.steps, mine) - pyramidReward(c.effect.steps, py.stones[pi]) + toward) * odds;
+}
+
 /** 一番点の高い相手 */
 function leader(s: GameState, candidates: number[]): number {
   return [...candidates].sort((x, y) => s.players[y].points - s.players[x].points)[0];
@@ -149,6 +165,8 @@ export function cpuAction(s: GameState): Action | null {
     case 'draw': {
       const slots = s.market.map((_, i) => i);
       const best = slots.filter((i) => canTake(s, ph.player, i)).sort((x, y) => marketValue(s, ph.player, y) - marketValue(s, ph.player, x))[0];
+      const bv = buildValue(s, ph.player);
+      if (bv > 0 && (best === undefined || bv > marketValue(s, ph.player, best))) return { type: 'build' };
       if (best !== undefined && marketValue(s, ph.player, best) > 0) return { type: 'take', slot: best };
       // 取りたいものがなければ、一番高いカードを捨てて見送る
       return { type: 'pass', slot: slots.sort((x, y) => marketCost(s.market[y]) - marketCost(s.market[x]))[0] };
