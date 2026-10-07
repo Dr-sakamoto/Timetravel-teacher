@@ -703,28 +703,6 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       tell(`${ps[win].name}のクラスが恐竜の卵を持ち帰った！次の手番で孵る。`, win);
       break;
     }
-    // エジプト：全クラスの合計で1つのピラミッド。完成なら全員にほうび、一番少ないクラスはサボりで0
-    case 'together': {
-      const sum = values.reduce((a, v) => a + v, 0);
-      const need = e.need * n;
-      const done = sum >= need;
-      tell(done ? `完成！（全クラスで${ATTR_ICON[c.attr as Attr] ?? ''}${sum}／${need}）` : `未完成…（全クラスで${ATTR_ICON[c.attr as Attr] ?? ''}${sum}／${need}）`);
-      rows.forEach((r, i) => {
-        r.count = values[i];
-        r.uids = scores[i].holders.map((h) => h.uid);
-        if (!done) {
-          add(i, -e.lose);
-          r.note = `未完成 ${sum}/${need}`;
-        } else if (values[i] === worst && best !== worst) {
-          r.note = 'サボり';
-        } else {
-          add(i, e.win);
-          r.note = `完成 ${sum}/${need}`;
-          scores[i].holders.forEach((h) => h.mvp++);
-        }
-      });
-      break;
-    }
     // エジプト：Xと also を両方持つ子（書記）1人につき +per
     case 'scribe': {
       const a = c.attr;
