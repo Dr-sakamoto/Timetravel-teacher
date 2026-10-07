@@ -62,7 +62,7 @@ export interface SwingCard {
  *   oath      … 三国志「ポイントが一番少ないクラスが、ほかのクラスを max まで選んで義兄弟になる。学期の区切りまでに義兄弟が得た点・失った点を合わせて山分けする」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
  *   genji     … 平安「全校でXが一番多い子が作者。作者のクラスで also を持つ子1人につき +per」（同点なら作者が複数）
- *   kaguya    … 平安「かぐや姫が学期の区切りまで滞在し、各クラスに平安の宝（グッズ）を1つずつくじで頼む。頼まれた宝を装備した子がいれば、手番で差し出すかどうか選べる。差し出すと +win（宝は消える）」
+ *   kaguya    … 平安「かぐや姫が学期の区切りまで滞在し、平安の5つの宝（グッズ）を頼む。どのクラスが差し出してもよい（各宝1回きり）。装備した宝は手番でいつでも、場の宝は取ってそのまま差し出せる。差し出すと +win（宝は消え、手番は続く）」
  *   benkei    … 平安「Xの合計が need 以上のクラスが弁慶を倒し、一番多いクラスに弁慶が家来として転入。届かないクラスは −lose」
  *   masterpiece … 中世「各クラスのXが一番多い子1人の、Xの数 × per」
  *   printing  … 中世「Xを持っていない子全員のXが1つ増える（全員持っていれば何も起こらない）」
@@ -290,7 +290,7 @@ export const NEW_WORLD_GOODS: GoodsCard[] = [
 ];
 export const NEW_WORLD_MAP: Record<string, GoodsCard> = Object.fromEntries(NEW_WORLD_GOODS.map((g) => [g.id, g]));
 
-/** かぐや姫が頼む5つの宝（竹取物語の難題）＝平安のグッズ。くじで各クラスに1つずつ、重ならないように頼む */
+/** かぐや姫が頼む5つの宝（竹取物語の難題）＝平安のグッズ。どのクラスが差し出してもよい（各宝1回きり） */
 export const KAGUYA_TREASURES: GoodsCard[] = GOODS_CARDS.filter((g) => g.era === 'heian');
 
 /** 鉄砲伝来で全クラスに1丁ずつ届く鉄砲（山札には入らない。装備するとグッズと同じく👊＋1） */
@@ -503,7 +503,7 @@ export function eraEffectRule(c: ContestCard): string {
     case 'genji':
       return `全校で${a}が一番多い子が作者に：作者のクラスで${ATTR_ICON[e.also]}を持つ子1人につき+${e.per}`;
     case 'kaguya':
-      return `かぐや姫が学期の終わりまで滞在し、宝（${KAGUYA_TREASURES.map((t) => t.name).join('・')}）をクラスごとに1つずつ頼む：頼まれた宝を装備していれば、手番で差し出して+${e.win}（宝は消える）`;
+      return `かぐや姫が学期の終わりまで滞在し、宝（${KAGUYA_TREASURES.map((t) => t.name).join('・')}）を待つ：どのクラスでも、装備した宝か場から取った宝を差し出せば+${e.win}（宝は消え、手番は続く。各宝1回きり）`;
     case 'benkei':
       return `${a}の合計が${e.need}以上のクラスが弁慶を倒し、一番多いクラスに弁慶（${a}${a}${a}）が転入${e.lose ? `。届かないクラスは−${e.lose}` : ''}`;
     case 'masterpiece':
@@ -618,7 +618,7 @@ function contestGlyph(c: ContestCard): string {
     case 'genji':
       return `${a}1位の子のクラス ${ATTR_ICON[e.also]}の子1人 +${e.per}`;
     case 'kaguya':
-      return `頼まれた宝を差し出す +${e.win}`;
+      return `宝を差し出す +${e.win}（手番は続く）`;
     case 'benkei':
       return `${a}${e.need}以上 弁慶が家来に${e.lose ? `／未満 −${e.lose}` : ''}`;
     case 'masterpiece':

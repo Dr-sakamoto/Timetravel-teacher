@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, kaguyaGift, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
+import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, kaguyaGift, kaguyaWants, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -124,8 +124,8 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
     case 'normal':
       return attrScore(p, c.attr).total;
     case 'goods':
-      // かぐや姫に頼まれた宝なら、装備して差し出す（宝は消えて点が入る）
-      if (s.kaguya?.[pi] === c.id && equippable(p).length) return KAGUYA_GIFT - cost;
+      // かぐや姫が待っている宝なら、そのまま差し出す（宝は消えて点が入り、手番は続く）
+      if (kaguyaWants(s, c.id)) return KAGUYA_GIFT - cost;
       return Math.max(...equippable(p).map((st) => gain(s, p, swap(st.uid, equipped(st, c.attr))))) - cost;
     case 'cyborg':
       return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;
@@ -221,6 +221,8 @@ export function cpuAction(s: GameState): Action | null {
       return { type: 'cyborg', uid: st?.uid ?? null };
     }
     case 'equip': {
+      // かぐや姫が待っている宝なら、装備せずにそのまま差し出す
+      if (kaguyaWants(s, ph.card)) return { type: 'offer' };
       const p = s.players[ph.player];
       const c = EVENT_MAP[ph.card] as GoodsCard;
       // 係ボーナスが乗る子＞そのアイコンをたくさん持つ子
