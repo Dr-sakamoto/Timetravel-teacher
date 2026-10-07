@@ -1,6 +1,6 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { canBuild, canTake, currentEra, kaguyaGift, kaguyaWants, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
+import { canBuild, canTake, currentEra, kaguyaGift, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, GIFT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
@@ -601,14 +601,6 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
           {c.name}を装備する子をタップ（{attr}＋1）
           <div className="say-sub">{chosen(st)}</div>
           {pair(() => dispatch({ type: 'equip', uid: null }), `装備 −${marketCost(ph.card, state.players[ph.player])}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
-          {/* かぐや姫が待っている宝なら、装備せずにそのまま差し出せる（手番は続く） */}
-          {kaguyaWants(state, ph.card) && (
-            <div className="say-sub">
-              <button className="btn small" onClick={() => dispatch({ type: 'offer' })} title="宝はなくなるが、手番は続く">
-                🌙かぐや姫に差し出す −{marketCost(ph.card, state.players[ph.player])} +{kaguyaWinPts()}
-              </button>
-            </div>
-          )}
         </div>
       );
     }
