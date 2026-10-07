@@ -38,6 +38,19 @@ const Star = ({ x, y, r = 3, fill = '#ffd34d' }: { x: number; y: number; r?: num
   return <P d={`M${pts.join(' L')}Z`} fill={fill} sw={1} />;
 };
 
+/** 平安の女性（正面向き。長い黒髪と十二単） */
+const Hime = ({ x, y, c, c2 }: { x: number; y: number; c: string; c2: string }) => (
+  <g transform={`translate(${x} ${y})`}>
+    <P d="M-8 -6 C-9 -16 9 -16 8 -6 L11 14 H-11Z" fill="#1f1a1a" />
+    <P d="M-12 22 C-12 10 -7 4 0 4 C7 4 12 10 12 22Z" fill={c} />
+    <P d="M-4 4 L0 12 L4 4" fill={c2} sw={1} />
+    <C x={0} y={-4} r={6} fill="#fff1e6" />
+    <P d="M-6 -6 C-5 -11 5 -11 6 -6 C3 -8 -3 -8 -6 -6Z" fill="#1f1a1a" sw={0.8} />
+    <P d="M-3 -3.5 h1.6 M1.4 -3.5 h1.6" sw={1} />
+    <C x={0} y={-0.5} r={0.7} fill="#d14b6c" sw={0} />
+  </g>
+);
+
 const SCENES: Record<string, () => ReactNode> = {
   // ---------- 現代 ----------
   bunkasai: () => (
@@ -433,25 +446,24 @@ const SCENES: Record<string, () => ReactNode> = {
   ),
 
   // ---------- 平安 ----------
-  tentoku: () => (
+  // 源氏物語：几帳の前で巻物を広げる書き手と、のぞきこむ貴族たち
+  genji: () => (
     <g>
-      <Bg sky="#fde4ec" ground="#e8d6a8" y={56} />
-      <R x={4} y={8} w={44} h={46} fill="#d14b3c" rx={2} />
-      <R x={52} y={8} w={44} h={46} fill="#3566b8" rx={2} />
-      <text x={26} y={18} textAnchor="middle" fontSize={7} fontWeight={900} fill="#fff">
-        左
-      </text>
-      <text x={74} y={18} textAnchor="middle" fontSize={7} fontWeight={900} fill="#fff">
-        右
-      </text>
-      {[16, 30, 64, 78].map((x, i) => (
-        <g key={x} transform={`rotate(${i % 2 ? 6 : -6} ${x} 38)`}>
-          <R x={x - 4} y={24} w={8} h={26} fill="#fbf4e2" sw={1.1} />
-          <P d={`M${x - 1.5} 28 V46 M${x + 1.5} 30 V44`} sw={0.7} />
-        </g>
-      ))}
-      {[[10, 4], [40, 2], [60, 5], [90, 3], [50, 60], [20, 64], [80, 66]].map(([x, y]) => (
-        <g key={`${x}-${y}`}>
+      <Bg sky="#fde4ec" ground="#c9a46a" y={54} />
+      <R x={4} y={6} w={30} h={46} fill="#b58ad0" rx={1} />
+      <P d="M10 6 V52 M18 6 V52 M26 6 V52" stroke="#e8d6f2" sw={1} />
+      <R x={66} y={6} w={30} h={46} fill="#e57fa4" rx={1} />
+      <P d="M72 6 V52 M80 6 V52 M88 6 V52" stroke="#fbd4e2" sw={1} />
+      <P d="M22 60 C30 54 70 54 78 60 L76 66 C68 62 32 62 24 66Z" fill="#fbf4e2" />
+      <P d="M32 59 V63 M38 58 V62 M44 58 V62 M56 58 V62 M62 58 V62 M68 59 V63" sw={0.7} />
+      <C x={22} y={63} r={3} fill="#c0392b" sw={1} />
+      <C x={78} y={63} r={3} fill="#c0392b" sw={1} />
+      <Hime x={50} y={34} c="#7b5ea7" c2="#c9a7e8" />
+      <P d="M58 46 L66 56" sw={1.4} />
+      <Mini x={12} y={58} c="#3f7fd0" s={0.9} />
+      <Mini x={88} y={58} c="#2f8a4c" s={0.9} />
+      {[[10, 4], [90, 4], [50, 4]].map(([x, y]) => (
+        <g key={x}>
           {[0, 72, 144, 216, 288].map((a) => (
             <E key={a} x={x + Math.cos((a * Math.PI) / 180) * 2} y={y + Math.sin((a * Math.PI) / 180) * 2} rx={1.6} ry={1.1} fill="#f7b6cc" sw={0.5} rot={a} />
           ))}
@@ -459,7 +471,56 @@ const SCENES: Record<string, () => ReactNode> = {
       ))}
     </g>
   ),
-  michinaga: () => (
+  // かぐや姫の難題：月夜の竹林で、かぐや姫が5つの宝を並べて見せる
+  kaguya: () => (
+    <g>
+      <Bg sky="#1f2b4a" ground="#3f5a3a" y={56} />
+      <C x={50} y={16} r={11} fill="#fff3b0" />
+      {[[10, 10], [24, 6], [80, 8], [92, 18]].map(([x, y]) => (
+        <Star key={`${x}`} x={x} y={y} r={1.5} fill="#fff3b0" />
+      ))}
+      {[6, 16, 84, 94].map((x) => (
+        <g key={x}>
+          <R x={x - 2.5} y={8} w={5} h={50} fill="#6fb35a" sw={1} />
+          <P d={`M${x - 2.5} 20 h5 M${x - 2.5} 32 h5 M${x - 2.5} 44 h5`} sw={0.8} />
+        </g>
+      ))}
+      <Hime x={50} y={36} c="#f48fb1" c2="#fff3b0" />
+      {[['🥣', 22], ['🐚', 33], ['🌿', 50], ['🔥', 67], ['🐉', 78]].map(([t, x]) => (
+        <g key={t as string}>
+          <C x={x as number} y={64} r={5} fill="#fbf4e2" sw={1} />
+          <text x={x as number} y={66.5} textAnchor="middle" fontSize={6}>
+            {t}
+          </text>
+        </g>
+      ))}
+    </g>
+  ),
+  // 五条大橋の弁慶：橋の上で薙刀を構える弁慶と、欄干に跳び乗る牛若丸
+  gojo: () => (
+    <g>
+      <Bg sky="#2a3558" ground="#2f5f8a" y={52} />
+      <C x={84} y={12} r={7} fill="#fff3b0" />
+      <P d="M0 46 Q50 34 100 46 L100 52 Q50 40 0 52Z" fill="#a0683a" />
+      <P d="M0 40 Q50 28 100 40" sw={1.6} />
+      {[10, 30, 50, 70, 90].map((x) => (
+        <P key={x} d={`M${x} ${40 - 12 * Math.sin((x / 100) * Math.PI) * 0.9} V${46 - 12 * Math.sin((x / 100) * Math.PI) * 0.9}`} sw={1.4} />
+      ))}
+      <P d="M0 60 Q25 56 50 60 T100 60" stroke="#9be0ff" sw={1} />
+      <P d="M28 44 C28 32 32 26 38 26 C44 26 48 32 48 44Z" fill="#2b2b2b" />
+      <P d="M30 22 C30 12 46 12 46 22 C46 26 30 26 30 22Z" fill="#f6f1e4" />
+      <C x={38} y={23} r={4.5} fill="#e0a878" />
+      <Stick x1={20} y1={44} x2={54} y2={8} w={1.4} color="#7a5a3a" />
+      <P d="M54 8 C58 4 62 6 60 10 Z" fill="#d0d6dc" sw={1} />
+      <g transform="translate(70 22) rotate(-15)">
+        <P d="M-5 10 C-5 4 -3 1 0 1 C3 1 5 4 5 10Z" fill="#f2f2f2" sw={1.1} />
+        <C x={0} y={-3} r={3.6} fill="#fff1e6" sw={1.1} />
+        <P d="M-4 -5 C-2 -9 2 -9 4 -5" fill="#1f1a1a" sw={0.8} />
+        <P d="M5 4 L10 -2" sw={1} />
+      </g>
+    </g>
+  ),
+  mochizuki: () => (
     <g>
       <Bg sky="#1f2b4a" ground="#5a3a2a" y={56} />
       <C x={74} y={18} r={12} fill="#fff3b0" />

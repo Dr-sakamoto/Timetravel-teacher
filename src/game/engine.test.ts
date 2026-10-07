@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
-import { CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/cards';
+import { BENKEI, CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
-import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
+import { ERA_CARDS, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
-import { MONTHS, canBuild, canTake, currentEra, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
+import { MONTHS, canBuild, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
@@ -168,7 +168,7 @@ describe('engine', () => {
       ...ARCHETYPES.map((a) => ({ name: a.title, attrs: parseAttrs(a.attrs), tags: a.tags })),
     ];
     // ヤンキーは必ず👊を持つ。現代の👊持ちはみなヤンキー（偉人の👊持ちにはまだタグをつけていない）
-    for (const x of [...all, ...EGG_DINOS]) {
+    for (const x of [...all, ...EGG_DINOS, BENKEI]) {
       if (x.tags.includes('ヤンキー')) expect(x.attrs, x.name).toContain('fight');
     }
     for (const a of ARCHETYPES) if (parseAttrs(a.attrs).includes('fight')) expect(a.tags, a.title).toContain('ヤンキー');
@@ -371,8 +371,8 @@ describe('engine', () => {
 
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
     for (const era of ERAS) {
-      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン
-      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague').flatMap((c) => (c.also ? [c.attr, c.also] : [c.attr])));
+      // ペストの🏃は競うアイコンではなく、数えなくなるアイコン。五条大橋の弁慶は平安でただ1枚の👊のイベント
+      const used = new Set(ERA_CARDS.filter((c) => c.era === era.id && c.effect.type !== 'alien' && c.effect.type !== 'plague' && c.effect.type !== 'benkei').flatMap((c) => (c.also ? [c.attr, c.also] : [c.attr])));
       // 現代は優遇なし：全アイコンで競うカードがある（文化祭だけは出し物なので🎨）
       if (era.favor.length) for (const a of used) expect([...era.favor, 'all'], era.id).toContain(a);
       else expect(used.has('all'), era.id).toBe(true);
@@ -811,10 +811,87 @@ describe('engine', () => {
       });
     });
 
-    it('michinaga: every other class sends gifts to the class with the most 👑', () => {
-      expect(run('michinaga', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, -3, -3]);
+    it('mochizuki: every other class sends gifts to the class with the most 👑', () => {
+      expect(run('mochizuki', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, -3, -3]);
       // 一番が2クラスなら、残りのクラスがそれぞれに贈る
-      expect(run('michinaga', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
+      expect(run('mochizuki', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
+    });
+
+    it('genji: the school\'s best 🎨 writer\'s class scores 3 per 👑 reader in that class', () => {
+      // 作者はクラス0の a（🎨3）。クラス0で👑を持つ子は a 自身と r1・r2 の3人
+      const r = run('genji', [[mk('a', ['art', 'art', 'art', 'charm']), mk('r1', ['charm']), mk('r2', ['charm', 'study'])], [mk('b', ['art', 'art']), mk('r3', ['charm', 'charm'])], [mk('c', ['charm'])]]);
+      expect(r.delta).toEqual([9, 0, 0]);
+      // 同点なら作者が2人。👑の読者がいなければ0点
+      const tie = run('genji', [[mk('a', ['art', 'art']), mk('r1', ['charm'])], [mk('b', ['art', 'art'])], [mk('c', ['charm', 'charm'])]]);
+      expect(tie.delta).toEqual([3, 0, 0]);
+      // 文化委員の子は🎨を2倍に数えて作者になる
+      const role = run('genji', [[mk('a', ['art', 'art']), mk('r1', ['charm'])], [mk('b', ['art', 'art', 'art']), mk('r2', ['charm'])], []], [10, 10, 10], [[{ role: 'culture', uid: 'a' }], [], []]);
+      expect(role.delta).toEqual([3, 0, 0]);
+    });
+
+    it('kaguya: Kaguya stays until the term ends; each class may present its own treasure on its turn for +5', () => {
+      // クラス0は5つの宝を全部装備している。来ただけでは差し出さない（差し出すかどうかは手番で選ぶ）
+      const holders = KAGUYA_TREASURES.map((g, k) => ({ ...mk(`t${k}`, ['study', g.attr]), goods: { id: g.id, name: g.name, icon: g.icon, attr: g.attr } }));
+      const r = run('kaguya', [holders, [mk('b', ['art'])], [mk('c', ['charm'])]]);
+      expect(r.delta).toEqual([0, 0, 0]);
+      const asks = r.after.kaguya!;
+      expect(new Set(asks).size).toBe(3);
+      expect(asks.every((id) => KAGUYA_TREASURES.some((g) => g.id === id))).toBe(true);
+      expect(r.after.players[0].students.filter((x) => x.goods)).toHaveLength(KAGUYA_TREASURES.length);
+      // 手番で差し出す：宝は消えて+5、手番はそのまま続く
+      const t = structuredClone(r.after);
+      t.phase = { kind: 'draw', player: 0 };
+      expect(kaguyaGift(t, 0)?.goods?.id).toBe(asks[0]);
+      const given = step(t, { type: 'present' });
+      expect(given.players[0].points - t.players[0].points).toBe(5);
+      expect(given.kaguya![0]).toBeNull();
+      const gave = given.players[0].students.find((x) => x.uid.startsWith('t') && !x.goods)!;
+      expect(gave.attrs).toEqual(['study']);
+      expect(given.phase.kind).toBe('result');
+      const back = step(given, { type: 'continue' });
+      expect(back.phase).toEqual({ kind: 'draw', player: 0 });
+      // 2回は差し出せない。頼まれた宝を持っていないクラスも差し出せない
+      expect(step(back, { type: 'present' })).toBe(back);
+      const u = structuredClone(r.after);
+      u.phase = { kind: 'draw', player: 1 };
+      expect(step(u, { type: 'present' })).toBe(u);
+      // 頼まれた宝を装備しても、勝手には差し出さない（あとで差し出せる）
+      u.market[0] = asks[1]!;
+      const eq = step(step(u, { type: 'take', slot: 0 }), { type: 'equip', uid: 'b' });
+      expect(eq.players[1].students.find((x) => x.uid === 'b')!.goods?.id).toBe(asks[1]);
+      expect(eq.kaguya![1]).toBe(asks[1]);
+      // 学期の区切りで月へ帰る
+      let v = r.after;
+      for (let n = 0; n < 2000 && v.phase.kind !== 'roles'; n++) v = step(v, cpuAction(v)!);
+      expect(v.phase.kind).toBe('roles');
+      expect(v.kaguya).toBeUndefined();
+    });
+
+    it('gojo: classes with 3+ 👊 beat Benkei, and he joins the strongest one', () => {
+      const benkei = (st: GameState) => st.players.map((p) => p.students.filter((x) => x.cardId === 'benkei').length);
+      // 義経（👊3）がいるクラスは、それだけで必ず勝てる
+      const yoshitsune = CARDS.find((c) => c.id === 'yoshitsune')!;
+      expect(yoshitsune.attrs.filter((a) => a === 'fight')).toHaveLength(3);
+      const r = run('gojo', [[mk('y', [...yoshitsune.attrs])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight']), mk('d', ['fight', 'fight'])]]);
+      // 👊4のクラス2が弁慶を連れて帰る。クラス0も勝ちで減点なし、クラス1は届かず−2
+      expect(r.delta).toEqual([0, -2, 0]);
+      expect(benkei(r.after)).toEqual([0, 0, 1]);
+      const st = r.after.players[2].students.find((x) => x.cardId === 'benkei')!;
+      expect(st.attrs).toEqual(['fight', 'fight', 'fight']);
+      // 同点ならポイントが少ないクラスへ
+      const tie = run('gojo', [[mk('a', ['fight', 'fight', 'fight'])], [mk('b', ['fight', 'fight', 'fight'])], []], [20, 5, 10]);
+      expect(benkei(tie.after)).toEqual([0, 1, 0]);
+      expect(tie.delta).toEqual([0, 0, -2]);
+      // 弁慶がもういれば何も起こらない
+      const t = structuredClone(r.after);
+      t.phase = base.phase;
+      t.eventDeck.push('gojo');
+      const again = step(t, pass);
+      expect(again.players.map((p) => p.points)).toEqual(t.players.map((p) => p.points));
+      expect(benkei(again)).toEqual([0, 0, 1]);
+      // 満席なら次に強いクラスへ
+      const full = run('gojo', [[mk('a', ['fight', 'fight', 'fight', 'fight']), ...Array.from({ length: MAX_CLASS - 1 }, (_, k) => mk(`f${k}`, ['study']))], [mk('b', ['fight', 'fight', 'fight'])], []]);
+      expect(benkei(full.after)).toEqual([0, 1, 0]);
     });
 
     it('monalisa: each class scores its best painter\'s 🎨 × 3 (role bonus counts)', () => {

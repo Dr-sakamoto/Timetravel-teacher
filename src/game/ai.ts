@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
+import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, kaguyaGift, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -102,6 +102,12 @@ function cyborged(st: Student): Student {
   return { ...st, attrs: [...CYBORG_ATTRS], goods: undefined };
 }
 
+/** かぐや姫に宝を差し出したときの点 */
+const KAGUYA_GIFT = (() => {
+  const c = EVENT_MAP.kaguya;
+  return c.kind === 'contest' && c.effect.type === 'kaguya' ? c.effect.win : 0;
+})();
+
 /** その場のカードを取る値打ち（払うポイントを差し引いた、この先の得点の目安） */
 export function marketValue(s: GameState, pi: number, slot: number): number {
   const p = s.players[pi];
@@ -118,6 +124,8 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
     case 'normal':
       return attrScore(p, c.attr).total;
     case 'goods':
+      // かぐや姫に頼まれた宝なら、装備して差し出す（宝は消えて点が入る）
+      if (s.kaguya?.[pi] === c.id && equippable(p).length) return KAGUYA_GIFT - cost;
       return Math.max(...equippable(p).map((st) => gain(s, p, swap(st.uid, equipped(st, c.attr))))) - cost;
     case 'cyborg':
       return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;
@@ -163,6 +171,8 @@ export function cpuAction(s: GameState): Action | null {
       return { type: 'setRoles', unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
     }
     case 'draw': {
+      // かぐや姫に頼まれた宝を持っていれば、先に差し出す（手番は終わらない）
+      if (kaguyaGift(s, ph.player)) return { type: 'present' };
       const slots = s.market.map((_, i) => i);
       const best = slots.filter((i) => canTake(s, ph.player, i)).sort((x, y) => marketValue(s, ph.player, y) - marketValue(s, ph.player, x))[0];
       const bv = buildValue(s, ph.player);

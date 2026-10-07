@@ -1,6 +1,8 @@
 import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, counted, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock, type AttrScore } from './calc';
 import { CARDS, CARD_MAP, EGG_DINOS, KONGMING, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
+import { BENKEI } from './data/cards';
+import { KAGUYA_TREASURES } from './data/events';
 import {
   ALL_EVENT_CARDS,
   KACHIKOMI_CARDS,
@@ -302,6 +304,7 @@ function order(s: GameState): number[] {
 }
 
 function startTerm(s: GameState, first = false) {
+  kaguyaLeaves(s);
   s.queue = termOrder(s, first);
   s.queueIdx = 0;
   const t = termOfMonth(MONTHS[s.monthIdx]);
@@ -959,6 +962,75 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
+    // 平安：全校で一番の書き手（同点なら全員）が作者。作者のクラスで also を持つ子（物語を読む貴族）1人につき +per
+    case 'genji': {
+      const authors = ps.map((p) => bestOf(p, p.students, c.attr));
+      const hi = Math.max(0, ...authors.map((x) => x?.pts ?? 0));
+      if (hi === 0) break;
+      authors.forEach((x, i) => {
+        if (!x || x.pts !== hi) return;
+        const readers = ps[i].students.filter((y) => counted(y).includes(e.also));
+        add(i, readers.length * e.per);
+        x.student.mvp++;
+        moved.push(x.student);
+        rows[i].count = readers.length;
+        rows[i].uids = [x.student.uid, ...readers.filter((y) => y !== x.student).map((y) => y.uid)];
+        rows[i].note = `作者・読者${readers.length}人`;
+        tell(`${ps[i].name}のクラスの${name(x.student)}が物語を書いた！${ATTR_ICON[e.also]}の読者${readers.length}人（+${readers.length * e.per}）`, i);
+      });
+      break;
+    }
+    // 平安：かぐや姫が学期の区切りまで滞在し、各クラスに宝（平安のグッズ）を1つずつ、重ならないようにくじで頼む。差し出すかどうかは各クラスが手番で選ぶ（+win）
+    case 'kaguya': {
+      const asks = shuffle(s, KAGUYA_TREASURES.map((g) => g.id));
+      s.kaguya = ps.map((_, i) => asks[i % asks.length]);
+      ps.forEach((p, i) => {
+        const g = EVENT_MAP[s.kaguya![i]!] as GoodsCard;
+        const has = p.students.find((x) => x.goods?.id === g.id);
+        rows[i].note = `${g.icon}${g.name}`;
+        if (has) rows[i].uids = [has.uid];
+        tell(`${p.name}のクラスは${g.icon}「${g.name}」を頼まれた。${has ? `${name(has)}が持っている！手番で差し出せば+${e.win}。` : ''}`, i);
+      });
+      break;
+    }
+    // 平安：Xの合計が need 以上のクラスが弁慶を倒す。一番多いクラス（同点ならポイントが少ないクラス。満席なら次のクラス）に弁慶が家来として転入。届かないクラスは刀を取られて −lose
+    case 'benkei': {
+      if (ps.some((p) => p.students.some(isBenkei))) {
+        tell('弁慶はもう義経の家来になって、橋にはだれもいない。');
+        break;
+      }
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+      });
+      const wins = ps.map((_, i) => i).filter((i) => values[i] >= e.need);
+      ps.forEach((_, i) => {
+        if (wins.includes(i)) {
+          rows[i].note = '弁慶に勝った';
+          scores[i].holders.forEach((h) => h.mvp++);
+        } else {
+          add(i, -e.lose);
+          rows[i].note = '刀を取られた';
+        }
+      });
+      if (!wins.length) {
+        tell('どのクラスも弁慶にかなわず、刀を取られた。');
+        break;
+      }
+      wins.sort((x, y) => values[y] - values[x] || ps[x].points - ps[y].points);
+      const to = wins.find((i) => ps[i].students.length < MAX_CLASS);
+      if (to === undefined) {
+        tell('弁慶を倒したが、どのクラスも満席で家来にできなかった。');
+        break;
+      }
+      const st = fromCard(s, BENKEI.id, joinedLabel(s));
+      ps[to].students.push(st);
+      moved.push(st);
+      rows[to].note = '弁慶が家来に';
+      rows[to].uids = [...(rows[to].uids ?? []), st.uid];
+      tell(`${ps[to].name}のクラスが弁慶を倒した！${name(st)}が家来になって転入した。`, to);
+      break;
+    }
     // 中世：各クラスの一番の描き手1人が描く。その子の点（係ボーナス込み）× per
     case 'masterpiece': {
       ps.forEach((p, i) => {
@@ -1187,6 +1259,48 @@ function resolveInvasion(s: GameState, c: ContestCard): EventResult {
   });
   log(s, `【${c.name}】 空席のあるクラスにエイリアンが転入した。`);
   return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows, students: aliens.slice(0, 1) };
+}
+
+/** かぐや姫に頼まれた宝を装備した子（いなければ null）。手番でこの子の宝を差し出せる */
+export function kaguyaGift(s: GameState, pi: number): Student | null {
+  const want = s.kaguya?.[pi];
+  return (want && s.players[pi].students.find((x) => x.goods?.id === want)) || null;
+}
+
+/** かぐや姫に頼まれた宝を装備した子がいれば差し出す（宝は消えて +win）。差し出した子を返す */
+function presentKaguya(s: GameState, pi: number, win = kaguyaWin()): Student | null {
+  const want = s.kaguya?.[pi];
+  if (!want) return null;
+  const p = s.players[pi];
+  const st = p.students.find((x) => x.goods?.id === want);
+  if (!st) return null;
+  const g = st.goods!;
+  const k = st.attrs.lastIndexOf(g.attr);
+  st.attrs = st.attrs.filter((_, i) => i !== k);
+  delete st.goods;
+  st.mvp++;
+  p.points += win;
+  s.kaguya![pi] = null;
+  log(s, `${p.name}のクラスの${st.name}が、かぐや姫に${g.icon}${g.name}を差し出した！（+${win}）`, pi);
+  return st;
+}
+
+/** かぐや姫に宝を差し出したときの点（カードの効果から） */
+function kaguyaWin(): number {
+  const e = (EVENT_MAP.kaguya as ContestCard).effect;
+  return e.type === 'kaguya' ? e.win : 0;
+}
+
+/** 学期の区切り：滞在していたかぐや姫が月へ帰る */
+function kaguyaLeaves(s: GameState) {
+  if (!s.kaguya) return;
+  log(s, s.kaguya.some((x) => x) ? '宝がそろわないまま、かぐや姫は月へ帰っていった。' : 'かぐや姫は月へ帰っていった。');
+  delete s.kaguya;
+}
+
+/** 五条大橋の弁慶で来た弁慶（1人しかいない） */
+export function isBenkei(x: Student): boolean {
+  return x.cardId === BENKEI.id;
 }
 
 /** 機械の子：機械の人物・サイボーグ・機械のグッズ（スマホ・タブレット・電脳チップ）を装備した子 */
@@ -1618,6 +1732,10 @@ export function step(prev: GameState, a: Action): GameState {
         case 'hatch':
           if (ph.player !== null) s.phase = { kind: 'draw', player: ph.player };
           break;
+        case 'kaguya':
+          // かぐや姫に宝を差し出したあとは、同じ人の手番に戻る
+          if (ph.player !== null) s.phase = { kind: 'draw', player: ph.player };
+          break;
         case 'monthEnd':
           advanceMonth(s);
           break;
@@ -1796,6 +1914,19 @@ export function step(prev: GameState, a: Action): GameState {
       // 新大陸の品は早い者勝ち。鉄砲はどのクラスにも同じものが届く
       const items = (EVENT_MAP[ph.card] as ContestCard).effect.type === 'teppo' ? ph.items : ph.items.filter((x) => x !== a.item);
       nextGift(s, ph.card, ph.left, items, [...ph.got, { player: ph.player, uid: st.uid, item: g.id }]);
+      return s;
+    }
+    case 'present': {
+      if (ph.kind !== 'draw') return prev;
+      const st = presentKaguya(s, ph.player);
+      if (!st) return prev;
+      const win = kaguyaWin();
+      setResult(
+        s,
+        ph.player,
+        { title: 'かぐや姫に宝を差し出した', icon: '🌙', art: 'kaguya', tone: 'personal', desc: `${st.icon}${st.name}が宝を差し出した！（+${win}）`, rows: [{ player: ph.player, delta: win, note: '差し出した', uids: [st.uid] }], students: [st] },
+        'kaguya',
+      );
       return s;
     }
     case 'oath': {

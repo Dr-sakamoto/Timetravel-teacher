@@ -1,12 +1,13 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { canBuild, canTake, currentEra, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
+import { canBuild, canTake, currentEra, kaguyaGift, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, GIFT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import { ATTR_ICON, type Action, type GameState, type Player, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
 import { TcgCard } from './TcgCard';
+import { KaguyaStay } from './KaguyaStay';
 
 interface Props {
   state: GameState;
@@ -26,6 +27,12 @@ export interface Pick {
   uid: string | null;
   target: number | null;
   theirUid: string | null;
+}
+
+/** かぐや姫に宝を差し出したときの点 */
+function kaguyaWinPts(): number {
+  const c = EVENT_MAP.kaguya;
+  return c.kind === 'contest' && c.effect.type === 'kaguya' ? c.effect.win : 0;
 }
 
 /** 場のカード1枚の見た目 */
@@ -112,6 +119,9 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
               <span className="pile-label">現代の生徒</span>
               <span className="pile-count">{state.starters.length}</span>
             </button>
+          ) : state.kaguya ? (
+            // かぐや姫が滞在している間は、時代の偉人の山の場所に座る（卓の幅を変えない）
+            <KaguyaStay state={state} />
           ) : (
             <div className="pile era-pile" style={{ borderColor: era.color }} title={`まだ転入していない${era.name}の生徒`}>
               <span className="pile-back">{era.icon}</span>
@@ -427,7 +437,20 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     case 'roles':
       return <div className="say">{who} 🏷️ 係決め</div>;
     case 'draw': {
-      if (sel === null) return <div className="say">{who} 👆 1枚えらぶ</div>;
+      // かぐや姫に頼まれた宝を持っていれば、手番の中でいつでも差し出せる（手番は終わらない）
+      const gift = kaguyaGift(state, ph.player);
+      const present = gift?.goods && (
+        <button className="btn small" onClick={() => dispatch({ type: 'present' })} title="宝はなくなるが、手番は続く">
+          🌙 {gift.goods.icon}を差し出す +{kaguyaWinPts()}
+        </button>
+      );
+      if (sel === null)
+        return (
+          <div className="say">
+            {who} 👆 1枚えらぶ
+            {present && <div className="say-sub">{present}</div>}
+          </div>
+        );
       if (sel === PYRAMID_SEL) {
         const c = pyramidCard(state);
         const ok = canBuild(state, ph.player);
@@ -467,6 +490,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             <button className="btn primary" disabled={!ok} onClick={() => dispatch({ type: 'take', slot: sel })}>
               {label}
             </button>
+            {present}
           </div>
         </div>
       );

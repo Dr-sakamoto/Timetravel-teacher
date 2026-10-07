@@ -127,7 +127,7 @@ export interface EventResult {
   outUids?: string[];
 }
 
-export type ResultCtx = 'turn' | 'hatch' | 'monthEnd' | 'yearEnd' | 'final' | 'oath';
+export type ResultCtx = 'turn' | 'hatch' | 'kaguya' | 'monthEnd' | 'yearEnd' | 'final' | 'oath';
 
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
@@ -199,6 +199,8 @@ export interface GameState {
   /** 初期メンバー用の山（現代の普通の生徒） */
   starters: string[];
   pools: Record<EraId, string[]>;
+  /** かぐや姫が滞在中なら、各クラス（添字）に頼んでいる宝（グッズのID）。差し出したクラスは null。差し出すかどうかは手番で選ぶ。学期の区切りで月へ帰る（undefined に戻る） */
+  kaguya?: (string | null)[];
   uidCounter: number;
   logCounter: number;
   log: LogEntry[];
@@ -229,5 +231,7 @@ export type Action =
   | { type: 'equip'; uid: string | null }
   | { type: 'gift'; item: string; uid: string }
   | { type: 'cyborg'; uid: string | null }
+  /** かぐや姫に頼まれた宝を差し出す（手番の中でいつでも。手番は終わらない） */
+  | { type: 'present' }
   /** 桃園の誓い：義兄弟になるクラス（自分以外・1つ以上） */
   | { type: 'oath'; targets: number[] };

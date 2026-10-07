@@ -59,6 +59,9 @@ export interface SwingCard {
  *   bridge    … 三国志「ポイントが一番多いクラス（1クラスだけ）が追いかける。ほかの各クラスはXが一番多い子1人が橋に立ち、その子のXが need 以上なら一喝して追い返し、追いかけるクラスから take 点奪う。足りなければ −lose（追いかけるクラスは得をしない）」
  *   oath      … 三国志「ポイントが一番少ないクラスが、ほかのクラスを max まで選んで義兄弟になる。学期の区切りまでに義兄弟が得た点・失った点を合わせて山分けする」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
+ *   genji     … 平安「全校でXが一番多い子が作者。作者のクラスで also を持つ子1人につき +per」（同点なら作者が複数）
+ *   kaguya    … 平安「かぐや姫が学期の区切りまで滞在し、各クラスに平安の宝（グッズ）を1つずつくじで頼む。頼まれた宝を装備した子がいれば、手番で差し出すかどうか選べる。差し出すと +win（宝は消える）」
+ *   benkei    … 平安「Xの合計が need 以上のクラスが弁慶を倒し、一番多いクラスに弁慶が家来として転入。届かないクラスは −lose」
  *   masterpiece … 中世「各クラスのXが一番多い子1人の、Xの数 × per」
  *   printing  … 中世「Xを持っていない子全員のXが1つ増える（全員持っていれば何も起こらない）」
  *   plague    … 中世「各クラスの係に就いていない子1人（ランダム）がペストにかかる。学期の区切りまでXを数えない」
@@ -95,6 +98,9 @@ export type EraEffect =
   | { type: 'bridge'; need: number; take: number; lose: number }
   | { type: 'oath'; max: number }
   | { type: 'tribute'; per: number }
+  | { type: 'genji'; also: Attr; per: number }
+  | { type: 'kaguya'; win: number }
+  | { type: 'benkei'; need: number; lose: number }
   | { type: 'masterpiece'; per: number }
   | { type: 'printing' }
   | { type: 'plague' }
@@ -235,7 +241,7 @@ export const MOVE_CARDS: MoveCard[] = [
 ];
 
 const G = (id: string, name: string, icon: string, attr: Attr, era?: EraId): GoodsCard => ({ id, kind: 'goods', name, icon, attr, era, count: 1 });
-/** グッズ：全時代共通3種＋時代ごとに2種（時代のグッズはその時代の優遇アイコン。歴史の時代は実在の品。未来の片方はサイボーグ化） */
+/** グッズ：全時代共通3種＋時代ごとに2種（時代のグッズはその時代の優遇アイコン。歴史の時代は実在の品。未来の片方はサイボーグ化）。平安だけは竹取物語の5つの宝（かぐや姫の難題） */
 export const GOODS_CARDS: GoodsCard[] = [
   G('g_book', '参考書', '📕', 'study'),
   G('g_shoes', 'スポーツシューズ', '👟', 'sports'),
@@ -250,8 +256,11 @@ export const GOODS_CARDS: GoodsCard[] = [
   G('g_republic', 'プラトンの『国家』', '📜', 'study', 'greece'),
   G('g_sunzi', '『孫子』の兵法書', '🎋', 'study', 'china'),
   G('g_halberd', '青龍偃月刀', '🗡️', 'fight', 'china'),
-  G('g_genjiemaki', '源氏物語絵巻', '🖼️', 'art', 'heian'),
-  G('g_junihitoe', '十二単', '👘', 'charm', 'heian'),
+  G('g_hachi', '仏の御石の鉢', '🥣', 'study', 'heian'),
+  G('g_koyasugai', '燕の子安貝', '🐚', 'sports', 'heian'),
+  G('g_horai', '蓬莱の玉の枝', '🌿', 'art', 'heian'),
+  G('g_hinezumi', '火鼠の皮衣', '🔥', 'charm', 'heian'),
+  G('g_ryunotama', '龍の首の珠', '🐉', 'fight', 'heian'),
   G('g_chisel', 'ミケランジェロのノミ', '🔨', 'art', 'europe'),
   G('g_copernicus', 'コペルニクスの『天球回転論』', '📙', 'study', 'europe'),
   G('g_tonbogiri', '本多忠勝の蜻蛉切', '🔱', 'fight', 'sengoku'),
@@ -271,6 +280,9 @@ export const NEW_WORLD_GOODS: GoodsCard[] = [
   G('g_newmap', '新大陸の地図', '🗺️', 'study'),
 ];
 export const NEW_WORLD_MAP: Record<string, GoodsCard> = Object.fromEntries(NEW_WORLD_GOODS.map((g) => [g.id, g]));
+
+/** かぐや姫が頼む5つの宝（竹取物語の難題）＝平安のグッズ。くじで各クラスに1つずつ、重ならないように頼む */
+export const KAGUYA_TREASURES: GoodsCard[] = GOODS_CARDS.filter((g) => g.era === 'heian');
 
 /** 鉄砲伝来で全クラスに1丁ずつ届く鉄砲（山札には入らない。装備するとグッズと同じく👊＋1） */
 export const TEPPO_GOODS: GoodsCard = G('g_tanegashima', '種子島（火縄銃）', '🔫', 'fight');
@@ -335,9 +347,11 @@ export const ERA_CARDS: ContestCard[] = [
   C('sangu', '三顧の礼', '🏠', 'study', { type: 'kongming' }, '人望はあっても知恵の足りなかった劉備は、諸葛亮の家を3回たずねて、やっと軍師に迎えた。', 'china', 1),
   C('changban', '長坂の戦い', '🌉', 'fight', { type: 'bridge', need: 2, take: 4, lose: 2 }, '208年、曹操の大軍に追われた劉備軍。張飛はたった一人で橋の上に立ち、大声で一喝して追っ手を止めた。', 'china', 1),
   C('taoyuan', '桃園の誓い', '🍑', 'all', { type: 'oath', max: 2 }, '物語『三国志演義』では、まだ何者でもなかった劉備が、関羽・張飛と桃の園で義兄弟になった。生まれた日はちがっても、喜びも苦しみも分け合う。', 'china', 1),
-  // 平安：🎨👑。権力者のもとに、ほかのクラスから贈り物が集まる
-  C('tentoku', '天徳内裏歌合', '🌸', 'art', { type: 'battle', win: 15, second: 5, lose: 10 }, '村上天皇の御前で和歌の勝負。勝ち負けがはっきりつく。', 'heian'),
-  C('michinaga', '藤原道長の宴', '🌕', 'charm', { type: 'tribute', per: 3 }, '「この世をば…」。道長に一番気に入られたクラスへ、ほかのクラスから贈り物が届く。', 'heian'),
+  // 平安：🎨👑。物語を書く子と読む貴族、権力者への贈り物、かぐや姫の難題、五条大橋の弁慶（👊だけはこの1枚）
+  C('genji', '源氏物語', '📖', 'art', { type: 'genji', also: 'charm', per: 3 }, '紫式部が書いた光源氏の物語。宮中の貴族たちが続きを楽しみに回し読みした。', 'heian', 1),
+  C('mochizuki', '藤原道長の望月の歌', '🌕', 'charm', { type: 'tribute', per: 3 }, '「この世をば わが世とぞ思ふ 望月の 欠けたることも なしと思へば」。道長に一番気に入られたクラスへ、ほかのクラスから贈り物が届く。', 'heian', 1),
+  C('kaguya', '竹取物語・かぐや姫の難題', '🌙', 'all', { type: 'kaguya', win: 5 }, 'かぐや姫が学校にやってきて「この宝を持ってきてください」。持ってこられなければ、学期の終わりに月へ帰ってしまう。', 'heian', 1),
+  C('gojo', '五条大橋の弁慶', '🪓', 'fight', { type: 'benkei', need: 3, lose: 2 }, '京の五条大橋で、弁慶が通る人の刀を奪っている。力を合わせて倒せば、弁慶が家来になる。', 'heian', 1),
   // 中世・ルネサンス：🎨📚。ペストにかかった子は走れなくなり、新大陸の品は早い者勝ち
   C('monalisa', 'モナ・リザ制作', '🖼️', 'art', { type: 'masterpiece', per: 3 }, '何年もかけて仕上げられた、謎の微笑み。名画を生むのはクラス一番の描き手の腕前。', 'europe', 1),
   C('printing', '活版印刷', '📘', 'study', { type: 'printing' }, 'グーテンベルクの印刷機で、本が安く刷れるようになった。本を読んだことのない子も、みんな学び始める。', 'europe', 1),
@@ -475,6 +489,12 @@ export function eraEffectRule(c: ContestCard): string {
       return `ポイントが一番少ないクラスが、ほかのクラスを${e.max}つまで選んで義兄弟に。学期の区切りまで、義兄弟のもうけと損は山分け`;
     case 'tribute':
       return `${a}が一番多いクラスに、ほかの全クラスが${e.per}点ずつ贈る`;
+    case 'genji':
+      return `全校で${a}が一番多い子が作者に：作者のクラスで${ATTR_ICON[e.also]}を持つ子1人につき+${e.per}`;
+    case 'kaguya':
+      return `かぐや姫が学期の終わりまで滞在し、宝（${KAGUYA_TREASURES.map((t) => t.icon).join('')}）をクラスごとに1つずつ頼む：頼まれた宝を装備していれば、手番で差し出して+${e.win}（宝は消える）`;
+    case 'benkei':
+      return `${a}の合計が${e.need}以上のクラスが弁慶を倒し、一番多いクラスに弁慶（${a}${a}${a}）が転入。届かないクラスは−${e.lose}`;
     case 'masterpiece':
       return `各クラスの${a}が一番多い子1人の、${a}の数×${e.per}`;
     case 'printing':
@@ -578,6 +598,12 @@ function contestGlyph(c: ContestCard): string {
       return `ポイント最下位 🍑 義兄弟 → 点を山分け`;
     case 'tribute':
       return `${a}🥇 ⟵ ${e.per}点ずつ`;
+    case 'genji':
+      return `🧑${a}🥇 → 🧑${ATTR_ICON[e.also]}×${e.per}`;
+    case 'kaguya':
+      return `🌙 ⟵ ${KAGUYA_TREASURES.map((t) => t.icon).join('')}？ → +${e.win}`;
+    case 'benkei':
+      return `${a}${e.need}↑ → 🪓🧑　届かず−${e.lose}`;
     case 'masterpiece':
       return `🧑${a}🥇 → ${a}×${e.per}`;
     case 'printing':
