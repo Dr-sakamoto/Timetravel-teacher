@@ -47,7 +47,11 @@ export interface SwingCard {
  *   plunder   … 白亜紀「Xが一番多いクラスが、一番少ないクラスから amount 点奪う」
  *   disaster  … 白亜紀「全クラス −lose。Xを持つ子1人につき +per」
  *   egg       … 白亜紀「Xが一番多いクラス（1クラスだけ）の空いた席に卵が置かれ、そのクラスの次の手番の始めに恐竜が孵る」
+ *   pyramid   … エジプト「山札には入らず、学期のあいだ場の横に残る。手番で選ぶと、クラスのXの数だけ石を積む（その手番は点なし）。
+ *               全クラスの石が need×クラス数 に届いたら完成：自分のクラスが積んだ石が steps[i][0] 以上なら +steps[i][1]（届いた一番上の段だけ）。学期中に完成しなければむだになる」
  *   together  … エジプト「全クラスのXの合計が need×クラス数 以上なら全クラス +win（Xが一番少ないクラスだけ0）、届かなければ全クラス −lose」
+ *   scribe    … エジプト「Xと also を両方持つ子（書記）1人につき +per」
+ *   burial    … エジプト「Xを持っていて、グッズを装備している子1人につき +per（王や貴族があの世へ持っていく副葬品）」
  *   arena     … ギリシャ「各クラスの、Xと also の合計が一番多い子が闘技場で戦う：1位 +win、負けたクラス（出せる子がいないクラスも）−lose」
  *   dialogue  … ギリシャ「各クラスのXが一番多い子が代表になってソクラテス（強さ need）と対話：代表のXが need 以上なら +win、届かない（代表がいない）と論破されて −lose」
  *   ostracism … ギリシャ「全クラスが自分以外のクラスに秘密で投票し、票が一番多いクラスが、係に就いていない子を1人転校させる」
@@ -79,6 +83,9 @@ export type EraEffect =
   | { type: 'disaster'; lose: number; per: number }
   | { type: 'egg' }
   | { type: 'together'; need: number; win: number; lose: number }
+  | { type: 'pyramid'; need: number; steps: [stones: number, win: number][] }
+  | { type: 'scribe'; also: Attr; per: number }
+  | { type: 'burial'; per: number }
   | { type: 'arena'; also: Attr; win: number; lose: number }
   | { type: 'dialogue'; need: number; win: number; lose: number }
   | { type: 'ostracism' }
@@ -234,7 +241,7 @@ export const GOODS_CARDS: GoodsCard[] = [
   G('g_fang', 'ティラノサウルスの牙', '🦷', 'fight', 'cretaceous'),
   G('g_amber', '琥珀', '🟠', 'art', 'cretaceous'),
   G('g_mask', 'ツタンカーメンの黄金のマスク', '🎭', 'charm', 'egypt'),
-  G('g_sandal', 'ツタンカーメンのサンダル', '🩴', 'sports', 'egypt'),
+  G('g_sledge', 'ピラミッドの石運びそり', '🛷', 'sports', 'egypt'),
   G('g_olive', 'オリンピアのオリーブ冠', '🌿', 'sports', 'greece'),
   G('g_republic', 'プラトンの『国家』', '📜', 'study', 'greece'),
   G('g_sunzi', '『孫子』の兵法書', '🎋', 'study', 'china'),
@@ -309,9 +316,11 @@ export const ERA_CARDS: ContestCard[] = [
   C('trex_hunt', 'ティラノサウルスの狩り', '🦖', 'fight', { type: 'plunder', amount: 8 }, '強い者が、一番弱い者を狩っていく。', 'cretaceous', 1),
   C('migration', '大移動', '🦕', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, 'パラサウロロフスの群れが大地を渡る。群れを守り切れるか。', 'cretaceous', 1),
   C('egg_theft', 'オヴィラプトルの卵泥棒', '🥚', 'sports', { type: 'egg' }, '一番すばしこいクラスが、恐竜の卵をこっそり持ち帰る。何が孵るかはお楽しみ。', 'cretaceous', 1),
-  // 古代エジプト：🏃👑。全クラスで1つのピラミッドを積む（サボったクラスは分け前なし）
-  C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'together', need: 6, win: 6, lose: 3 }, '全クラス総出で石を積む。完成すれば全員にほうび、サボったクラスは分け前なし。', 'egypt'),
-  C('ramesses', 'ラムセス2世への謁見', '🤴', 'charm', { type: 'heads', per: 2 }, 'ファラオに気に入られる子が多いほど、クラスの株が上がる。', 'egypt'),
+  // 古代エジプト：🏃👑。ピラミッドは場の横に残り、みんなで少しずつ積む。ナイルの氾濫のあとは大豊作。書記はえらい役人、ミイラの副葬品は王や貴族のもの
+  C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'pyramid', need: 7, steps: [[7, 20], [14, 30]] }, '学期のあいだ、みんなで少しずつ石を積む。働く人はパンとビールを給料にもらっていた。完成すれば、たくさん積んだクラスほど大きなほうび。学期が終わるまでに完成しなければ、積んだ石はむだになる。', 'egypt', 1),
+  C('nile', 'ナイルの氾濫', '🌊', 'sports', { type: 'heads', per: 2 }, '毎年夏、ナイル川があふれて畑に黒い土を運ぶ。水が引いたら大豊作。畑で働く子が多いほど、たくさんとれる。', 'egypt', 1),
+  C('hieroglyph', 'ヒエログリフ', '👁️', 'charm', { type: 'scribe', also: 'study', per: 3 }, '絵のような文字で、石や紙（パピルス）に書き残す。読み書きができる書記は、王に仕えるえらい役人だった。', 'egypt', 1),
+  C('mummy', 'ミイラづくり', '⚱️', 'charm', { type: 'burial', per: 4 }, '70日かけてミイラをつくり、あの世で使う宝物（副葬品）といっしょにお墓に納める。りっぱなお墓に宝物を入れてもらえたのは、王や貴族だけ。', 'egypt', 1),
   // ギリシャ・ローマ：🏃📚。オリンピックは負けても減点なし、剣闘は負けると減点。陶片追放は秘密投票で1クラスだけ転校
   C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 12, second: 5, lose: 0 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。参加することに意義がある。', 'greece', 1),
   C('colosseum', 'コロッセオの剣闘', '⚔️', 'sports', { type: 'arena', also: 'fight', win: 12, lose: 4 }, '各クラスの一番の剣闘士が闘技場へ。勝てば喝采、負ければ大恥。', 'greece', 1),
@@ -442,6 +451,12 @@ export function eraEffectRule(c: ContestCard): string {
       return `各クラスの${a}が一番多い子が代表でソクラテスと対話：${a}${e.need}以上なら+${e.win}、足りないと論破されて−${e.lose}`;
     case 'plunder':
       return `${a}が一番多いクラスが、一番少ないクラスから${e.amount}点奪う`;
+    case 'pyramid':
+      return `手番で選ぶと、クラスの${a}の数だけ石を積む（その手番は点なし）。全クラスで${e.need}×クラス数に届いたら完成：積んだ石が${e.steps.map(([n, w]) => `${n}個以上で+${w}`).join('、')}。学期中に完成しなければむだ`;
+    case 'scribe':
+      return `${a}と${ATTR_ICON[e.also]}を両方持つ子（書記）1人につき+${e.per}`;
+    case 'burial':
+      return `${c.attr === 'all' ? '' : `${a}を持っていて、`}グッズを装備している子1人につき+${e.per}`;
     case 'together':
       return `全クラスの${a}の合計が${e.need}×クラス数以上なら全クラス+${e.win}（${a}が一番少ないクラスは0）、届かなければ全クラス−${e.lose}`;
     case 'ostracism':
@@ -535,6 +550,12 @@ function contestGlyph(c: ContestCard): string {
       return `🧑${a}🥇 vs 🧔${e.need}　+${e.win}／−${e.lose}`;
     case 'plunder':
       return `${a}🥇 ⟵${e.amount}点 ${a}最下位`;
+    case 'pyramid':
+      return `${a} → 🧱 → 🔺完成で ${e.steps.map(([n, w]) => `🧱${n}↑+${w}`).join('／')}`;
+    case 'scribe':
+      return `🧑${a}${ATTR_ICON[e.also]} → +${e.per}ずつ`;
+    case 'burial':
+      return `🧑${c.attr === 'all' ? '' : a}💍 → +${e.per}ずつ`;
     case 'together':
       return `みんなの${a} ${e.need}×クラス数↑ +${e.win}／−${e.lose}`;
     case 'ostracism':
