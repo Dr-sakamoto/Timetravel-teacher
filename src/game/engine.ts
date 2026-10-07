@@ -1,6 +1,6 @@
 import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, counted, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock, type AttrScore } from './calc';
 import { CARDS, CARD_MAP, EGG_DINOS, KONGMING, toIcons } from './data/cards';
-import { ERAS, PRESENT_INDEX } from './data/eras';
+import { ERAS } from './data/eras';
 import { BENKEI } from './data/cards';
 import { KAGUYA_TREASURES } from './data/events';
 import {
@@ -54,8 +54,8 @@ import {
 } from './types';
 import { ATTR_ICON } from './types';
 
-/** 転校生がやってくる歴史上の時代（現代以外） */
-export const HISTORY_ERAS = ERAS.map((_, i) => i).filter((i) => i !== PRESENT_INDEX);
+/** 学期に巡ってくる時代（現代もほかの時代と並列に扱う） */
+export const ALL_ERAS = ERAS.map((_, i) => i);
 /** 手番のある月（8月の夏休みは飛ばす） */
 export const MONTHS = [4, 5, 6, 7, 9, 10, 11, 12, 1, 2, 3];
 export const PLAYER_COLORS = ['#ff6b6b', '#4dabf7', '#69db7c', '#ffd43b', '#da77f2'];
@@ -145,7 +145,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     logCounter: 0,
     log: [],
   };
-  drawYearEras(s, true);
+  drawYearEras(s);
   s.eventDeck = buildDeck(s);
   log(s, `時空最強クラス決定戦、開幕！ ${years}年間の勝負です。`);
   return s;
@@ -258,11 +258,11 @@ function afterMemberDraw(s: GameState, last: { player: number; student: Student 
 
 // ---------- 時代と山札 ----------
 
-/** その年の3学期ぶんの時代をランダムに決める（ゲーム中はなるべく被らない）。1年目の1学期は現代で固定 */
-function drawYearEras(s: GameState, first = false) {
-  s.yearEras = first ? [PRESENT_INDEX] : [];
+/** その年の3学期ぶんの時代をランダムに決める（ゲーム中はなるべく被らない） */
+function drawYearEras(s: GameState) {
+  s.yearEras = [];
   while (s.yearEras.length < 3) {
-    if (s.eraDeck.length === 0) s.eraDeck = shuffle(s, [...HISTORY_ERAS]);
+    if (s.eraDeck.length === 0) s.eraDeck = shuffle(s, [...ALL_ERAS]);
     const e = s.eraDeck.pop()!;
     if (!s.yearEras.includes(e)) s.yearEras.push(e);
   }

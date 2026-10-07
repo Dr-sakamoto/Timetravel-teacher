@@ -183,7 +183,6 @@ describe('engine', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 2, 42);
     while (s.phase.kind !== 'gameOver') {
       expect(new Set(s.yearEras).size).toBe(3);
-      if (s.year > 1) expect(s.yearEras).not.toContain(PRESENT_INDEX);
       const ph = s.phase;
       if (ph.kind === 'result' && ph.result.title === '転入' && ph.result.students?.length && ph.ctx === 'turn') {
         for (const o of ph.result.students) expect([ERAS[currentEra(s)].id, 'present']).toContain(o.era);
@@ -192,15 +191,29 @@ describe('engine', () => {
     }
   });
 
-  it('year 1 term 1 is the present era; era cards and person cards fill the deck', () => {
+  it('the first term era is random like any other; era cards and person cards fill the deck', () => {
     const s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 2, 77);
-    expect(s.yearEras[0]).toBe(PRESENT_INDEX);
     const era = ERAS[currentEra(s)].id;
     expect(s.eventDeck.some((id) => ERA_CARDS.some((e) => e.id === id && e.era === era))).toBe(true);
     expect(s.eventDeck.some((id) => ERA_CARDS.some((e) => e.id === id && e.era !== era))).toBe(false);
     const persons = s.eventDeck.filter((id) => id.startsWith('person:'));
-    expect(persons).toHaveLength(PERSON_CARDS_PER_TERM);
-    expect(persons.every((id) => id.startsWith('person:m:'))).toBe(true);
+    expect(persons).toHaveLength(Math.min(PERSON_CARDS_PER_TERM, s.pools[era].length));
+    expect(persons.every((id) => s.pools[era].includes(id.slice(7)))).toBe(true);
+  });
+
+  it('the present era is drawn like the others: not always first, and it can come in later years', () => {
+    const firsts = new Set<number>();
+    let laterPresent = false;
+    for (let seed = 1; seed <= 60; seed++) {
+      let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 3, seed);
+      firsts.add(s.yearEras[0]);
+      while (s.phase.kind !== 'gameOver') {
+        if (s.year > 1 && s.yearEras.includes(PRESENT_INDEX)) laterPresent = true;
+        s = step(s, cpuAction(s)!);
+      }
+    }
+    expect(firsts.size).toBeGreaterThan(3);
+    expect(laterPresent).toBe(true);
   });
 
   it('every era has 3-6 figures and 4 era event cards', () => {
@@ -261,7 +274,6 @@ describe('engine', () => {
   it('starting members come from the regular modern students; later only the rare transfer students come from the present', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 9);
     expect(s.pools.present).toEqual(MODERN_POOL);
-    expect(s.eventDeck.filter((id) => id.startsWith('person:')).every((id) => MODERN_POOL.includes(id.slice(7)))).toBe(true);
     const before = s.starters.length;
     while (s.phase.kind === 'memberDraw') s = step(s, cpuAction(s)!);
     expect(s.starters).toHaveLength(before - 3 * STARTING_MEMBERS);
