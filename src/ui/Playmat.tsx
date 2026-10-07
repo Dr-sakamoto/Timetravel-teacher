@@ -51,6 +51,8 @@ interface Props {
   arrange?: Arrange;
   /** 今のイベントに関わった生徒（光らせる） */
   lit?: Set<string>;
+  /** 桃園の誓いで義兄弟になっている */
+  sworn?: boolean;
 }
 
 function parseDrop(v: string): DropTo {
@@ -117,6 +119,7 @@ export function Playmat(props: Props) {
         <span className="plate-name">
           {player.name}
           {player.isCpu && <small>🤖</small>}
+          {props.sworn && <small title="桃園の誓い：義兄弟（学期の区切りで点を山分け）">🍑</small>}
           {player.freeGoods && <small title="楽市楽座：次に取るグッズ1つがタダ">🪙</small>}
         </span>
         <span className="plate-class">
@@ -198,10 +201,12 @@ interface SeatProps {
   targetable: boolean;
   targeted: boolean;
   onClick: () => void;
+  /** 桃園の誓いで義兄弟になっている */
+  sworn?: boolean;
 }
 
 /** 相手の席：小さく畳んだ教室（名札と12席の埋まり具合）。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
-export function OpponentSeat({ player, year, acting, picking, upNext, offline, delta, rank, litIcons, targetable, targeted, onClick }: SeatProps) {
+export function OpponentSeat({ player, year, acting, picking, upNext, offline, delta, rank, litIcons, targetable, targeted, onClick, sworn }: SeatProps) {
   return (
     <button
       data-pid={player.id}
@@ -215,6 +220,7 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
           {player.name}
           {player.isCpu && <small>🤖</small>}
           {offline && <small title="通信が切れています">📵</small>}
+          {sworn && <small title="桃園の誓い：義兄弟（学期の区切りで点を山分け）">🍑</small>}
           {player.freeGoods && <small title="楽市楽座：次に取るグッズ1つがタダ">🪙</small>}
         </span>
         <span className="opp-class">{className(player.id, year)}</span>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
-import { CARDS, EGG_DINOS, parseAttrs, toIcons } from './data/cards';
+import { CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
@@ -275,7 +275,7 @@ describe('engine', () => {
     // 恐竜は👊（と🏃）の個数だけのキャラなので、ほかの子との重複は許す
     for (const d of CARDS.filter((c) => c.tags.includes('恐竜'))) expect(d.attrs.every((x) => x === 'fight' || x === 'sports'), d.name).toBe(true);
     const all = [
-      ...CARDS.filter((c) => !c.tags.includes('恐竜')).map((c) => ({ name: c.name, k: key(c.attrs) })),
+      ...[...CARDS, KONGMING].filter((c) => !c.tags.includes('恐竜')).map((c) => ({ name: c.name, k: key(c.attrs) })),
       ...ARCHETYPES.filter((a) => a.rarity !== 'N').map((a) => ({ name: a.title, k: key(toIcons(a.attrs, a.rarity, a.power)) })),
     ];
     for (const x of all) expect(all.filter((y) => y.k === x.k).map((y) => y.name), x.name).toEqual([x.name]);
@@ -716,13 +716,98 @@ describe('engine', () => {
       });
     });
 
-    it('keju: each class\'s best scholar takes the exam and gains a 📚 on passing', () => {
-      const r = run('keju', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study', 'study'])], [mk('c', ['study', 'study'], 'china')]]);
-      const attrs = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!.attrs;
-      expect(attrs(0, 'a')).toEqual(['study', 'study', 'study', 'study']);
-      expect(attrs(1, 'b')).toEqual(['study', 'study']);
-      // その時代の子も2倍にはならない
-      expect(attrs(2, 'c')).toEqual(['study', 'study']);
+    it('chibi: the class with the most 👊 (the fleet) fights the class with the most 📚 among the rest (the strategist)', () => {
+      // 軍師の📚3 ＞ 大船団の👊2 → 火攻め成功：大船団 −10、軍師 +10、ほかは0
+      expect(run('chibi', [[mk('y', ['fight', 'fight'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['study'])]]).delta).toEqual([-10, 10, 0]);
+      // 届かなければ：大船団 +10、軍師 −5
+      expect(run('chibi', [[mk('y', ['fight', 'fight', 'fight'])], [mk('b', ['study', 'study'])], [mk('c', ['study'])]]).delta).toEqual([10, -5, 0]);
+      // 大船団のクラスの📚は数えない（軍師はほかのクラスから選ぶ）
+      expect(run('chibi', [[mk('y', ['fight']), mk('y2', ['study', 'study', 'study'])], [mk('b', ['study'])], []]).delta).toEqual([10, -5, 0]);
+      // 軍師が同点なら、ポイントの少ないクラス
+      expect(run('chibi', [[mk('y', ['fight'])], [mk('b', ['study', 'study'])], [mk('c', ['study', 'study'])]], [10, 10, 5]).delta).toEqual([-10, 0, 10]);
+      // 👊の一番が並ぶ・だれも👊を持たないなら、にらみ合いで何も起こらない
+      expect(run('chibi', [[mk('y', ['fight'])], [mk('b', ['fight'])], [mk('c', ['study', 'study'])]]).delta).toEqual([0, 0, 0]);
+      expect(run('chibi', [[mk('y', ['study'])], [], []]).delta).toEqual([0, 0, 0]);
+    });
+
+    it('sangu: Zhuge Liang joins, for free, the class whose 👑 most outnumbers its 📚', () => {
+      // 👑−📚：A 3−0=3、B 1−0=1、C 0−2=−2 → A に孔明
+      const r = run('sangu', [[mk('a', ['charm', 'charm', 'charm'])], [mk('b', ['charm'])], [mk('c', ['study', 'study'])]]);
+      expect(r.delta).toEqual([0, 0, 0]);
+      const kongming = (t: GameState) => t.players.map((p) => p.students.filter((x) => x.cardId === 'zhuge').length);
+      expect(kongming(r.after)).toEqual([1, 0, 0]);
+      expect(r.after.players[0].students.find((x) => x.cardId === 'zhuge')!.attrs).toEqual(['study', 'study', 'study', 'charm']);
+      // 孔明は人物カードのプールにはいない
+      expect(Object.values(r.after.pools).flat()).not.toContain('zhuge');
+      // もうどこかのクラスにいれば、もう1人は来ない
+      const again = structuredClone(r.after);
+      again.phase = base.phase;
+      again.eventDeck.push('sangu');
+      expect(kongming(step(again, pass))).toEqual([1, 0, 0]);
+      // 満席のクラスには来ない（次に差が大きいクラスへ）
+      const full = Array.from({ length: MAX_CLASS }, (_, k) => mk(`f${k}`, ['charm']));
+      expect(kongming(run('sangu', [full, [mk('b', ['charm'])], [mk('c', ['study'])]]).after)).toEqual([0, 1, 0]);
+    });
+
+    it('changban: the class with the most points gives chase; each other class holds the bridge with its best 👊 student', () => {
+      // A が一番ポイントが多い。B は👊2の子で追い返して +5、C は👊1しかいないので A に3点取られる
+      const r = run('changban', [[mk('a', ['study'])], [mk('b', ['fight', 'fight']), mk('b2', ['fight'])], [mk('c', ['fight'])]], [20, 10, 10]);
+      expect(r.delta).toEqual([3, 5, -3]);
+      // 👊を持つ子がいないクラスも取られる
+      expect(run('changban', [[], [mk('b', ['study'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([3, -3, 5]);
+      // ポイントの一番が並べば、にらみ合いで何も起こらない
+      expect(run('changban', [[], [mk('b', ['study'])], []]).delta).toEqual([0, 0, 0]);
+    });
+
+    describe('taoyuan: the class with the fewest points picks sworn brothers, and they share what they gain until the term ends', () => {
+      const sworn = () => run('taoyuan', [[mk('a', ['charm'])], [mk('b', ['charm', 'charm'])], [mk('c', ['study'])]], [10, 4, 10]).after;
+
+      it('the class with the fewest points chooses up to two other classes', () => {
+        const t = sworn();
+        expect(t.phase).toEqual({ kind: 'oath', player: 1, max: 2 });
+        // 自分・同じクラス2回・選ばない、はだめ
+        expect(step(t, { type: 'oath', targets: [1] })).toBe(t);
+        expect(step(t, { type: 'oath', targets: [0, 0] })).toBe(t);
+        expect(step(t, { type: 'oath', targets: [] })).toBe(t);
+        const after = step(t, { type: 'oath', targets: [2] });
+        expect(after.oath).toEqual({ players: [1, 2], base: [4, 10] });
+        expect(after.phase).toMatchObject({ kind: 'result', player: null });
+        expect(after.players.map((p) => p.points)).toEqual([10, 4, 10]);
+        // CPUも選べる
+        expect(step(t, cpuAction(t)!)).not.toBe(t);
+      });
+
+      it('nothing happens if an oath is already in place', () => {
+        const t = structuredClone(base);
+        t.oath = { players: [0, 1], base: [0, 0] };
+        t.eventDeck.push('taoyuan');
+        const after = step(t, pass);
+        expect(after.phase).toMatchObject({ kind: 'result' });
+        expect(after.oath).toEqual(t.oath);
+      });
+
+      it('at the end of the term, the sworn classes split their combined gains evenly', () => {
+        let t = step(sworn(), { type: 'oath', targets: [0, 2] });
+        // 誓ったあとの稼ぎを合わせて、3クラスで同じだけ分ける（割り切れない分は1点差まで）
+        t.players[1].points += 12;
+        t.players[0].points -= 2;
+        t.players[2].points += 3;
+        let before = t;
+        while (!(t.phase.kind === 'result' && t.phase.ctx === 'oath')) {
+          before = t;
+          t = step(t, cpuAction(t)!);
+        }
+        const gains = before.players.map((p, i) => p.points - before.oath!.base[before.oath!.players.indexOf(i)]);
+        const total = gains.reduce((x, g) => x + g, 0);
+        const shared = t.players.map((p, i) => p.points - before.oath!.base[before.oath!.players.indexOf(i)]);
+        expect(shared.reduce((x, g) => x + g, 0)).toBe(total);
+        expect(Math.max(...shared) - Math.min(...shared)).toBeLessThanOrEqual(1);
+        expect(t.oath).toBeUndefined();
+        // 次へで新しい学期（または進級）に進む
+        t = step(t, { type: 'continue' });
+        expect(['roles', 'result']).toContain(t.phase.kind);
+        expect(t.oath).toBeUndefined();
+      });
     });
 
     it('michinaga: every other class sends gifts to the class with the most 👑', () => {
@@ -1028,9 +1113,9 @@ describe('engine', () => {
         s = step(s, cpuAction(s)!);
         if (!s.log.some((l) => l.id >= before && l.text.startsWith('ゲリラ発生'))) continue;
         fired++;
-        // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところか、陶片追放の投票
+        // ゲリラの直後は、全員向けの結果か、転校で出ていく子を選ぶところか、陶片追放の投票か、新大陸の品か、桃園の誓いの相手選び
         if (s.phase.kind === 'result') expect(s.phase.player).toBeNull();
-        else expect(['push', 'vote', 'gift']).toContain(s.phase.kind);
+        else expect(['push', 'vote', 'gift', 'oath']).toContain(s.phase.kind);
       }
       expect(fired).toBeGreaterThan(0);
     }
