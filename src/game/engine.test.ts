@@ -299,7 +299,7 @@ describe('engine', () => {
       expect(c.attrs.length).toBeLessThanOrEqual(5);
       if (c.rarity === 'SSR') expect(c.attrs.length, c.name).toBeGreaterThanOrEqual(4);
     }
-    expect(CARDS.find((c) => c.id === 'einstein')!.attrs).toEqual(['study', 'study', 'study', 'art', 'art']);
+    expect(CARDS.find((c) => c.id === 'einstein')!.attrs).toEqual(['study', 'study', 'study', 'study', 'art']);
   });
 
   it('era raids add or take away the difference between 👊 and the threat', () => {
@@ -474,8 +474,6 @@ describe('engine', () => {
     // 修学旅行：アイコンの総数が12以上で+5、18以上で+10、24以上で+15（順位はつけない）
     const many = (u: string, n: number) => Array.from({ length: n }, (_, k) => mk(`${u}${k}`, ['study', 'art', 'charm']));
     expect(run('shugakuryoko', [many('a', 8), many('b', 4), many('c', 3)])).toEqual([15, 5, 0]);
-    // 鹿鳴館の舞踏会：👑を持つ子1人につき+2
-    expect(run('rokumeikan', [[mk('c', ['charm']), mk('d', ['charm', 'charm'], 'modern')], B, C])).toEqual([4, 0, 0]);
   });
 
   it('every era has a special event with its own mechanism', () => {
@@ -1042,6 +1040,94 @@ describe('engine', () => {
       expect(run('nobel', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study']), mk('b2', ['study', 'study'])], []]).delta).toEqual([12, 0, 0]);
       // 同点なら全員が受賞
       expect(run('nobel', [[mk('a', ['study', 'study'])], [mk('b', ['study', 'study'], 'modern')], []]).delta).toEqual([12, 12, 0]);
+    });
+
+    describe('patent: the class with the most 📚 earns a fee whenever another class takes a lesson card', () => {
+      const patented = () => run('patent', [[mk('a', ['study', 'study'])], [mk('b', ['study'])], []]).after;
+
+      it('only a single top class gets the patent, and no points move yet', () => {
+        const r = run('patent', [[mk('a', ['study', 'study'])], [mk('b', ['study'])], []]);
+        expect(r.delta).toEqual([0, 0, 0]);
+        expect(r.after.patent).toBe(0);
+        // 一番が並んだら特許はだれのものにもならない
+        expect(run('patent', [[mk('a', ['study'])], [mk('b', ['study'])], []]).after.patent).toBeUndefined();
+      });
+
+      it('another class pays the fee for each lesson card it takes; the holder pays nothing', () => {
+        let t = patented();
+        while (t.phase.kind !== 'draw') t = step(t, { type: 'continue' });
+        const me = t.phase.player;
+        t.patent = (me + 1) % 3;
+        const holder = t.patent;
+        const before = t.players.map((p) => p.points);
+        const lesson = attrScore(t.players[me], 'study').total;
+        const after = take(structuredClone(t), 'n_study');
+        expect(after.players[me].points - before[me]).toBe(lesson - 1);
+        expect(after.players[holder].points - before[holder]).toBe(1);
+        expect(after.phase).toMatchObject({ kind: 'result', result: { rows: expect.arrayContaining([expect.objectContaining({ player: holder, delta: 1 })]) } });
+        // 特許を持つクラス自身は払わない
+        t.patent = me;
+        const own = take(structuredClone(t), 'n_study');
+        expect(own.players.map((p, i) => p.points - before[i])).toEqual(t.players.map((_, i) => (i === me ? lesson : 0)));
+      });
+
+      it('the patent expires when a new term starts', () => {
+        let t = patented();
+        expect(t.patent).toBe(0);
+        let guard = 0;
+        while (t.phase.kind !== 'roles' && guard++ < 2000) t = step(t, cpuAction(t)!);
+        expect(t.patent).toBeUndefined();
+      });
+    });
+
+    it('expo: points for how many kinds of icons the class has (5 kinds +10, 4 kinds +4)', () => {
+      const r = run('expo', [
+        [mk('a', ['study', 'sports']), mk('a2', ['art', 'charm', 'fight'])],
+        [mk('b', ['study', 'sports', 'art']), mk('b2', ['charm', 'charm'])],
+        [mk('c', ['study', 'art', 'art'])],
+      ]);
+      expect(r.delta).toEqual([10, 4, 0]);
+      // 生徒は動かない
+      expect(r.uids).toEqual([['a', 'a2'], ['b', 'b2'], ['c']]);
+    });
+
+    describe('sunflower: each class hangs a painting by its best 🎨 child; it pays off at the end of the term', () => {
+      const painted = () => run('sunflower', [[mk('a', ['art', 'art', 'art'])], [mk('b', ['art']), mk('b2', ['art', 'art'])], [mk('c', ['study'])]]);
+
+      it('nothing is scored right away; the best painter of each class is remembered', () => {
+        const r = painted();
+        expect(r.delta).toEqual([0, 0, 0]);
+        expect(r.after.sunflower).toEqual([
+          { player: 0, uid: 'a', pts: 3 },
+          { player: 1, uid: 'b2', pts: 2 },
+        ]);
+      });
+
+      it('at the end of the term each painting is worth 🎨×3, unless its painter has left the class', () => {
+        let t = painted().after;
+        // b2 が転校してしまった
+        t.players[1].students = t.players[1].students.filter((x) => x.uid !== 'b2');
+        let before = t;
+        let guard = 0;
+        while (!(t.phase.kind === 'result' && t.phase.ctx === 'sunflower') && guard++ < 2000) {
+          before = t;
+          t = step(t, cpuAction(t)!);
+        }
+        expect(t.phase).toMatchObject({ kind: 'result', ctx: 'sunflower' });
+        expect(t.players.map((p, i) => p.points - before.players[i].points)).toEqual([9, 0, 0]);
+        expect(t.sunflower).toBeUndefined();
+        // 次へで新しい学期（または進級）に進む
+        t = step(t, { type: 'continue' });
+        expect(['roles', 'result']).toContain(t.phase.kind);
+      });
+    });
+
+    it('modern era: favors 📚🎨 and has four different events, one card each', () => {
+      const modern = ERAS.find((e) => e.id === 'modern')!;
+      expect(modern.favor).toEqual(['study', 'art']);
+      const cards = ERA_CARDS.filter((c) => c.era === 'modern');
+      expect(cards.map((c) => c.id)).toEqual(['nobel', 'patent', 'expo', 'sunflower']);
+      expect(cards.every((c) => c.count === 1)).toBe(true);
     });
 
     it('seitokai: the student with the most 👑 in the school is elected and gains a 👑', () => {

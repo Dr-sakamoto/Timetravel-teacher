@@ -22,7 +22,7 @@ export const ERAS: EraDef[] = [
   { id: 'europe', name: '中世・ルネサンス', when: '1200〜1500年頃', icon: '🏰', color: '#ba68c8', favor: ['art', 'study'], motto: '芸術家が神を描き、科学者が星を見上げた時代' },
   { id: 'sengoku', name: '戦国', when: '1550年頃', icon: '⚔️', color: '#ff8a3d', favor: ['fight', 'charm'], motto: '力ある者が城を奪い、人を惹きつける者が天下を取る時代' },
   { id: 'edo', name: '江戸・幕末', when: '1600〜1860年代', icon: '🗾', color: '#4db6ac', favor: ['art', 'sports'], motto: '芝居と浮世絵に町じゅうが熱狂し、旅人が日本中を歩いた時代' },
-  { id: 'modern', name: '近代', when: '1700〜1900年代', icon: '🎩', color: '#bcaaa4', favor: ['study', 'charm'], motto: '発明と知性が世界を変え、社交界で名声が生まれた時代' },
+  { id: 'modern', name: '近代', when: '1700〜1900年代', icon: '🎩', color: '#bcaaa4', favor: ['study', 'art'], motto: '発明と科学が世界を変え、新しい音楽や絵が次々に生まれた時代' },
   { id: 'present', name: '現代', when: 'いま', icon: '🏫', color: '#64b5f6', favor: [], motto: '何が得意でも、それなりに認められる。いつもの学校' },
   { id: 'future', name: '未来', when: '2300年', icon: '🚀', color: '#4dd0e1', favor: ['study'], motto: '機械と知能がすべて。頭脳だけがものを言う時代' },
 ];

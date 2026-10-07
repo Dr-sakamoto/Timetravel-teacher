@@ -127,7 +127,7 @@ export interface EventResult {
   outUids?: string[];
 }
 
-export type ResultCtx = 'turn' | 'hatch' | 'kaguya' | 'monthEnd' | 'yearEnd' | 'final' | 'oath';
+export type ResultCtx = 'turn' | 'hatch' | 'kaguya' | 'monthEnd' | 'yearEnd' | 'final' | 'oath' | 'sunflower';
 
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
@@ -209,6 +209,10 @@ export interface GameState {
   oath?: { players: number[]; base: number[] };
   /** 建設中のピラミッド（古代エジプトの学期だけ） */
   pyramid?: Pyramid;
+  /** 電球の特許をとったクラス（ほかのクラスが授業カードを取るたびに特許料が入る。学期の頭に切れる） */
+  patent?: number;
+  /** ゴッホのひまわり：各クラスが飾った絵（描いた子と、描いたときの点。学期の区切りに値打ちが出て消える） */
+  sunflower?: { player: number; uid: string; pts: number }[];
 }
 
 export type Action =
