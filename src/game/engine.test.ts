@@ -625,14 +625,8 @@ describe('engine', () => {
       expect(t.phase).toEqual({ kind: 'draw', player: 0 });
     });
 
-    it('nile: every farmer (🏃) harvests, then the other classes pay tax to the pharaoh (most 👑)', () => {
-      // 収穫：2人×2・1人×2・0。税：👑一番のクラス2に、ほかの2クラスが2点ずつ
-      const r = run('nile', [[mk('a', ['sports']), mk('b', ['sports', 'sports'])], [mk('c', ['sports', 'charm'])], [mk('d', ['charm', 'charm'])]]);
-      expect(r.delta).toEqual([4 - 2, 2 - 2, 0 + 4]);
-      // ファラオが並べば、それぞれに納める
-      expect(run('nile', [[mk('a', ['charm'])], [mk('b', ['charm'])], [mk('c', ['sports'])]]).delta).toEqual([2, 2, 2 - 4]);
-      // 👑が全クラス同じなら税はなし
-      expect(run('nile', [[mk('a', ['sports'])], [], []]).delta).toEqual([2, 0, 0]);
+    it('nile: every farmer (🏃) harvests +2', () => {
+      expect(run('nile', [[mk('a', ['sports']), mk('b', ['sports', 'sports'])], [mk('c', ['sports', 'charm'])], [mk('d', ['charm', 'charm'])]]).delta).toEqual([4, 2, 0]);
     });
 
     it('hieroglyph: each scribe (a child with both 👑 and 📚) scores', () => {

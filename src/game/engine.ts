@@ -725,36 +725,6 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // エジプト：🏃の子1人につき収穫。そのあと👑が一番多いクラス（ファラオ。同点なら全部）に、ほかの全クラスが税を納める
-    case 'nile': {
-      const has = (x: Student) => c.attr !== 'all' && counted(x).includes(c.attr);
-      const farmers = ps.map((p) => p.students.filter(has));
-      farmers.forEach((f, i) => {
-        add(i, f.length * e.per);
-        rows[i].count = f.length;
-        rows[i].uids = f.map((x) => x.uid);
-        rows[i].note = `収穫${f.length}人`;
-        f.forEach((x) => x.mvp++);
-      });
-      const crowns = ps.map((p) => attrScore(p, e.also).total);
-      const hi = Math.max(...crowns);
-      if (hi === Math.min(...crowns)) {
-        tell('大豊作！ ファラオは決まらず、税はなし。');
-        break;
-      }
-      const pharaohs = crowns.flatMap((v, i) => (v === hi ? [i] : []));
-      ps.forEach((_, i) => {
-        if (pharaohs.includes(i)) return;
-        for (const t of pharaohs) {
-          add(i, -e.tax);
-          add(t, e.tax);
-        }
-        rows[i].note += '・納税';
-      });
-      pharaohs.forEach((t) => (rows[t].note += '・ファラオ'));
-      tell(`大豊作！ ${pharaohs.map((t) => ps[t].name).join('・')}のクラスに税が集まった。`);
-      break;
-    }
     // エジプト：Xと also を両方持つ子（書記）1人につき +per
     case 'scribe': {
       const a = c.attr;
