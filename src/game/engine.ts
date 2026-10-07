@@ -322,32 +322,31 @@ function startTerm(s: GameState, first = false) {
   s.phase = { kind: 'roles', player: null, ready: s.players.map(() => false) };
 }
 
-/** 1学期に必ず起こる時代イベントの枚数 */
-export const ERA_EVENTS_PER_TERM = 2;
+/** 時代イベントを入れる深さ：学期の手番の数のこの倍まで（1より大きいほど、めくられないカードが出やすい） */
+export const ERA_EVENT_SPREAD = 1.8;
 
 /**
- * 時代イベントは毎学期ちょうど ERA_EVENTS_PER_TERM 枚（ちがう種類）を、学期中に必ずめくられる深さに入れる。
- * 1枚目は学期の前半、2枚目は後半に。手番1回で山札は1枚以上めくられるので、手番の数までの深さなら必ずめくられる
+ * 時代イベント（4種×1枚）は山札の上のほうに、学期を等分した区間に1枚ずつ散らして入れる。
+ * 手番1回で山札は1枚以上めくられるので、1枚目は必ず、残りもたいていめくられる
  * （古代エジプトはピラミッドを積む手番で山札がめくられないので、半分の深さまでにする）
  */
 function placeEraEvents(s: GameState) {
   const isEra = (id: string) => !isPerson(id) && EVENT_MAP[id].kind === 'contest';
-  const kinds = shuffle(s, [...new Set(s.eventDeck.filter(isEra))]);
-  if (!kinds.length) return;
+  const cards = shuffle(s, s.eventDeck.filter(isEra));
+  if (!cards.length) return;
   s.eventDeck = s.eventDeck.filter((id) => !isEra(id));
-  const chosen = Array.from({ length: ERA_EVENTS_PER_TERM }, (_, i) => kinds[i % kinds.length]);
   const term = termOfMonth(MONTHS[s.monthIdx]);
   const months = MONTHS.slice(s.monthIdx).filter((m) => termOfMonth(m) === term).length;
-  const turns = Math.max(ERA_EVENTS_PER_TERM, Math.floor((s.players.length * months) / (pyramidCard(s) ? 2 : 1)));
-  const slice = turns / ERA_EVENTS_PER_TERM;
-  // 深さ（0 なら次にめくるカード）。i枚目は学期を等分したi番目の区間に。浅いカードが上に i 枚入るので、その分を引いておく
-  const depths = chosen.map((_, i) => {
-    const lo = Math.floor(slice * i);
-    const hi = Math.floor(slice * (i + 1)) - i - 1;
-    return Math.min(s.eventDeck.length, lo + randInt(s, Math.max(1, hi - lo + 1)));
+  const turns = Math.max(cards.length, Math.floor((s.players.length * months) / (pyramidCard(s) ? 2 : 1)));
+  const slice = (turns * ERA_EVENT_SPREAD) / cards.length;
+  // 深さ（0 なら次にめくるカード）。i枚目は i 番目の区間に。浅いカードが上に i 枚入るので、その分を引いておく
+  const depths = cards.map((_, i) => {
+    const lo = Math.max(0, Math.floor(slice * i) - i);
+    const hi = Math.max(lo, Math.floor(slice * (i + 1)) - i - 1);
+    return Math.min(s.eventDeck.length, lo + randInt(s, hi - lo + 1));
   });
   // 深いほうから入れて、浅いほうの位置がずれないようにする
-  for (let i = chosen.length - 1; i >= 0; i--) s.eventDeck.splice(s.eventDeck.length - depths[i], 0, chosen[i]);
+  for (let i = cards.length - 1; i >= 0; i--) s.eventDeck.splice(s.eventDeck.length - depths[i], 0, cards[i]);
 }
 
 // ---------- ピラミッド（古代エジプトの学期だけ、場の横に残る） ----------
