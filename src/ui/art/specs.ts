@@ -44,9 +44,9 @@ export const ART: Record<string, ArtSpec> = {
   // ---- 古代エジプト ----
   cleopatra: { skin: SKIN.tan, back: 'egypt', hair: 'patsun', hairColor: black, outfit: 'egypt', c1: '#3f7fd0', hat: 'diadem', acc: ['earring'], expr: 'calm', liner: true },
   tut: { skin: SKIN.tan, outfit: 'egypt', c1: '#3f7fd0', hat: 'nemes', hatColor: '#2f5fb3', expr: 'smile', liner: true },
-  imhotep: { skin: SKIN.tan, outfit: 'egypt', c1: '#35a37a', expr: 'calm', prop: 'setsquare', acc: ['old'] },
+  ramesses: { skin: SKIN.tan, outfit: 'egypt', c1: '#d14b3c', hat: 'nemes', hatColor: '#d9a441', expr: 'cool', liner: true, prop: 'spear' },
+  khufu: { skin: SKIN.tan, outfit: 'egypt', c1: '#35a37a', hat: 'nemes', hatColor: '#35a37a', beard: 'goatee', beardColor: black, expr: 'calm', liner: true, prop: 'brick' },
   nefertiti: { skin: SKIN.tan, outfit: 'egypt', c1: '#d14b3c', hat: 'nefercrown', hatColor: '#3566b8', acc: ['earring'], expr: 'calm', liner: true },
-  mason: { skin: SKIN.brown, outfit: 'bare', c1: '#f6f1e4', hat: 'headcloth', hatColor: '#f6f1e4', expr: 'grin', prop: 'brick', acc: ['sweat'] },
 
   // ---- ギリシャ・ローマ ----
   alexander: { skin: SKIN.fair, hair: 'curly', hairColor: blond, outfit: 'cuirass', c1: '#d9a441', c2: '#c0392b', expr: 'cool', prop: 'sword' },
@@ -55,19 +55,23 @@ export const ART: Record<string, ArtSpec> = {
   archimedes: { skin: SKIN.fair, hair: 'curly', hairColor: grey, outfit: 'bare', c1: '#fbfbf7', beard: 'full', beardColor: grey, expr: 'surprised', prop: 'bubbles' },
   spartacus: { skin: SKIN.tan, hair: 'messy', hairColor: dark, outfit: 'bare', c1: '#8a5a32', expr: 'angry', acc: ['scar'], prop: 'sword' },
 
-  // ---- 古代中国 ----
+  // ---- 三国志 ----
   zhuge: { skin: SKIN.fair, outfit: 'robe', c1: '#f4f2ea', c2: '#3a5a8c', hat: 'guanjin', hatColor: '#3a5a8c', beard: 'thin', beardColor: black, expr: 'calm', prop: 'featherfan' },
+  caocao: { skin: SKIN.fair, outfit: 'robe', c1: '#3a3a5a', c2: '#f2c94c', hat: 'guanjin', hatColor: '#1f1f2e', beard: 'goatee', beardColor: black, expr: 'cool', prop: 'sword' },
+  liubei: { skin: SKIN.fair, outfit: 'robe', c1: '#2f8a4c', c2: '#f2c94c', hat: 'softcap', hatColor: '#2f8a4c', beard: 'thin', beardColor: black, expr: 'smile', prop: 'twoswords' },
+  zhouyu: { skin: SKIN.fair, hair: 'short', hairColor: black, outfit: 'robe', c1: '#c0392b', c2: '#f4f2ea', hat: 'guanjin', hatColor: '#c0392b', expr: 'smile', prop: 'note' },
   lubu: { skin: SKIN.fair, hair: 'short', hairColor: black, outfit: 'yoroi', c1: '#c0392b', c2: '#f2c94c', hat: 'pheasant', expr: 'angry', prop: 'halberd' },
-  guanyu: { skin: SKIN.red, outfit: 'robe', c1: '#2f8a4c', c2: '#f2c94c', hat: 'softcap', hatColor: '#2f8a4c', beard: 'long', beardColor: black, expr: 'calm', prop: 'guandao' },
-  confucius: { skin: SKIN.fair, hair: 'bun', hairColor: grey, outfit: 'robe', c1: '#8a6a4a', c2: '#f4f2ea', beard: 'long', beardColor: white, expr: 'calm', acc: ['old'], prop: 'book' },
-  zhangfei: { skin: SKIN.tan, hair: 'messy', hairColor: black, outfit: 'yoroi', c1: '#3a3a44', c2: '#c0392b', beard: 'whiskers', beardColor: black, expr: 'shout', prop: 'spear' },
 
   // ---- 平安 ----
   seimei: { skin: SKIN.pale, outfit: 'robe', c1: '#fbfbf7', c2: '#7b5ea7', hat: 'eboshi', expr: 'calm', prop: 'ofuda' },
+  michinaga: { skin: SKIN.pale, outfit: 'robe', c1: '#3a2a6a', c2: '#c9a7e8', hat: 'eboshi', expr: 'cool', prop: 'sensu' },
+  seishonagon: { skin: SKIN.pale, back: 'hime', hair: 'patsun', hairColor: black, outfit: 'juuni', c1: '#d9822b', c2: '#f2c94c', expr: 'wink', prop: 'brush' },
   murasaki: { skin: SKIN.pale, back: 'hime', hair: 'patsun', hairColor: black, outfit: 'juuni', c1: '#7b5ea7', c2: '#c9a7e8', expr: 'calm', prop: 'scroll' },
   yoshitsune: { skin: SKIN.pale, outfit: 'yoroi', c1: '#c0392b', c2: '#f2c94c', hat: 'kabuto', hatColor: '#c0392b', crest: 'horns', expr: 'smile', prop: 'katana' },
+  // かぐや姫（かぐや姫の難題で場に滞在する。クラスには入らない）
+  kaguya: { skin: SKIN.pale, back: 'hime', hair: 'patsun', hairColor: black, outfit: 'juuni', c1: '#f48fb1', c2: '#fff3b0', hat: 'diadem', expr: 'calm', acc: ['earring'] },
+  // 五条大橋の弁慶で来る弁慶
   benkei: { skin: SKIN.tan, outfit: 'yoroi', c1: '#2b2b2b', c2: '#f6f1e4', hat: 'monkhood', hatColor: '#f6f1e4', beard: 'stubble', beardColor: dark, expr: 'angry', prop: 'naginata' },
-  komachi: { skin: SKIN.pale, back: 'hime', hair: 'patsun', hairColor: black, outfit: 'juuni', c1: '#f48fb1', c2: '#d14b6c', expr: 'smile', prop: 'sensu' },
 
   // ---- 中世・ルネサンス ----
   davinci: { skin: SKIN.fair, back: 'shoulder', hair: 'mid', hairColor: white, outfit: 'tunic', c1: '#a0442f', c2: '#5a3a2a', hat: 'beret', hatColor: '#3a2a2a', beard: 'long', beardColor: white, expr: 'calm', acc: ['old'], prop: 'palette' },
@@ -82,7 +86,6 @@ export const ART: Record<string, ArtSpec> = {
   ieyasu: { skin: SKIN.fair, hair: 'topknot', hairColor: black, outfit: 'kimono', c1: '#6b4a2a', c2: '#2b2b2b', expr: 'calm', prop: 'sensu' },
   yukimura: { skin: SKIN.fair, outfit: 'yoroi', c1: '#d23a2a', c2: '#2b2b2b', hat: 'kabuto', hatColor: '#d23a2a', crest: 'antler', expr: 'angry', prop: 'spear' },
   hanzo: { skin: SKIN.fair, outfit: 'ninja', c1: '#2e3440', c2: '#7b5ea7', hat: 'ninja', hatColor: '#2e3440', expr: 'cool', prop: 'shuriken' },
-  keiji: { skin: SKIN.fair, back: 'tail', hair: 'spiky', hairColor: '#8a3a2a', outfit: 'kimono', c1: '#e5534b', c2: '#f2c94c', expr: 'grin', prop: 'kiseru' },
 
   // ---- 江戸 ----
   hokusai: { skin: SKIN.fair, hair: 'sides', hairColor: grey, outfit: 'kimono', c1: '#5a6a7a', c2: '#2b2b2b', expr: 'happy', acc: ['old'], prop: 'wave' },

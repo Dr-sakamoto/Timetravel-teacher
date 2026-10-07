@@ -1,12 +1,11 @@
 import { actingPlayer } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 
-/** PeerJS のIDの頭につける（ほかのアプリの部屋とぶつからないように） */
-export const PEER_PREFIX = 'jikuu-saikyou-';
 export const MAX_SEATS = 5;
 /** これだけ音沙汰がなければ、つながっていないとみなす */
-export const TIMEOUT_MS = 12000;
-export const PING_MS = 4000;
+export const TIMEOUT_MS = 15000;
+/** 生存確認の間隔（中継サーバーのメッセージ数を抑えるため、あまり短くしない） */
+export const PING_MS = 5000;
 
 /** ロビーの席 */
 export interface Seat {
@@ -38,6 +37,17 @@ export type ToGuest =
   | { t: 'pong'; seq: number }
   | { t: 'reject'; reason: string }
   | { t: 'closed' };
+
+/** 中継サーバーのチャンネルに流す形（h=部屋を作った人あて g=参加した人あて） */
+export interface ToHostEnvelope {
+  cid: string;
+  m: ToHost;
+}
+export interface ToGuestEnvelope {
+  /** 参加した人の端末ID。'*' なら全員あて（席番号 you は -1 にして、受け取った側が端末IDから探す） */
+  to: string;
+  m: ToGuest;
+}
 
 /** 部屋番号：スマホの数字キーで打ちやすい5桁 */
 export function newRoomCode(): string {
@@ -71,14 +81,23 @@ export function canAct(s: GameState, seat: number, a: Action): boolean {
     if (ph.player !== null && !s.players[ph.player].isCpu) return ph.player === seat;
     return true;
   }
+  // 係決めは一斉：自分のクラスの準備OKだけ
+  if (ph.kind === 'roles') return a.type === 'setRoles' && a.player === seat && !ph.ready[seat];
   return actingPlayer(s) === seat && a.type !== 'continue';
 }
 
-/** 今だれの操作を待っているか（CPUの番や、CPU・全員向けの結果なら null） */
+/** 今だれの操作を待っているか（CPUの番や、CPU・全員向けの結果、一斉の係決めなら null） */
 export function waitingOn(s: GameState): number | null {
   const ph = s.phase;
   if (ph.kind === 'gameOver' || ph.player === null) return null;
   return s.players[ph.player].isCpu ? null : ph.player;
+}
+
+/** その人の操作を待って止まっているか（一斉の係決めでは、まだ準備OKでない人間みんな） */
+export function waitsFor(s: GameState, seat: number): boolean {
+  const ph = s.phase;
+  if (ph.kind === 'roles') return !s.players[seat].isCpu && !ph.ready[seat];
+  return waitingOn(s) === seat;
 }
 
 /** 端末ID（この端末でずっと同じ。つなぎ直した時に同じ席へ戻るため） */

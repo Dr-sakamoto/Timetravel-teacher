@@ -1,7 +1,7 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
-import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, NEW_WORLD_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
+import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
-import { MONTHS, canTake, cyborgable, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, previewStudent, slotsNow, voteTargets } from './engine';
+import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, kaguyaGift, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
 
 /** 山札でその属性が使われる枚数（通常カード＋時代イベントは半分の重み） */
@@ -21,7 +21,7 @@ export function classScore(p: Player): number {
   for (const c of SWING_CARDS) {
     const plus = attrScore(p, c.plus).total;
     const minus = c.minus ? attrScore(p, c.minus).total : 0;
-    v += plus - minus;
+    v += (plus - minus) * c.count;
   }
   v += (attrScore(p, 'study').total - countAttr(p, 'fight') * TEST_YANKEE_PENALTY) * 2;
   return v;
@@ -102,11 +102,17 @@ function cyborged(st: Student): Student {
   return { ...st, attrs: [...CYBORG_ATTRS], goods: undefined };
 }
 
+/** かぐや姫に宝を差し出したときの点 */
+const KAGUYA_GIFT = (() => {
+  const c = EVENT_MAP.kaguya;
+  return c.kind === 'contest' && c.effect.type === 'kaguya' ? c.effect.win : 0;
+})();
+
 /** その場のカードを取る値打ち（払うポイントを差し引いた、この先の得点の目安） */
 export function marketValue(s: GameState, pi: number, slot: number): number {
   const p = s.players[pi];
   const id = s.market[slot];
-  const cost = marketCost(id);
+  const cost = marketCost(id, p);
   if (id.startsWith('person:')) {
     const out = p.students.length >= 9 ? leastWorth(p) : undefined;
     const kept = p.students.filter((x) => x.uid !== out?.uid);
@@ -118,12 +124,14 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
     case 'normal':
       return attrScore(p, c.attr).total;
     case 'goods':
+      // かぐや姫に頼まれた宝なら、装備して差し出す（宝は消えて点が入る）
+      if (s.kaguya?.[pi] === c.id && equippable(p).length) return KAGUYA_GIFT - cost;
       return Math.max(...equippable(p).map((st) => gain(s, p, swap(st.uid, equipped(st, c.attr))))) - cost;
     case 'cyborg':
       return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;
     case 'kachikomi':
-      // 相手1クラスを減点するだけなので、相手の数で割って自分の加点と比べる
-      return (attrScore(p, 'fight').total * c.mult) / (s.players.length - 1);
+      // 相手1クラスの減点は相手の数で割って自分の加点と比べる。ドレインの分はそのまま自分の加点
+      return attrScore(p, 'fight').total * (c.mult / (s.players.length - 1) + c.drain);
     case 'exchange':
       return Math.max(...exchangePairs(s, pi).map((x) => gain(s, p, swap(x.uid, s.players[x.target].students.find((y) => y.uid === x.theirUid)!))));
     default:
@@ -131,9 +139,32 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
   }
 }
 
+/** ピラミッドに石を積む値打ち（完成させれば、積んだ石で届く段のほうび。完成しなければ、学期の残りで完成しそうな分だけ） */
+export function buildValue(s: GameState, pi: number): number {
+  const c = pyramidCard(s);
+  const py = s.pyramid;
+  if (!c || !py || !canBuild(s, pi)) return -Infinity;
+  const t = attrScore(s.players[pi], c.attr).total;
+  const mine = py.stones[pi] + t;
+  const sum = py.stones.reduce((a, x) => a + x, 0) + t;
+  if (sum >= py.need) return pyramidReward(c.effect.steps, mine);
+  // 学期の最後の月（7・12・3月）は完成しないかもしれない。次の段に近づいた分も少し数える
+  const odds = [7, 12, 3].includes(MONTHS[s.monthIdx]) ? 0.25 : 0.5;
+  const next = c.effect.steps.map(([n]) => n).find((n) => n > py.stones[pi]) ?? Infinity;
+  const toward = Math.min(t, Math.max(0, next - py.stones[pi]));
+  return (pyramidReward(c.effect.steps, mine) - pyramidReward(c.effect.steps, py.stones[pi]) + toward) * odds;
+}
+
 /** 一番点の高い相手 */
 function leader(s: GameState, candidates: number[]): number {
   return [...candidates].sort((x, y) => s.players[y].points - s.players[x].points)[0];
+}
+
+/** そのクラスの係をおまかせで決めて準備OKにする（CPU・通信が切れた人の代わり） */
+export function rolesAction(s: GameState, pi: number): Action {
+  const p = s.players[pi];
+  const unlock = autoUnlock(p, slotsNow(s));
+  return { type: 'setRoles', player: pi, unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
 }
 
 export function cpuAction(s: GameState): Action | null {
@@ -142,13 +173,18 @@ export function cpuAction(s: GameState): Action | null {
     case 'memberDraw':
       return { type: 'drawMember' };
     case 'roles': {
-      const p = s.players[ph.player];
-      const unlock = autoUnlock(p, slotsNow(s));
-      return { type: 'setRoles', unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
+      // 係決めは一斉：まだ準備OKでないCPUのクラスから決める（CPUがみな決めていれば、まだの人のクラスを代わりに）
+      const cpu = s.players.findIndex((p, i) => p.isCpu && !ph.ready[i]);
+      const pi = cpu >= 0 ? cpu : ph.ready.indexOf(false);
+      return pi < 0 ? null : rolesAction(s, pi);
     }
     case 'draw': {
+      // かぐや姫に頼まれた宝を持っていれば、先に差し出す（手番は終わらない）
+      if (kaguyaGift(s, ph.player)) return { type: 'present' };
       const slots = s.market.map((_, i) => i);
       const best = slots.filter((i) => canTake(s, ph.player, i)).sort((x, y) => marketValue(s, ph.player, y) - marketValue(s, ph.player, x))[0];
+      const bv = buildValue(s, ph.player);
+      if (bv > 0 && (best === undefined || bv > marketValue(s, ph.player, best))) return { type: 'build' };
       if (best !== undefined && marketValue(s, ph.player, best) > 0) return { type: 'take', slot: best };
       // 取りたいものがなければ、一番高いカードを捨てて見送る
       return { type: 'pass', slot: slots.sort((x, y) => marketCost(s.market[y]) - marketCost(s.market[x]))[0] };
@@ -192,18 +228,25 @@ export function cpuAction(s: GameState): Action | null {
       const st = equippable(p).sort((x, y) => score(y) - score(x))[0];
       return { type: 'equip', uid: st?.uid ?? null };
     }
-    case 'newWorld': {
-      // 品と子の組み合わせ：係ボーナスが乗る子＞そのアイコンをたくさん持つ子
+    case 'gift': {
+      // 品と子の組み合わせ：係ボーナスが乗る子＞そのアイコンをたくさん持つ子（鉄砲なら👊の多い子）
       const p = s.players[ph.player];
       let best: { item: string; uid: string; score: number } | null = null;
       for (const item of ph.items) {
-        const attr = NEW_WORLD_MAP[item].attr;
+        const attr = GIFT_MAP[item].attr;
         for (const st of equippable(p)) {
           const score = (hasRoleBonus(p, st, attr) ? 10 : 0) + iconsOf(st, attr);
           if (!best || score > best.score) best = { item, uid: st.uid, score };
         }
       }
-      return { type: 'newWorld', item: best!.item, uid: best!.uid };
+      return { type: 'gift', item: best!.item, uid: best!.uid };
+    }
+    case 'oath': {
+      // 桃園の誓い：自分より強い（これから稼ぎそうな）クラスと義兄弟になる。いなければ一番強い1クラスだけ
+      const mine = classScore(s.players[ph.player]);
+      const targets = oathTargets(s, ph.player).sort((x, y) => classScore(s.players[y]) - classScore(s.players[x]));
+      const stronger = targets.filter((t) => classScore(s.players[t]) >= mine);
+      return { type: 'oath', targets: (stronger.length ? stronger : targets).slice(0, stronger.length ? ph.max : 1) };
     }
     case 'result':
       return { type: 'continue' };

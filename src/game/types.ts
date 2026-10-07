@@ -82,6 +82,8 @@ export interface Player {
   /** 係に就いている生徒（解放した係に1人ずつ） */
   roles: RoleSeat[];
   points: number;
+  /** 楽市楽座：次に取るグッズ1つがタダ */
+  freeGoods?: boolean;
 }
 
 export interface ResultRow {
@@ -116,6 +118,8 @@ export interface EventResult {
   era?: EraId;
   /** 襲来：敵の強さ（得点演出用） */
   threat?: number;
+  /** 「持つ子1人につき+N」のイベント：アイコンの数ではなく人数で数える（得点演出用） */
+  perHead?: number;
   /** 共通イベント：引かれるアイコン（または人数）（得点演出用） */
   minus?: Attr | 'heads';
   rows: ResultRow[];
@@ -125,12 +129,13 @@ export interface EventResult {
   outUids?: string[];
 }
 
-export type ResultCtx = 'turn' | 'hatch' | 'monthEnd' | 'yearEnd' | 'final';
+export type ResultCtx = 'turn' | 'hatch' | 'kaguya' | 'monthEnd' | 'yearEnd' | 'final' | 'oath' | 'sunflower';
 
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
   | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
-  | { kind: 'roles'; player: number }
+  /** 係決め：全クラスが一斉に決め、全員の準備OK（ready）がそろったら手番に進む */
+  | { kind: 'roles'; player: null; ready: boolean[] }
   /** 手番：場のカードを1枚取る（または1枚捨てて見送る） */
   | { kind: 'draw'; player: number }
   /** 満席で人物カードを取る：代わりに転校させる生徒を選ぶ（slot は場のカードの位置） */
@@ -145,8 +150,13 @@ export type Phase =
   | { kind: 'exchange'; player: number; slot: number }
   /** サイボーグ化：自分のクラスの生徒1人をサイボーグに作り替える */
   | { kind: 'cyborg'; player: number; slot: number }
-  /** 新大陸の品（コロンブスの新大陸到達・ゲリラ）：📚の多いクラスから順に、品と装備させる子を選ぶ（取られた品は次のクラスは選べない。left はこの後に選ぶクラス） */
-  | { kind: 'newWorld'; player: number; left: number[]; items: string[]; got: { player: number; uid: string; item: string }[] }
+  /**
+   * 品を配る（ゲリラ。card はめくったイベント）：クラスが順番に、品と装備させる子（グッズのない子）を選ぶ。left はこの後に選ぶクラス
+   * コロンブスの新大陸到達は📚の多いクラスから順に、取られた品は次のクラスは選べない。鉄砲伝来は全クラスに同じ鉄砲が1丁ずつ届く
+   */
+  | { kind: 'gift'; card: string; player: number; left: number[]; items: string[]; got: { player: number; uid: string; item: string }[] }
+  /** 桃園の誓い（ゲリラ）：劉備役のクラスが、義兄弟になるクラスを max まで選ぶ */
+  | { kind: 'oath'; player: number; max: number }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
@@ -159,8 +169,18 @@ export interface LogEntry {
   player?: number;
 }
 
+/** 建設中のピラミッド（古代エジプトの学期だけ場の横に残る。学期が変わると、完成していなくても消える） */
+export interface Pyramid {
+  /** クラスごとに積んだ石（🏃の数） */
+  stones: number[];
+  /** 完成に必要な石の合計 */
+  need: number;
+  done: boolean;
+}
+
 export interface GameState {
-  version: 24;
+  /** 保存データの版（saveVersion.ts の SAVE_VERSION。データを変えると自動で変わる） */
+  version: string;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */
@@ -170,6 +190,7 @@ export interface GameState {
   years: number;
   year: number;
   monthIdx: number;
+  /** 今学期の手番の順（1学期はランダム、2学期からは得点の低い順＝最下位から） */
   queue: number[];
   queueIdx: number;
   phase: Phase;
@@ -182,20 +203,33 @@ export interface GameState {
   /** 初期メンバー用の山（現代の普通の生徒） */
   starters: string[];
   pools: Record<EraId, string[]>;
+  /** かぐや姫が滞在中なら、各クラス（添字）に頼んでいる宝（グッズのID）。差し出したクラスは null。差し出すかどうかは手番で選ぶ。学期の区切りで月へ帰る（undefined に戻る） */
+  kaguya?: (string | null)[];
   uidCounter: number;
   logCounter: number;
   log: LogEntry[];
+  /** 桃園の誓い：義兄弟のクラスと、誓ったときの各クラスのポイント（学期の区切りで山分けして消える） */
+  oath?: { players: number[]; base: number[] };
+  /** 建設中のピラミッド（古代エジプトの学期だけ） */
+  pyramid?: Pyramid;
+  /** 電球の特許をとったクラス（ほかのクラスが授業カードを取るたびに特許料が入る。学期の頭に切れる） */
+  patent?: number;
+  /** ゴッホのひまわり：各クラスが飾った絵（描いた子と、描いたときの点。学期の区切りに値打ちが出て消える） */
+  sunflower?: { player: number; uid: string; pts: number }[];
 }
 
 export type Action =
   | { type: 'drawMember' }
   | { type: 'drawAllMembers' }
   | { type: 'continue' }
-  | { type: 'setRoles'; roles: RoleSeat[]; unlock?: RoleId[] }
+  /** 係決めの準備OK（係決めは一斉なので、だれのクラスかを player で言う） */
+  | { type: 'setRoles'; player: number; roles: RoleSeat[]; unlock?: RoleId[] }
   /** 場のカードを取る（人物・グッズはクラスポイントを払う） */
   | { type: 'take'; slot: number }
   /** 場のカードを1枚捨てて見送る */
   | { type: 'pass'; slot: number }
+  /** ピラミッドに石を積む（クラスの🏃の数だけ。場のカードは減らない） */
+  | { type: 'build' }
   /** 満席で人物を迎える時に、代わりに転校させる生徒（null でやめる） */
   | { type: 'makeRoom'; uid: string | null }
   | { type: 'push'; uid: string }
@@ -204,5 +238,9 @@ export type Action =
   | { type: 'kachikomi'; target: number | null }
   | { type: 'exchange'; uid: string | null; target?: number; theirUid?: string }
   | { type: 'equip'; uid: string | null }
-  | { type: 'newWorld'; item: string; uid: string }
-  | { type: 'cyborg'; uid: string | null };
+  | { type: 'gift'; item: string; uid: string }
+  | { type: 'cyborg'; uid: string | null }
+  /** かぐや姫に頼まれた宝を差し出す（手番の中でいつでも。手番は終わらない） */
+  | { type: 'present' }
+  /** 桃園の誓い：義兄弟になるクラス（自分以外・1つ以上） */
+  | { type: 'oath'; targets: number[] };

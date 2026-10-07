@@ -3,7 +3,7 @@ import { PLAYER_COLORS } from '../game/engine';
 import type { Action } from '../game/types';
 import { GuestRoom, type GuestSnap } from '../net/guest';
 import { clearHostSave, HostRoom, loadHostSave, type HostSnap } from '../net/host';
-import { joinUrl, loadName, MAX_SEATS, newRoomCode, normalizeCode, saveName, waitingOn, type Seat } from '../net/protocol';
+import { joinUrl, loadName, MAX_SEATS, newRoomCode, normalizeCode, saveName, waitsFor, type Seat } from '../net/protocol';
 import { GameView } from './GameView';
 
 type Mode = { kind: 'menu' } | { kind: 'host'; resume: boolean } | { kind: 'guest'; code: string };
@@ -159,7 +159,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
     const seats = snap.lobby.seats;
     const lost = seats.map((s, i) => ({ s, i })).filter(({ s }) => s.kind === 'guest' && !s.online);
     // 通信が切れた人の操作を待って止まっているときだけ、1手だけ代わりに進められる
-    const stuck = waitingOn(snap.state);
+    const stuck = (i: number) => waitsFor(snap.state!, i);
     return (
       <GameView
         state={snap.state}
@@ -176,7 +176,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
             {lost.map(({ s, i }) => (
               <span key={i} className="net-warn">
                 📵{s.name}
-                {stuck === i && (
+                {stuck(i) && (
                   <button
                     className="btn small ghost"
                     onClick={() => confirm(`${s.name}さんの通信が切れています。${s.name}さんの代わりに、今の1手だけCPUが進めますか？（つなぎ直すのを待つなら「キャンセル」）`) && room.current?.stepFor(i)}
@@ -199,7 +199,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
       {snap.status === 'error' ? (
         <p className="online-warn">{snap.error}</p>
       ) : snap.status === 'opening' ? (
-        <p className="online-lead">通信サーバーにつないでいます…</p>
+        <p className="online-lead">{snap.error ?? '通信サーバーにつないでいます…'}</p>
       ) : (
         <>
           <ShareCode code={snap.code} />
@@ -318,7 +318,13 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
           </section>
         </>
       ) : (
-        <p className="online-lead">{snap.status === 'reconnecting' ? 'つなぎ直しています…' : 'ルームに入っています…'}</p>
+        <p className="online-lead">
+          {snap.status === 'reconnecting'
+            ? 'つなぎ直しています…'
+            : snap.stage === 'server'
+              ? '通信サーバーにつないでいます…'
+              : `ルーム ${code} に入っています…`}
+        </p>
       )}
       <div className="actions">
         <button className="btn ghost" onClick={onExit}>

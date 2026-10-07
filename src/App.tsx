@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CARDS } from './game/data/cards';
 import { newGame, PLAYER_COLORS, step, calendarLabel } from './game/engine';
+import { SAVE_VERSION } from './game/saveVersion';
 import type { Action, GameState } from './game/types';
 import { GameView } from './ui/GameView';
 import { Online } from './ui/Online';
@@ -15,7 +16,7 @@ function loadSave(): GameState | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as GameState;
-    return s.version === 24 ? s : null;
+    return s.version === SAVE_VERSION ? s : null;
   } catch {
     return null;
   }

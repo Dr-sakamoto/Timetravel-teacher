@@ -5,7 +5,7 @@ import type { Action, GameState } from '../game/types';
 import type { Pick } from './Center';
 import { Center } from './Center';
 import { GameOver } from './GameOver';
-import { OpponentSeat, Playmat } from './Playmat';
+import { OpponentSeat, Playmat, type EraMark } from './Playmat';
 import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
 import { useGameFx } from './useGameFx';
@@ -23,6 +23,18 @@ interface Props {
   offline?: (pi: number) => boolean;
   /** 通信対戦：画面の上に出す通信の状態など */
   banner?: ReactNode;
+}
+
+/** 名札に出す時代の印：近代の電球の特許💡と、飾っているひまわりの絵🖼️ */
+function eraMarks(state: GameState, pi: number): EraMark[] {
+  const out: EraMark[] = [];
+  if (state.patent === pi) out.push({ icon: '💡', title: '電球の特許：ほかのクラスが授業カードを取るたびに特許料が入る（学期の区切りまで）' });
+  const art = state.sunflower?.find((x) => x.player === pi);
+  if (art) {
+    const st = state.players[pi].students.find((x) => x.uid === art.uid);
+    out.push({ icon: '🖼️', title: st ? `ゴッホのひまわり：${st.name}の絵を飾っている（学期の区切りに値打ちが出る）` : 'ゴッホのひまわり：描いた子が転校してしまった' });
+  }
+  return out;
 }
 
 export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner }: Props) {
@@ -44,9 +56,11 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   /** ゲリラの最中（誰の手番でもない。転校で選んでいる人も手番の光り方にしない） */
   const guerrilla = inGuerrilla(state);
   const upNext = guerrilla ? nextTurnPlayer(state) : null;
-  const cpuTurn = actor !== null && state.players[actor].isCpu && ph.kind !== 'result';
+  // 係決めは一斉：まだ準備OKでないCPUがいれば、CPUが決める
+  const cpuRoles = ph.kind === 'roles' && state.players.some((p, i) => p.isCpu && !ph.ready[i]);
+  const cpuTurn = (actor !== null && state.players[actor].isCpu && ph.kind !== 'result') || cpuRoles;
   /** 通信対戦で、ほかの人の番（自分は見ているだけ） */
-  const othersTurn = online && actor !== mySeat && ph.kind !== 'result';
+  const othersTurn = online && actor !== mySeat && ph.kind !== 'result' && ph.kind !== 'roles';
   // 結果の「次へ」：手番の人が人間ならその人、CPUや全員向けの結果なら誰でも
   const resultOwner = ph.kind === 'result' && ph.player !== null && !state.players[ph.player].isCpu ? ph.player : null;
   const canContinue = !online || (mySeat !== undefined && !state.players[mySeat].isCpu && (resultOwner === null || resultOwner === mySeat));
@@ -55,7 +69,12 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   useEffect(() => {
     if (online) return;
     if (actor !== null && !state.players[actor].isCpu) setFocus(actor);
-  }, [actor, state.players, online]);
+    // 係決め（一斉）：手前の人が準備OKなら、まだの人間に席をゆずる
+    if (ph.kind === 'roles' && (state.players[focus].isCpu || ph.ready[focus])) {
+      const next = state.players.findIndex((p, i) => !p.isCpu && !ph.ready[i]);
+      if (next >= 0) setFocus(next);
+    }
+  }, [actor, state.players, online, ph, focus]);
 
   useEffect(() => {
     setPick({ uid: null, target: null, theirUid: null });
@@ -105,7 +124,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
 
   // 転校・カチコミ・クラス替え・グッズ：手前の教室の生徒と、相手のクラスを選ぶ（転校は自分の生徒だけ）
   const choosing =
-    (ph.kind === 'push' || ph.kind === 'makeRoom' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg' || ph.kind === 'newWorld') && !cpuTurn && !othersTurn && ph.player === focus
+    (ph.kind === 'push' || ph.kind === 'makeRoom' || ph.kind === 'kachikomi' || ph.kind === 'exchange' || ph.kind === 'equip' || ph.kind === 'cyborg' || ph.kind === 'gift') && !cpuTurn && !othersTurn && ph.player === focus
       ? ph.kind
       : null;
   // クラス替え：アイコンの数が同じ子どうしの組み合わせ（自分の子を選んでいたらその子の相手だけ）
@@ -118,7 +137,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const selectable =
     choosing === 'push' || choosing === 'makeRoom' ? droppable(meNow)
     : choosing === 'exchange' ? meNow.students.filter((x) => pairs.some((y) => y.uid === x.uid))
-    : choosing === 'equip' || choosing === 'newWorld' ? equippable(meNow)
+    : choosing === 'equip' || choosing === 'gift' ? equippable(meNow)
     : choosing === 'cyborg' ? cyborgable(meNow)
     : [];
   const pickOpponent = (pi: number) => {
@@ -136,7 +155,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const matLit = (i: number) => fx?.lit(i) ?? lit;
   const fxDim = (i: number) => (fx?.dims(i) ? (u: string) => fx.dims(i)!.has(u) : undefined);
   const me = state.players[focus];
-  const editingRoles = ph.kind === 'roles' && ph.player === focus && !me.isCpu && !othersTurn;
+  const editingRoles = ph.kind === 'roles' && !ph.ready[focus] && !me.isCpu;
 
   return (
     <div className="table-wrap">
@@ -171,7 +190,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
 
       {banner}
 
-      <div className={`felt ${guerrilla ? 'in-guerrilla' : ''} ${ph.kind === 'newWorld' ? 'new-world' : ''}`} ref={feltRef}>
+      <div className={`felt ${guerrilla ? 'in-guerrilla' : ''} ${ph.kind === 'gift' ? 'gift-pick' : ''}`} ref={feltRef}>
         <div className="opponents">
           {others.map((pi) => (
             <OpponentSeat
@@ -188,12 +207,14 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               targetable={targets.includes(pi)}
               targeted={pick.target === pi}
               onClick={() => pickOpponent(pi)}
+              sworn={state.oath?.players.includes(pi)}
+              marks={eraMarks(state, pi)}
             />
           ))}
         </div>
         {/* 相手の教室は卓に出さない（名札をタップしたときだけ開く） */}
         <div className="stage">
-          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} />
+          <Center state={state} dispatch={dispatch} cpuBusy={(cpuTurn && ph.kind !== 'roles') || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} />
         </div>
         <div className="near-seat">
           {editingRoles ? (
@@ -202,7 +223,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               player={me}
               year={state.year}
               slots={slots}
-              onConfirm={(roles, unlock) => dispatch({ type: 'setRoles', roles, unlock })}
+              onConfirm={(roles, unlock) => dispatch({ type: 'setRoles', player: focus, roles, unlock })}
             />
           ) : (
             <Playmat
@@ -210,6 +231,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               year={state.year}
               slots={slots}
               variant="near"
+              sworn={state.oath?.players.includes(focus)}
+              marks={eraMarks(state, focus)}
               acting={!guerrilla && actor === focus}
               picking={guerrilla && actor === focus}
               upNext={upNext === focus}
@@ -236,12 +259,14 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
             <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
               ✕
             </button>
-            {peekPicking && <div className="peek-hint">🔁 こちらのクラスに来てもらう生徒をタップ（アイコンの数が同じ子だけ。係の子は選べない）</div>}
+            {peekPicking && <div className="peek-hint">こちらのクラスに来てもらう生徒をタップ（アイコンの数が同じ子だけ。係の子は選べない）</div>}
             <Playmat
               player={state.players[peek]}
               year={state.year}
               slots={slots}
               variant="peek"
+              sworn={state.oath?.players.includes(peek)}
+              marks={eraMarks(state, peek)}
               delta={deltas.get(peek)}
               lit={lit}
               onSeatClick={
