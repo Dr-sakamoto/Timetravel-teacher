@@ -510,7 +510,8 @@ body:has(.title-screen) {
 }
 .peek {
   position: relative;
-  width: min(900px, 96vw);
+  /* 背景の余白（左右1rem）の内側に収める */
+  width: min(900px, calc(100vw - 2rem));
   max-height: 92dvh;
   overflow-y: auto;
 }
@@ -4133,5 +4134,49 @@ body:has(.title-screen) {
 @media (orientation: landscape) and (max-height: 600px) {
   .effect {
     font-size: 0.95rem;
+  }
+}
+
+/* 生徒カードが細いとき（どの画面でも）：種別の行を省き、名前は1行にして絵の場所を残す */
+@container (max-width: 76px) {
+  .tcg-type,
+  .tcg-foot {
+    display: none;
+  }
+  .tcg-name {
+    -webkit-line-clamp: 1;
+    font-size: min(0.66rem, 16cqw);
+  }
+  .tcg-head {
+    min-height: 0;
+    padding: 1px 2px;
+  }
+}
+
+/* ポップアップは背景の余白の内側に必ず収める（背の低い画面で上下が欠けないように） */
+.modal,
+.peek {
+  max-height: calc(100dvh - 2rem);
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .modal-back {
+    padding: 0.5rem;
+  }
+  .modal,
+  .peek {
+    max-height: calc(100dvh - 1rem);
+  }
+  .peek {
+    width: min(900px, calc(100vw - 1rem));
+  }
+}
+
+/* 縦持ち：タップで開いた教室は空いている机を省いて2段に（カードを大きく） */
+@media (orientation: portrait) and (max-width: 900px) {
+  .playmat.pm-peek .floor {
+    grid-template-columns: repeat(var(--fhalf), minmax(0, 1fr));
+  }
+  .playmat.pm-peek .seat.empty {
+    display: none;
   }
 }
