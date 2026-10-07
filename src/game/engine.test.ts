@@ -424,7 +424,7 @@ describe('engine', () => {
     expect(step(again, { type: 'cyborg', uid: mine.uid })).toBe(again);
   });
 
-  it('battles pay 1st +15, 2nd +5, 3rd 0, last -10 (ties share a place)', () => {
+  it('battles pay 1st +15, 2nd +5, and losers lose nothing (ties share a place)', () => {
     let s = newGame(['A', 'B', 'C', 'D'].map((name) => ({ name, isCpu: true })), 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const run = (fights: number[]) => {
@@ -437,9 +437,9 @@ describe('engine', () => {
       const after = step(t, pass);
       return after.players.map((p, i) => p.points - t.players[i].points);
     };
-    expect(run([4, 3, 2, 1])).toEqual([15, 5, 0, -10]);
+    expect(run([4, 3, 2, 1])).toEqual([15, 5, 0, 0]);
     // 1位が2クラスなら、次のクラスは3位（0点）
-    expect(run([3, 3, 2, 1])).toEqual([15, 15, 0, -10]);
+    expect(run([3, 3, 2, 1])).toEqual([15, 15, 0, 0]);
     // 全クラス同点なら引き分け
     expect(run([2, 2, 2, 2])).toEqual([0, 0, 0, 0]);
   });
@@ -460,13 +460,13 @@ describe('engine', () => {
     const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
     const B = [mk('b1', ['sports', 'sports'])];
     const C = [mk('c1', ['study'])];
-    // 大移動：👊6以上で+6、足りなければ−3
-    expect(run('migration', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, -3, -3]);
+    // 大移動：👊6以上で+6、足りなくても減点なし
+    expect(run('migration', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, 0, 0]);
     // 古代オリンピック：🏃の数で勝負、1位+12・2位+5、負けても減点なし
     expect(run('olympia', [A, B, C])).toEqual([12, 5, 0]);
-    // 関ヶ原の戦い：👑＋👊の数で勝負、1位+15・2位+5・最下位−10
-    expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 5, -10]);
-    expect(run('sekigahara', [[mk('y', ['fight']), mk('x', ['charm', 'charm'])], [mk('z', ['charm', 'fight'])], C])).toEqual([15, 5, -10]);
+    // 関ヶ原の戦い：👑＋👊の数で勝負、1位+15・2位+5（負けても減点なし）
+    expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 5, 0]);
+    expect(run('sekigahara', [[mk('y', ['fight']), mk('x', ['charm', 'charm'])], [mk('z', ['charm', 'fight'])], C])).toEqual([15, 5, 0]);
     // 文化祭：🎨を持つ子1人につき+2（その時代の子も同じ）
     expect(run('bunkasai', [[mk('c', ['charm', 'art'], 'present'), mk('d', ['art', 'art'])], B, C])).toEqual([4, 0, 0]);
     // 体育祭：🏃を持つ子1人につき+2
@@ -589,9 +589,11 @@ describe('engine', () => {
       };
     };
 
-    it('trex_hunt: the strongest pack takes points from the weakest', () => {
-      const r = run('trex_hunt', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study', 'study', 'art'])]]);
-      expect(r.delta).toEqual([8, 0, -8]);
+    it('trex_hunt: the strongest pack takes points from the class with the most points', () => {
+      const r = run('trex_hunt', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study', 'study', 'art'])]], [5, 20, 10]);
+      expect(r.delta).toEqual([8, -8, 0]);
+      // 狩る側がポイント1位なら、満腹で何もしない
+      expect(run('trex_hunt', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study'])]], [20, 10, 5]).delta).toEqual([0, 0, 0]);
       // 生徒は動かない
       expect(r.uids).toEqual([['y'], ['z'], ['c']]);
       // 一番が並んだら何も起こらない
@@ -643,18 +645,18 @@ describe('engine', () => {
       expect(r.after.players[0].students.filter((x) => x.goods).map((x) => x.uid)).toEqual(['a', 'b']);
     });
 
-    it('colosseum: each class\'s best fighter (🏃+👊) enters the arena; the winner scores and every other class loses points', () => {
-      expect(run('colosseum', [[mk('a', ['sports', 'fight', 'fight'])], [mk('b', ['sports', 'sports'])], []]).delta).toEqual([12, -4, -4]);
+    it('colosseum: each class\'s best fighter (🏃+👊) enters the arena; the winner scores and the others lose nothing', () => {
+      expect(run('colosseum', [[mk('a', ['sports', 'fight', 'fight'])], [mk('b', ['sports', 'sports'])], []]).delta).toEqual([12, 0, 0]);
       // 1位が並べば両方+12
-      expect(run('colosseum', [[mk('a', ['fight', 'fight'])], [mk('b', ['sports', 'sports'])], [mk('c', ['sports'])]]).delta).toEqual([12, 12, -4]);
+      expect(run('colosseum', [[mk('a', ['fight', 'fight'])], [mk('b', ['sports', 'sports'])], [mk('c', ['sports'])]]).delta).toEqual([12, 12, 0]);
       // だれも出せなければ引き分け
       expect(run('colosseum', [[mk('a', ['study'])], [mk('b', ['art'])], []]).delta).toEqual([0, 0, 0]);
     });
 
-    it('socratic: each class\'s best scholar talks with Socrates; 📚4 or more scores, less is refuted', () => {
-      // 代表の📚：4（+8）／3（−3）／代表なし（−3）
+    it('socratic: each class\'s best scholar talks with Socrates; 📚4 or more scores', () => {
+      // 代表の📚：4（+8）／3（0）／代表なし（0）
       const r = run('socratic', [[mk('a', ['study', 'study', 'study', 'study']), mk('a2', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['art'])]]);
-      expect(r.delta).toEqual([8, -3, -3]);
+      expect(r.delta).toEqual([8, 0, 0]);
       // 学習係の係ボーナスも乗る（📚📚×2＝4）
       const roles = run('socratic', [[mk('a', ['study', 'study'])], [], []], [10, 10, 10], [[{ role: 'study', uid: 'a' }], [], []]);
       expect(roles.delta[0]).toBe(8);
@@ -748,11 +750,11 @@ describe('engine', () => {
     });
 
     it('changban: the class with the most points gives chase; each other class holds the bridge with its best 👊 student', () => {
-      // A が一番ポイントが多い。B は👊2の子で追い返して A から4点奪う。C は👊1しかいないので −2（A は得をしない）
+      // A が一番ポイントが多い。B は👊2の子で追い返して A から4点奪う。C は👊1しかいないので何もない
       const r = run('changban', [[mk('a', ['study'])], [mk('b', ['fight', 'fight']), mk('b2', ['fight'])], [mk('c', ['fight'])]], [20, 10, 10]);
-      expect(r.delta).toEqual([-4, 4, -2]);
-      // 👊を持つ子がいないクラスも −2。2クラスとも追い返せば、追いかけるクラスは2回奪われる
-      expect(run('changban', [[], [mk('b', ['study'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([-4, -2, 4]);
+      expect(r.delta).toEqual([-4, 4, 0]);
+      // 2クラスとも追い返せば、追いかけるクラスは2回奪われる
+      expect(run('changban', [[], [mk('b', ['study'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([-4, 0, 4]);
       expect(run('changban', [[], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([-8, 4, 4]);
       // ポイントの一番が並べば、にらみ合いで何も起こらない
       expect(run('changban', [[], [mk('b', ['study'])], []]).delta).toEqual([0, 0, 0]);
@@ -809,10 +811,10 @@ describe('engine', () => {
       });
     });
 
-    it('mochizuki: every other class sends gifts to the class with the most 👑', () => {
-      expect(run('mochizuki', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, -3, -3]);
-      // 一番が2クラスなら、残りのクラスがそれぞれに贈る
-      expect(run('mochizuki', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
+    it('mochizuki: the class with the most 👑 is invited to the feast (no one pays)', () => {
+      expect(run('mochizuki', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, 0, 0]);
+      // 一番が2クラスなら両方
+      expect(run('mochizuki', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, 6, 0]);
     });
 
     it('genji: the school\'s best 🎨 writer\'s class scores 3 per 👑 reader in that class', () => {
@@ -871,15 +873,15 @@ describe('engine', () => {
       const yoshitsune = CARDS.find((c) => c.id === 'yoshitsune')!;
       expect(yoshitsune.attrs.filter((a) => a === 'fight')).toHaveLength(3);
       const r = run('gojo', [[mk('y', [...yoshitsune.attrs])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight']), mk('d', ['fight', 'fight'])]]);
-      // 👊4のクラス2が弁慶を連れて帰る。クラス0も勝ちで減点なし、クラス1は届かず−2
-      expect(r.delta).toEqual([0, -2, 0]);
+      // 👊4のクラス2が弁慶を連れて帰る。届かないクラスも減点なし
+      expect(r.delta).toEqual([0, 0, 0]);
       expect(benkei(r.after)).toEqual([0, 0, 1]);
       const st = r.after.players[2].students.find((x) => x.cardId === 'benkei')!;
       expect(st.attrs).toEqual(['fight', 'fight', 'fight']);
       // 同点ならポイントが少ないクラスへ
       const tie = run('gojo', [[mk('a', ['fight', 'fight', 'fight'])], [mk('b', ['fight', 'fight', 'fight'])], []], [20, 5, 10]);
       expect(benkei(tie.after)).toEqual([0, 1, 0]);
-      expect(tie.delta).toEqual([0, 0, -2]);
+      expect(tie.delta).toEqual([0, 0, 0]);
       // 弁慶がもういれば何も起こらない
       const t = structuredClone(r.after);
       t.phase = base.phase;

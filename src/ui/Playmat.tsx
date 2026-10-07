@@ -258,13 +258,9 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
           );
         })}
         {litIcons.length > 0 && (
+          // 関わった子は人数だけ（何人いても名札からはみ出さない）
           <span className="opp-lit">
-            {litIcons.slice(0, 6).map((ic, i) => (
-              <span key={i} style={{ animationDelay: `${i * 60}ms` }}>
-                {ic}
-              </span>
-            ))}
-            {litIcons.length > 6 && <small>+{litIcons.length - 6}</small>}
+            <span>{litIcons.length}人</span>
           </span>
         )}
       </span>

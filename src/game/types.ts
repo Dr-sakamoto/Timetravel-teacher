@@ -118,6 +118,8 @@ export interface EventResult {
   era?: EraId;
   /** 襲来：敵の強さ（得点演出用） */
   threat?: number;
+  /** 「持つ子1人につき+N」のイベント：アイコンの数ではなく人数で数える（得点演出用） */
+  perHead?: number;
   /** 共通イベント：引かれるアイコン（または人数）（得点演出用） */
   minus?: Attr | 'heads';
   rows: ResultRow[];

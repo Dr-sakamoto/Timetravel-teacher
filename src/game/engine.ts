@@ -680,14 +680,14 @@ function resolveEraScore(s: GameState, c: ContestCard, e: Extract<EraEffect, { t
         break;
       }
       case 'threshold':
-        delta = values[i] >= e.need ? e.win : -e.lose;
+        delta = values[i] >= e.need ? e.win : e.lose ? -e.lose : 0;
         note = values[i] >= e.need ? '成功' : '失敗';
         break;
       case 'battle': {
         // 順位：自分より多いクラスの数＋1（同点は同じ順位）。1位と最下位が先、2位はその次
         const rank = values.filter((v) => v > values[i]).length + 1;
         const p = best === worst ? 0 : rank === 1 ? 1 : values[i] === worst ? -1 : rank === 2 ? 2 : 3;
-        delta = p === 1 ? e.win : p === 2 ? e.second : p === -1 ? -e.lose : 0;
+        delta = p === 1 ? e.win : p === 2 ? e.second : p === -1 && e.lose ? -e.lose : 0;
         note = best === worst ? '引き分け' : p === -1 ? '最下位' : `${rank}位`;
         if (best !== worst) place = rank - 1;
         break;
@@ -698,7 +698,8 @@ function resolveEraScore(s: GameState, c: ContestCard, e: Extract<EraEffect, { t
     return { player: i, count, rank: place, delta, note, uids: holders.map((h) => h.uid) };
   });
   // 2つのアイコンを合わせて数えるカードは、1つのアイコンの得点演出が合わないので出さない
-  return eraResult(s, c, rows, { attr: c.also ? undefined : c.attr });
+  const perHead = e.type === 'heads' || e.type === 'disaster' ? e.per : undefined;
+  return eraResult(s, c, rows, { attr: c.also ? undefined : c.attr, perHead });
 }
 
 /** 時代イベントで数えるアイコンの点（also があれば attr と合わせて数える） */
@@ -755,7 +756,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
   };
 
   switch (e.type) {
-    // 白亜紀：一番強いクラス（1クラスだけ）が、一番弱いクラスから点を奪う
+    // 白亜紀：一番強いクラス（1クラスだけ）が、ポイントが一番多いクラスから点を奪う（自分がポイント1位なら何もしない）
     case 'plunder': {
       rows.forEach((r, i) => {
         r.count = values[i];
@@ -767,8 +768,16 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         break;
       }
       const win = tops[0];
-      // 一番弱いクラスが複数なら、ポイントの多いほうが狙われる
-      const lose = values.flatMap((v, i) => (v === worst ? [i] : [])).sort((x, y) => ps[y].points - ps[x].points)[0];
+      // 狙われるのは、ほかのクラスで一番ポイントが多いクラス（並んだら弱いほう）。狩る側がポイント1位なら、もう満腹で何もしない
+      const lose = ps
+        .map((_, i) => i)
+        .filter((i) => i !== win)
+        .sort((x, y) => ps[y].points - ps[x].points || values[x] - values[y])[0];
+      if (ps[win].points >= ps[lose].points) {
+        rows[win].note = '満腹';
+        tell(`${ps[win].name}のクラスはもう満腹で、狩りをしなかった。`, win);
+        break;
+      }
       add(win, e.amount);
       add(lose, -e.amount);
       scores[win].holders.forEach((h) => h.mvp++);
@@ -1001,16 +1010,9 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         break;
       }
       const tops = values.flatMap((v, i) => (v === best ? [i] : []));
-      ps.forEach((_, i) => {
-        if (tops.includes(i)) return;
-        for (const t of tops) {
-          add(i, -e.per);
-          add(t, e.per);
-        }
-        rows[i].note = '贈った';
-      });
-      tell(`${tops.map((t) => ps[t].name).join('・')}のクラスに贈り物が集まった。`);
+      tell(`${tops.map((t) => ps[t].name).join('・')}のクラスが道長の宴に招かれた。`);
       tops.forEach((t) => {
+        add(t, e.win);
         rows[t].note = '招かれた';
         scores[t].holders.forEach((h) => h.mvp++);
       });

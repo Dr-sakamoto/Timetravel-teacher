@@ -4,7 +4,7 @@ import { canBuild, canTake, currentEra, kaguyaGift, pyramidCard, inGuerrilla, ma
 import { EVENT_MAP, GIFT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
-import { ATTR_ICON, type Action, type GameState, type Player, type Student } from '../game/types';
+import { ATTR_ICON, type Action, type EventResult, type GameState, type Player, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
 import { TcgCard } from './TcgCard';
 import { KaguyaStay } from './KaguyaStay';
@@ -296,6 +296,34 @@ function OathPopup({ state, chooser, max, onSwear }: { state: GameState; chooser
           誓う
         </button>
       </div>
+    </div>
+  );
+}
+
+/** 結果のカードの横に並べる生徒の最大数 */
+const DEAL_MAX = 4;
+
+/** 結果の明細：クラスごとに「何があって何点か」を1行ずつ（点も出来事もないクラスは省く） */
+function ResultTable({ state, result }: { state: GameState; result: EventResult }) {
+  const attr = result.attr && result.attr !== 'all' ? ATTR_ICON[result.attr] : '';
+  const rows = result.rows.filter((r) => r.delta !== 0 || r.note);
+  if (!rows.length) return null;
+  return (
+    <div className="tally">
+      {rows.map((r, i) => {
+        const p = state.players[r.player];
+        // 数えたアイコンの数が書いていなければ、頭に足す（「1位」→「🏃11 1位」）
+        const count = attr && r.count !== undefined && r.count >= 0 && !(r.note ?? '').includes(String(r.count)) ? `${attr}${r.count}` : '';
+        return (
+          <div key={i} className="tally-row" style={{ borderColor: p.color }}>
+            <b className="tally-name" style={{ color: p.color }}>
+              {p.name}
+            </b>
+            <span className="tally-count">{[count, r.note].filter(Boolean).join(' ')}</span>
+            <span className={`tally-delta ${r.delta > 0 ? 'up' : r.delta < 0 ? 'down' : ''}`}>{r.delta > 0 ? `+${r.delta}` : r.delta < 0 ? `−${-r.delta}` : '±0'}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -599,14 +627,17 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             ) : (
               <div className="reveal-say">{r.say ?? r.rule ?? r.desc}</div>
             )}
+            <ResultTable state={state} result={r} />
             {r.students && r.students.length > 0 && (
               <div className="deal">
-                {r.students.map((s) => (
+                {/* 何人いても卓からはみ出さないように、見せるのは4人まで */}
+                {r.students.slice(0, DEAL_MAX).map((s) => (
                   <div key={s.uid} className={`deal-card ${out.has(s.uid) ? 'out' : 'in'}`}>
                     <TcgCard student={s} size="mini" />
                     <span className="deal-mark">{out.has(s.uid) ? '転校' : '転入'}</span>
                   </div>
                 ))}
+                {r.students.length > DEAL_MAX && <span className="deal-more">ほか{r.students.length - DEAL_MAX}人</span>}
               </div>
             )}
             {ph.ctx === 'turn' && ph.player === null && <NextTurn state={state} />}

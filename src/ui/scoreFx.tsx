@@ -26,6 +26,8 @@ export interface FxCard {
   threat?: number;
   /** 共通イベント：引かれるアイコン（または人数） */
   minus?: Attr | 'heads';
+  /** 「持つ子1人につき+N」：アイコンの数や×2に関係なく、1人ずつ同じ点 */
+  perHead?: number;
 }
 
 export interface FxRects {
@@ -109,6 +111,7 @@ function dimOthers(c: FxCtx, f: Frame) {
 
 /** 内訳のラベル：🏃×3 時代×2 係×2 */
 export function why(c: Contribution, card: FxCard): ReactNode {
+  if (card.perHead) return <span>1人</span>;
   const era = card.era ? ERAS.find((e) => e.id === card.era)! : null;
   return (
     <>
@@ -140,7 +143,8 @@ function finale(c: FxCtx, from: Pt, t0: number, f: Frame) {
   const { t, delta, total, card, rects } = c;
   if (t < t0) return;
   const raid = isRaid(card);
-  if (raid) {
+  // 襲来の式は、点が名札へ飛び終わったら消す（あとは結果の明細に残る）
+  if (raid && t < t0 + 900 + FINALE_FLY) {
     const q = back((t - t0) / 300);
     f.overlay.push(
       <div key="raid-eq" className="fx-raid-eq" style={{ left: (rects.ecard?.right ?? 0) + 16, top: from.y, transform: `translate(0,-50%) scale(${q})` }}>
