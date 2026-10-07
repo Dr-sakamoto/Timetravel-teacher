@@ -56,7 +56,7 @@ export interface SwingCard {
  *   ostracism … ギリシャ「全クラスが自分以外のクラスに秘密で投票し、票が一番多いクラスが、係に就いていない子を1人転校させる」
  *   fireattack … 三国志「Xが一番多いクラス（1クラスだけ。大船団）と、それ以外で📚が一番多いクラス（軍師）の勝負：軍師の📚が大船団のXより多ければ大船団 −lose・軍師 +win、届かなければ大船団 +win・軍師 −fail」
  *   kongming  … 三国志「👑の数からXの数を引いた差が一番大きいクラス（満席のクラスは除く）に、諸葛亮孔明が軍師として無料で転入する」
- *   bridge    … 三国志「ポイントが一番多いクラス（1クラスだけ）が追いかける。ほかの各クラスはXが一番多い子1人が橋に立ち、その子のXが need 以上なら追い返して +win、足りなければ追いかけるクラスに take 点取られる」
+ *   bridge    … 三国志「ポイントが一番多いクラス（1クラスだけ）が追いかける。ほかの各クラスはXが一番多い子1人が橋に立ち、その子のXが need 以上なら一喝して追い返し、追いかけるクラスから take 点奪う。足りなければ −lose（追いかけるクラスは得をしない）」
  *   oath      … 三国志「ポイントが一番少ないクラスが、ほかのクラスを max まで選んで義兄弟になる。学期の区切りまでに義兄弟が得た点・失った点を合わせて山分けする」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
  *   masterpiece … 中世「各クラスのXが一番多い子1人の、Xの数 × per」
@@ -92,7 +92,7 @@ export type EraEffect =
   | { type: 'ostracism' }
   | { type: 'fireattack'; win: number; lose: number; fail: number }
   | { type: 'kongming' }
-  | { type: 'bridge'; need: number; win: number; take: number }
+  | { type: 'bridge'; need: number; take: number; lose: number }
   | { type: 'oath'; max: number }
   | { type: 'tribute'; per: number }
   | { type: 'masterpiece'; per: number }
@@ -333,7 +333,7 @@ export const ERA_CARDS: ContestCard[] = [
   // 三国志：📚👊。腕っぷしの大船団と知恵の軍師がぶつかり、孔明は知恵の足りないクラスへ来て、義兄弟はもうけも損も分け合う
   C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'fireattack', win: 10, lose: 10, fail: 5 }, '208年、曹操の大船団に、周瑜と孔明が知恵の火攻めで挑んだ。腕っぷしの大軍か、知恵の軍師か。', 'china', 1),
   C('sangu', '三顧の礼', '🏠', 'study', { type: 'kongming' }, '人望はあっても知恵の足りなかった劉備は、諸葛亮の家を3回たずねて、やっと軍師に迎えた。', 'china', 1),
-  C('changban', '長坂の戦い', '🌉', 'fight', { type: 'bridge', need: 2, win: 5, take: 3 }, '208年、曹操の大軍に追われた劉備軍。張飛はたった一人で橋の上に立ち、大声で一喝して追っ手を止めた。', 'china', 1),
+  C('changban', '長坂の戦い', '🌉', 'fight', { type: 'bridge', need: 2, take: 4, lose: 2 }, '208年、曹操の大軍に追われた劉備軍。張飛はたった一人で橋の上に立ち、大声で一喝して追っ手を止めた。', 'china', 1),
   C('taoyuan', '桃園の誓い', '🍑', 'all', { type: 'oath', max: 2 }, '物語『三国志演義』では、まだ何者でもなかった劉備が、関羽・張飛と桃の園で義兄弟になった。生まれた日はちがっても、喜びも苦しみも分け合う。', 'china', 1),
   // 平安：🎨👑。権力者のもとに、ほかのクラスから贈り物が集まる
   C('tentoku', '天徳内裏歌合', '🌸', 'art', { type: 'battle', win: 15, second: 5, lose: 10 }, '村上天皇の御前で和歌の勝負。勝ち負けがはっきりつく。', 'heian'),
@@ -470,7 +470,7 @@ export function eraEffectRule(c: ContestCard): string {
     case 'kongming':
       return `👑の数から${a}の数を引いた差が一番大きいクラスに、諸葛亮孔明が軍師として無料で転入（満席のクラスは除く）`;
     case 'bridge':
-      return `ポイントが一番多いクラスが追いかける。ほかの各クラスは${a}が一番多い子1人が橋に立ち、${a}${e.need}以上なら追い返して+${e.win}、足りなければ追いかけるクラスに${e.take}点取られる`;
+      return `ポイントが一番多いクラスが追いかける。ほかの各クラスは${a}が一番多い子1人が橋に立ち、${a}${e.need}以上なら一喝して追いかけるクラスから${e.take}点奪う、足りなければ−${e.lose}`;
     case 'oath':
       return `ポイントが一番少ないクラスが、ほかのクラスを${e.max}つまで選んで義兄弟に。学期の区切りまで、義兄弟のもうけと損は山分け`;
     case 'tribute':
@@ -573,7 +573,7 @@ function contestGlyph(c: ContestCard): string {
     case 'kongming':
       return `👑−${a} 🥇 ⟵ 🪶孔明`;
     case 'bridge':
-      return `🌉🧑${a}${e.need}↑ +${e.win}／⟶${e.take}点 ポイント🥇`;
+      return `🌉🧑${a}${e.need}↑ ⟵${e.take}点 ポイント🥇／−${e.lose}`;
     case 'oath':
       return `ポイント最下位 🍑 義兄弟 → 点を山分け`;
     case 'tribute':
