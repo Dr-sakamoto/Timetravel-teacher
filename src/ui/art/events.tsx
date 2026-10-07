@@ -371,19 +371,19 @@ const SCENES: Record<string, () => ReactNode> = {
       <P d="M84 12 C88 8 94 10 92 16" sw={1} op={0.5} />
     </g>
   ),
-  himiko: () => (
+  changban: () => (
     <g>
-      <Bg sky="#ffe9c8" ground="#4f8fc8" y={44} />
-      <P d="M0 52 Q25 48 50 52 T100 52 M0 62 Q25 58 50 62 T100 62" stroke="#bfe6ff" sw={1} />
-      <P d="M14 46 L46 46 L40 54 L20 54Z" fill="#7a5a3a" />
-      <Stick x1={30} y1={46} x2={30} y2={22} w={1.2} color="#7a5a3a" />
-      <P d="M31 24 L44 30 L31 40Z" fill="#fbf4e2" sw={1.1} />
-      <Mini x={22} y={40} c="#d14b3c" s={0.7} />
-      <C x={74} y={24} r={15} fill="#b98a3a" />
-      <C x={74} y={24} r={11} fill="#e8c46a" sw={1} />
-      <C x={74} y={24} r={3} fill="#b98a3a" sw={1} />
-      <P d="M68 18 L71 15 M79 31 L82 28" stroke="#fffbe6" sw={1.6} />
-      <Star x={92} y={8} r={2.4} fill="#fffbe6" />
+      <Bg sky="#ffe2b8" ground="#4f8fc8" y={48} />
+      <P d="M0 56 Q25 52 50 56 T100 56 M0 66 Q25 62 50 66 T100 66" stroke="#bfe6ff" sw={1} />
+      <P d="M14 46 Q50 30 86 46 L86 50 Q50 36 14 50Z" fill="#a9763f" />
+      <P d="M24 44 V54 M40 38 V52 M60 38 V52 M76 44 V54" sw={1.6} />
+      <Mini x={50} y={26} c="#3a3a44" s={1.3} />
+      <Stick x1={58} y1={34} x2={70} y2={8} w={1.6} color="#7a5a3a" />
+      <P d="M68 6 L74 4 L72 10Z" fill="#cfd8dc" sw={1} />
+      <P d="M40 18 L30 14 M40 22 L28 22 M40 26 L30 30" stroke="#e5534b" sw={1.6} />
+      {[6, 14, 92, 84].map((x, i) => (
+        <Mini key={x} x={x} y={36 + (i % 2) * 4} c="#7a7aa0" s={0.6} />
+      ))}
     </g>
   ),
   taoyuan: () => (

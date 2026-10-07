@@ -17,7 +17,6 @@ import {
   TEPPO_GOODS,
   PERSON_CARDS_PER_TERM,
   TEST_YANKEE_PENALTY,
-  WEI_MIRROR,
   cardEra,
   personCost,
   cardRule,
@@ -759,8 +758,9 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // 三国志：一番強いクラス（1クラスだけ）に、ほかの全クラスが連合して挑む。連合の合計が上回れば火攻めで一番のクラスが −lose・ほかの全クラスが +ally、届かなければ一番のクラスが +win
-    case 'alliance': {
+    // 三国志：Xが一番多いクラス（1クラスだけ。大船団）と、それ以外で📚が一番多いクラス（軍師。同じならポイントが少ないクラス）の勝負。軍師の📚が上回れば火攻め成功
+    case 'fireattack': {
+      const wits = ps.map((p) => attrScore(p, 'study').total);
       rows.forEach((r, i) => {
         r.count = values[i];
         r.uids = scores[i].holders.map((h) => h.uid);
@@ -768,28 +768,63 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       const tops = values.flatMap((v, i) => (v === best ? [i] : []));
       if (best === 0 || tops.length > 1) {
         rows.forEach((r) => (r.note = 'にらみ合い'));
-        tell('どのクラスも動かず、にらみ合いに終わった。');
+        tell('大船団が決まらず、にらみ合いに終わった。');
         break;
       }
       const fleet = tops[0];
-      const allies = values.reduce((a, v) => a + v, 0) - best;
-      if (allies > best) {
+      const sage = ps
+        .map((_, i) => i)
+        .filter((i) => i !== fleet)
+        .sort((x, y) => wits[y] - wits[x] || ps[x].points - ps[y].points || x - y)[0];
+      rows[sage].count = wits[sage];
+      rows[sage].uids = attrScore(ps[sage], 'study').holders.map((h) => h.uid);
+      if (wits[sage] > best) {
         add(fleet, -e.lose);
+        add(sage, e.win);
+        attrScore(ps[sage], 'study').holders.forEach((h) => h.mvp++);
         rows[fleet].note = '火攻めで敗北';
-        ps.forEach((_, i) => {
-          if (i === fleet) return;
-          add(i, e.ally);
-          scores[i].holders.forEach((h) => h.mvp++);
-          rows[i].note = '連合の勝利';
-        });
-        tell(`連合軍（${ATTR_ICON.fight}${allies}）が火攻めで${ps[fleet].name}のクラスの大船団（${ATTR_ICON.fight}${best}）を破った！`);
+        rows[sage].note = '火攻め成功';
+        tell(`${ps[sage].name}のクラスの知恵（📚${wits[sage]}）が、${ps[fleet].name}のクラスの大船団（${ATTR_ICON.fight}${best}）を火攻めで破った！`, sage);
       } else {
         add(fleet, e.win);
+        add(sage, -e.fail);
         scores[fleet].holders.forEach((h) => h.mvp++);
         rows[fleet].note = '大船団の勝利';
-        ps.forEach((_, i) => i !== fleet && (rows[i].note = '連合の敗北'));
-        tell(`${ps[fleet].name}のクラスの大船団（${ATTR_ICON.fight}${best}）が連合軍（${ATTR_ICON.fight}${allies}）を退けた！`, fleet);
+        rows[sage].note = '火攻め失敗';
+        tell(`${ps[fleet].name}のクラスの大船団（${ATTR_ICON.fight}${best}）が、${ps[sage].name}のクラスの火攻め（📚${wits[sage]}）をはね返した！`, fleet);
       }
+      break;
+    }
+    // 三国志：ポイントが一番多いクラス（1クラスだけ）が追いかける。ほかの各クラスはXが一番多い子1人が橋に立ち、need 以上なら追い返して +win、足りなければ take 点取られる
+    case 'bridge': {
+      if (c.attr === 'all') break;
+      const a = c.attr;
+      const hi = Math.max(...ps.map((p) => p.points));
+      const chasers = ps.flatMap((p, i) => (p.points === hi ? [i] : []));
+      if (chasers.length > 1) {
+        rows.forEach((r) => (r.note = 'にらみ合い'));
+        tell('追いかけるクラスが決まらず、にらみ合いに終わった。');
+        break;
+      }
+      const chaser = chasers[0];
+      rows[chaser].note = '追撃';
+      ps.forEach((p, i) => {
+        if (i === chaser) return;
+        const guard = bestOf(p, p.students, a);
+        rows[i].count = guard?.pts ?? 0;
+        rows[i].uids = guard ? [guard.student.uid] : [];
+        if (guard && guard.pts >= e.need) {
+          add(i, e.win);
+          guard.student.mvp++;
+          moved.push(guard.student);
+          rows[i].note = '一喝で追い返した';
+          tell(`${p.name}のクラスの${name(guard.student)}が橋の上で一喝！追っ手が止まった。`, i);
+        } else {
+          add(i, -e.take);
+          add(chaser, e.take);
+          rows[i].note = guard ? '突破された' : '守る子なし';
+        }
+      });
       break;
     }
     // 三国志：👑からXを引いた差が一番大きいクラス（満席は除く。同じならポイントが少ないクラス）に、諸葛亮孔明が無料で転入する。孔明は1人だけ
@@ -816,25 +851,6 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       rows[to].uids = [st.uid];
       rows[to].note = '孔明が転入';
       tell(`${ps[to].name}のクラスに、軍師の${name(st)}がやってきた！`, to);
-      break;
-    }
-    // 三国志：各クラスのグッズを持っていない子のうちアイコンが一番多い子1人に、魏の銅鏡が届く（同じなら先に並んでいる子）
-    case 'mirror': {
-      ps.forEach((p, i) => {
-        const cands = equippable(p).filter((x) => !isEgg(x));
-        const st = [...cands].sort((x, y) => counted(y).length - counted(x).length)[0];
-        if (!st) {
-          rows[i].note = '受け取れる子なし';
-          return;
-        }
-        st.goods = { id: WEI_MIRROR.id, name: WEI_MIRROR.name, icon: WEI_MIRROR.icon, attr: WEI_MIRROR.attr };
-        st.attrs = [...st.attrs, WEI_MIRROR.attr];
-        st.mvp++;
-        moved.push(st);
-        rows[i].uids = [st.uid];
-        rows[i].note = `${WEI_MIRROR.icon} ${ATTR_ICON[WEI_MIRROR.attr]}＋1`;
-        tell(`${p.name}のクラスの${name(st)}に${WEI_MIRROR.icon}${WEI_MIRROR.name}が届いた。`, i);
-      });
       break;
     }
     // 平安：一番のクラスへ、ほかの全クラスから贈り物（一番が複数なら、それぞれに贈る）

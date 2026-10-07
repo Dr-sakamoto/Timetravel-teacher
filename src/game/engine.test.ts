@@ -623,15 +623,17 @@ describe('engine', () => {
       });
     });
 
-    it('chibi: the other classes ally against the class with the most 👊; if together they have more, the big fleet burns', () => {
-      // 連合の👊 2+2=4 ＞ 3 → 大船団 −10、ほかの全クラス +4
-      expect(run('chibi', [[mk('y', ['fight', 'fight', 'fight'])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight'])]]).delta).toEqual([-10, 4, 4]);
-      // 大船団がどのクラスでも同じ
-      expect(run('chibi', [[mk('y', ['fight', 'fight'])], [mk('b', ['fight', 'fight', 'fight'])], [mk('c', ['fight', 'fight'])]]).delta).toEqual([4, -10, 4]);
-      // 連合が届かなければ大船団 +10
-      expect(run('chibi', [[mk('y', ['fight', 'fight', 'fight', 'fight'])], [mk('b', ['fight'])], [mk('c', ['fight'])]]).delta).toEqual([10, 0, 0]);
-      // 一番が並ぶ・だれも👊を持たないなら、にらみ合いで何も起こらない
-      expect(run('chibi', [[mk('y', ['fight'])], [mk('b', ['fight'])], []]).delta).toEqual([0, 0, 0]);
+    it('chibi: the class with the most 👊 (the fleet) fights the class with the most 📚 among the rest (the strategist)', () => {
+      // 軍師の📚3 ＞ 大船団の👊2 → 火攻め成功：大船団 −10、軍師 +10、ほかは0
+      expect(run('chibi', [[mk('y', ['fight', 'fight'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['study'])]]).delta).toEqual([-10, 10, 0]);
+      // 届かなければ：大船団 +10、軍師 −5
+      expect(run('chibi', [[mk('y', ['fight', 'fight', 'fight'])], [mk('b', ['study', 'study'])], [mk('c', ['study'])]]).delta).toEqual([10, -5, 0]);
+      // 大船団のクラスの📚は数えない（軍師はほかのクラスから選ぶ）
+      expect(run('chibi', [[mk('y', ['fight']), mk('y2', ['study', 'study', 'study'])], [mk('b', ['study'])], []]).delta).toEqual([10, -5, 0]);
+      // 軍師が同点なら、ポイントの少ないクラス
+      expect(run('chibi', [[mk('y', ['fight'])], [mk('b', ['study', 'study'])], [mk('c', ['study', 'study'])]], [10, 10, 5]).delta).toEqual([-10, 0, 10]);
+      // 👊の一番が並ぶ・だれも👊を持たないなら、にらみ合いで何も起こらない
+      expect(run('chibi', [[mk('y', ['fight'])], [mk('b', ['fight'])], [mk('c', ['study', 'study'])]]).delta).toEqual([0, 0, 0]);
       expect(run('chibi', [[mk('y', ['study'])], [], []]).delta).toEqual([0, 0, 0]);
     });
 
@@ -654,17 +656,14 @@ describe('engine', () => {
       expect(kongming(run('sangu', [full, [mk('b', ['charm'])], [mk('c', ['study'])]]).after)).toEqual([0, 1, 0]);
     });
 
-    it('himiko: in each class, the student without goods who has the most icons receives a bronze mirror (👑+1)', () => {
-      const worn = { ...mk('a', ['charm', 'charm', 'charm']), goods: { id: 'g_book', name: '参考書', icon: '📕', attr: 'study' as Attr } };
-      const r = run('himiko', [[worn, mk('a2', ['study', 'art']), mk('a3', ['sports'])], [mk('b', ['study'])], []]);
-      expect(r.delta).toEqual([0, 0, 0]);
-      const st = (pi: number, uid: string) => r.after.players[pi].students.find((x) => x.uid === uid)!;
-      // グッズを持っている a は受け取れない。残りでアイコンが一番多い a2 が受け取る
-      expect(st(0, 'a').goods?.id).toBe('g_book');
-      expect(st(0, 'a2').goods?.id).toBe('g_mirror');
-      expect(st(0, 'a2').attrs).toEqual(['study', 'art', 'charm']);
-      expect(st(1, 'b').goods?.id).toBe('g_mirror');
-      expect(r.after.players[0].students.filter((x) => x.goods?.id === 'g_mirror')).toHaveLength(1);
+    it('changban: the class with the most points gives chase; each other class holds the bridge with its best 👊 student', () => {
+      // A が一番ポイントが多い。B は👊2の子で追い返して +5、C は👊1しかいないので A に3点取られる
+      const r = run('changban', [[mk('a', ['study'])], [mk('b', ['fight', 'fight']), mk('b2', ['fight'])], [mk('c', ['fight'])]], [20, 10, 10]);
+      expect(r.delta).toEqual([3, 5, -3]);
+      // 👊を持つ子がいないクラスも取られる
+      expect(run('changban', [[], [mk('b', ['study'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([3, -3, 5]);
+      // ポイントの一番が並べば、にらみ合いで何も起こらない
+      expect(run('changban', [[], [mk('b', ['study'])], []]).delta).toEqual([0, 0, 0]);
     });
 
     describe('taoyuan: the class with the fewest points picks sworn brothers, and they share what they gain until the term ends', () => {
