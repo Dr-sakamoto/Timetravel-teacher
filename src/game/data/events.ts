@@ -54,7 +54,10 @@ export interface SwingCard {
  *   arena     … ギリシャ「各クラスの、Xと also の合計が一番多い子が闘技場で戦う：1位 +win、負けたクラス（出せる子がいないクラスも）−lose」
  *   dialogue  … ギリシャ「各クラスのXが一番多い子が代表になってソクラテス（強さ need）と対話：代表のXが need 以上なら +win、届かない（代表がいない）と論破されて −lose」
  *   ostracism … ギリシャ「全クラスが自分以外のクラスに秘密で投票し、票が一番多いクラスが、係に就いていない子を1人転校させる」
- *   upgrade   … 中国「各クラスのXが一番多い子が受験。need 以上なら合格して、Xが1つ増える」
+ *   fireattack … 三国志「Xが一番多いクラス（1クラスだけ。大船団）と、それ以外で📚が一番多いクラス（軍師）の勝負：軍師の📚が大船団のXより多ければ大船団 −lose・軍師 +win、届かなければ大船団 +win・軍師 −fail」
+ *   kongming  … 三国志「👑の数からXの数を引いた差が一番大きいクラス（満席のクラスは除く）に、諸葛亮孔明が軍師として無料で転入する」
+ *   bridge    … 三国志「ポイントが一番多いクラス（1クラスだけ）が追いかける。ほかの各クラスはXが一番多い子1人が橋に立ち、その子のXが need 以上なら一喝して追い返し、追いかけるクラスから take 点奪う。足りなければ −lose（追いかけるクラスは得をしない）」
+ *   oath      … 三国志「ポイントが一番少ないクラスが、ほかのクラスを max まで選んで義兄弟になる。学期の区切りまでに義兄弟が得た点・失った点を合わせて山分けする」
  *   tribute   … 平安「Xが一番多いクラスに、ほかの全クラスが per 点ずつ贈る」
  *   genji     … 平安「全校でXが一番多い子が作者。作者のクラスで also を持つ子1人につき +per」（同点なら作者が複数）
  *   kaguya    … 平安「かぐや姫が学期の区切りまで滞在し、各クラスに平安の宝（グッズ）を1つずつくじで頼む。頼まれた宝を装備した子がいれば、手番で差し出すかどうか選べる。差し出すと +win（宝は消える）」
@@ -90,7 +93,10 @@ export type EraEffect =
   | { type: 'arena'; also: Attr; win: number; lose: number }
   | { type: 'dialogue'; need: number; win: number; lose: number }
   | { type: 'ostracism' }
-  | { type: 'upgrade'; need: number }
+  | { type: 'fireattack'; win: number; lose: number; fail: number }
+  | { type: 'kongming' }
+  | { type: 'bridge'; need: number; take: number; lose: number }
+  | { type: 'oath'; max: number }
   | { type: 'tribute'; per: number }
   | { type: 'genji'; also: Attr; per: number }
   | { type: 'kaguya'; win: number }
@@ -106,7 +112,7 @@ export type EraEffect =
   | { type: 'prize'; win: number }
   | { type: 'alien' };
 
-/** カードに載るアイコンの上限（科挙・生徒会長選挙・シンギュラリティ・活版印刷で増えるのもここまで。グッズの＋1は別） */
+/** カードに載るアイコンの上限（生徒会長選挙・シンギュラリティ・活版印刷で増えるのもここまで。グッズの＋1は別） */
 export const MAX_ICONS = 6;
 
 /** 機械のグッズ（装備した子はシンギュラリティで機械として数える） */
@@ -336,14 +342,16 @@ export const ERA_CARDS: ContestCard[] = [
   C('colosseum', 'コロッセオの剣闘', '⚔️', 'sports', { type: 'arena', also: 'fight', win: 12, lose: 4 }, '各クラスの一番の剣闘士が闘技場へ。勝てば喝采、負ければ大恥。', 'greece', 1),
   C('socratic', 'ソクラテスの問答', '🧔', 'study', { type: 'dialogue', need: 4, win: 8, lose: 3 }, '「きみは何を知っている？」 クラスの代表がソクラテスと対話する。答えに詰まれば論破される。', 'greece', 1),
   C('ostracism', '陶片追放', '🏺', 'all', { type: 'ostracism' }, '陶器のかけらに名前を書いて、こっそり投票。票が一番集まったクラスから、1人がアテネを去る。', 'greece', 1),
-  // 古代中国：📚👊。科挙に受かった子はずっと強くなる
-  C('keju', '科挙', '📜', 'study', { type: 'upgrade', need: 3 }, '超難関の官僚登用試験。合格すれば一生の箔がつく。', 'china'),
-  C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '曹操の大船団に挑む。勝てば大手柄、負ければ火計で焼かれる。', 'china'),
+  // 三国志：📚👊。腕っぷしの大船団と知恵の軍師がぶつかり、孔明は知恵の足りないクラスへ来て、義兄弟はもうけも損も分け合う
+  C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'fireattack', win: 10, lose: 10, fail: 5 }, '208年、曹操の大船団に、周瑜と孔明が知恵の火攻めで挑んだ。腕っぷしの大軍か、知恵の軍師か。', 'china', 1),
+  C('sangu', '三顧の礼', '🏠', 'study', { type: 'kongming' }, '人望はあっても知恵の足りなかった劉備は、諸葛亮の家を3回たずねて、やっと軍師に迎えた。', 'china', 1),
+  C('changban', '長坂の戦い', '🌉', 'fight', { type: 'bridge', need: 2, take: 4, lose: 2 }, '208年、曹操の大軍に追われた劉備軍。張飛はたった一人で橋の上に立ち、大声で一喝して追っ手を止めた。', 'china', 1),
+  C('taoyuan', '桃園の誓い', '🍑', 'all', { type: 'oath', max: 2 }, '物語『三国志演義』では、まだ何者でもなかった劉備が、関羽・張飛と桃の園で義兄弟になった。生まれた日はちがっても、喜びも苦しみも分け合う。', 'china', 1),
   // 平安：🎨👑。物語を書く子と読む貴族、権力者への贈り物、かぐや姫の難題、五条大橋の弁慶（👊だけはこの1枚）
   C('genji', '源氏物語', '📖', 'art', { type: 'genji', also: 'charm', per: 3 }, '紫式部が書いた光源氏の物語。宮中の貴族たちが続きを楽しみに回し読みした。', 'heian', 1),
   C('mochizuki', '藤原道長の望月の歌', '🌕', 'charm', { type: 'tribute', per: 3 }, '「この世をば わが世とぞ思ふ 望月の 欠けたることも なしと思へば」。道長に一番気に入られたクラスへ、ほかのクラスから贈り物が届く。', 'heian', 1),
   C('kaguya', '竹取物語・かぐや姫の難題', '🌙', 'all', { type: 'kaguya', win: 5 }, 'かぐや姫が学校にやってきて「この宝を持ってきてください」。持ってこられなければ、学期の終わりに月へ帰ってしまう。', 'heian', 1),
-  C('gojo', '五条大橋の弁慶', '🌉', 'fight', { type: 'benkei', need: 3, lose: 2 }, '京の五条大橋で、弁慶が通る人の刀を奪っている。力を合わせて倒せば、弁慶が家来になる。', 'heian', 1),
+  C('gojo', '五条大橋の弁慶', '🪓', 'fight', { type: 'benkei', need: 3, lose: 2 }, '京の五条大橋で、弁慶が通る人の刀を奪っている。力を合わせて倒せば、弁慶が家来になる。', 'heian', 1),
   // 中世・ルネサンス：🎨📚。ペストにかかった子は走れなくなり、新大陸の品は早い者勝ち
   C('monalisa', 'モナ・リザ制作', '🖼️', 'art', { type: 'masterpiece', per: 3 }, '何年もかけて仕上げられた、謎の微笑み。名画を生むのはクラス一番の描き手の腕前。', 'europe', 1),
   C('printing', '活版印刷', '📘', 'study', { type: 'printing' }, 'グーテンベルクの印刷機で、本が安く刷れるようになった。本を読んだことのない子も、みんな学び始める。', 'europe', 1),
@@ -471,8 +479,14 @@ export function eraEffectRule(c: ContestCard): string {
       return `${c.attr === 'all' ? '' : `${a}を持っていて、`}グッズを装備している子1人につき+${e.per}`;
     case 'ostracism':
       return '全クラスがほかのクラスに秘密で投票し、票が一番多いクラスが1人転校させる';
-    case 'upgrade':
-      return `各クラスの${a}が一番多い子が受験：${a}${e.need}以上で合格し、${a}が1つ増える`;
+    case 'fireattack':
+      return `${a}が一番多いクラス（大船団）と、ほかで📚が一番多いクラス（軍師）の勝負：軍師の📚が大船団の${a}より多ければ火攻めで大船団−${e.lose}・軍師+${e.win}、届かなければ大船団+${e.win}・軍師−${e.fail}`;
+    case 'kongming':
+      return `👑の数から${a}の数を引いた差が一番大きいクラスに、諸葛亮孔明が軍師として無料で転入（満席のクラスは除く）`;
+    case 'bridge':
+      return `ポイントが一番多いクラスが追いかける。ほかの各クラスは${a}が一番多い子1人が橋に立ち、${a}${e.need}以上なら一喝して追いかけるクラスから${e.take}点奪う、足りなければ−${e.lose}`;
+    case 'oath':
+      return `ポイントが一番少ないクラスが、ほかのクラスを${e.max}つまで選んで義兄弟に。学期の区切りまで、義兄弟のもうけと損は山分け`;
     case 'tribute':
       return `${a}が一番多いクラスに、ほかの全クラスが${e.per}点ずつ贈る`;
     case 'genji':
@@ -574,8 +588,14 @@ function contestGlyph(c: ContestCard): string {
       return `🧑${c.attr === 'all' ? '' : a}💍 → +${e.per}ずつ`;
     case 'ostracism':
       return '🗳️ 票🥇のクラス → 👋🧑';
-    case 'upgrade':
-      return `🧑${a}${e.need}↑ → ${a}＋1`;
+    case 'fireattack':
+      return `${a}🥇 vs 📚🥇 🔥 +${e.win}／−${e.lose}`;
+    case 'kongming':
+      return `👑−${a} 🥇 ⟵ 🪶孔明`;
+    case 'bridge':
+      return `🌉🧑${a}${e.need}↑ ⟵${e.take}点 ポイント🥇／−${e.lose}`;
+    case 'oath':
+      return `ポイント最下位 🍑 義兄弟 → 点を山分け`;
     case 'tribute':
       return `${a}🥇 ⟵ ${e.per}点ずつ`;
     case 'genji':

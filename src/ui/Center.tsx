@@ -1,6 +1,6 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
-import { canBuild, canTake, currentEra, kaguyaGift, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, previewStudent, voteTargets } from '../game/engine';
+import { canBuild, canTake, currentEra, kaguyaGift, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, GIFT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
@@ -269,6 +269,37 @@ function VotePopup({ state, voter, onVote }: { state: GameState; voter: number; 
   );
 }
 
+/** 桃園の誓い：劉備役のクラスが、義兄弟になるクラスを選ぶ */
+function OathPopup({ state, chooser, max, onSwear }: { state: GameState; chooser: number; max: number; onSwear: (targets: number[]) => void }) {
+  const [targets, setTargets] = useState<number[]>([]);
+  const me = state.players[chooser];
+  const toggle = (pi: number) => setTargets((t) => (t.includes(pi) ? t.filter((x) => x !== pi) : t.length < max ? [...t, pi] : t));
+  return (
+    <div className="modal-back">
+      <div className="modal vote-modal">
+        <h2>
+          🍑 桃園の誓い — <span style={{ color: me.color }}>{me.name}</span> が劉備役
+        </h2>
+        <p>義兄弟になるクラスを{max}つまで選ぼう。学期の区切りまでに義兄弟のクラスが得た点・失った点は、合わせて山分けになる。これから稼ぎそうなクラスと組むと得をする。</p>
+        <div className="vote-options">
+          {oathTargets(state, chooser).map((pi) => {
+            const p = state.players[pi];
+            return (
+              <button key={pi} className={`btn vote-option ${targets.includes(pi) ? 'selected' : ''}`} style={{ borderColor: p.color }} onClick={() => toggle(pi)}>
+                <b style={{ color: p.color }}>{p.name}</b>
+                <small>{p.points}点</small>
+              </button>
+            );
+          })}
+        </div>
+        <button className="btn primary" disabled={targets.length === 0} onClick={() => targets.length && onSwear(targets)}>
+          🍑 誓う
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** 選んだ生徒（未選択なら「？」） */
 const chosen = (st?: Student) => <span className="pick-chip">{st ? `${st.icon}${st.name}` : '？'}</span>;
 
@@ -350,6 +381,20 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             })}
           <NextTurn state={state} inline />
         </div>
+      </div>
+    );
+  }
+
+  // 桃園の誓いもゲリラ：劉備役のクラスにだけ、義兄弟を選ぶポップアップを出す
+  if (ph.kind === 'oath') {
+    return (
+      <div className="say guerrilla-say">
+        <CutIn />
+        <div className="say-sub">🍑 桃園の誓い：{who} が{cpuBusy ? '義兄弟を選んでいます…' : '義兄弟を選ぶ'}</div>
+        <div className="say-sub">
+          <NextTurn state={state} inline />
+        </div>
+        {!cpuBusy && <OathPopup key={ph.player} state={state} chooser={ph.player} max={ph.max} onSwear={(targets) => dispatch({ type: 'oath', targets })} />}
       </div>
     );
   }

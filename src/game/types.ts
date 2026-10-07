@@ -127,7 +127,7 @@ export interface EventResult {
   outUids?: string[];
 }
 
-export type ResultCtx = 'turn' | 'hatch' | 'kaguya' | 'monthEnd' | 'yearEnd' | 'final';
+export type ResultCtx = 'turn' | 'hatch' | 'kaguya' | 'monthEnd' | 'yearEnd' | 'final' | 'oath';
 
 export type Phase =
   /** 初期メンバーを全員で順番に1枚ずつ引く */
@@ -152,6 +152,8 @@ export type Phase =
    * コロンブスの新大陸到達は📚の多いクラスから順に、取られた品は次のクラスは選べない。鉄砲伝来は全クラスに同じ鉄砲が1丁ずつ届く
    */
   | { kind: 'gift'; card: string; player: number; left: number[]; items: string[]; got: { player: number; uid: string; item: string }[] }
+  /** 桃園の誓い（ゲリラ）：劉備役のクラスが、義兄弟になるクラスを max まで選ぶ */
+  | { kind: 'oath'; player: number; max: number }
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
@@ -202,6 +204,8 @@ export interface GameState {
   uidCounter: number;
   logCounter: number;
   log: LogEntry[];
+  /** 桃園の誓い：義兄弟のクラスと、誓ったときの各クラスのポイント（学期の区切りで山分けして消える） */
+  oath?: { players: number[]; base: number[] };
   /** 建設中のピラミッド（古代エジプトの学期だけ） */
   pyramid?: Pyramid;
 }
@@ -228,4 +232,6 @@ export type Action =
   | { type: 'gift'; item: string; uid: string }
   | { type: 'cyborg'; uid: string | null }
   /** かぐや姫に頼まれた宝を差し出す（手番の中でいつでも。手番は終わらない） */
-  | { type: 'present' };
+  | { type: 'present' }
+  /** 桃園の誓い：義兄弟になるクラス（自分以外・1つ以上） */
+  | { type: 'oath'; targets: number[] };

@@ -1,5 +1,5 @@
 import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, counted, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock, type AttrScore } from './calc';
-import { CARDS, CARD_MAP, EGG_DINOS, toIcons } from './data/cards';
+import { CARDS, CARD_MAP, EGG_DINOS, KONGMING, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { BENKEI } from './data/cards';
 import { KAGUYA_TREASURES } from './data/events';
@@ -429,6 +429,11 @@ function monthEnd(s: GameState) {
 }
 
 function advanceMonth(s: GameState) {
+  // 桃園の誓い：学期の区切りの前に山分けを見せる（次へで、もう一度ここに来て先へ進む）
+  if (s.oath && termBreakNext(s)) {
+    settleOath(s);
+    return;
+  }
   s.monthIdx++;
   if (s.monthIdx >= MONTHS.length) {
     yearEnd(s);
@@ -439,6 +444,40 @@ function advanceMonth(s: GameState) {
     curePlague(s);
     startTerm(s);
   } else startTurns(s);
+}
+
+/** 次の月から新しい学期（または次の学年）になるか */
+function termBreakNext(s: GameState): boolean {
+  const i = s.monthIdx + 1;
+  return i >= MONTHS.length || MONTHS[i] === 9 || MONTHS[i] === 1;
+}
+
+/** 桃園の誓いの山分け：誓ってから義兄弟のクラスが得た点・失った点を合わせて、同じだけ分ける（割り切れない分はポイントの少ないクラスから1点ずつ） */
+function settleOath(s: GameState) {
+  const oath = s.oath!;
+  delete s.oath;
+  const ps = s.players;
+  const gains = oath.players.map((pi, k) => ps[pi].points - oath.base[k]);
+  const total = gains.reduce((a, g) => a + g, 0);
+  const share = Math.floor(total / oath.players.length);
+  let rest = total - share * oath.players.length;
+  const extra = new Set<number>();
+  for (const pi of [...oath.players].sort((x, y) => ps[x].points - ps[y].points || x - y)) {
+    if (rest-- <= 0) break;
+    extra.add(pi);
+  }
+  const rows: ResultRow[] = oath.players.map((pi, k) => {
+    const after = oath.base[k] + share + (extra.has(pi) ? 1 : 0);
+    const delta = after - ps[pi].points;
+    ps[pi].points = after;
+    return { player: pi, count: gains[k], delta, note: `稼ぎ${gains[k] >= 0 ? '+' : ''}${gains[k]} → 山分け` };
+  });
+  const c = EVENT_MAP.taoyuan as ContestCard;
+  sortRows(rows);
+  logRows(s, `${c.name}の山分け`, rows);
+  const say = `義兄弟の稼ぎは合わせて${total >= 0 ? '+' : ''}${total}点。${oath.players.map((pi) => ps[pi].name).join('・')}のクラスで山分けした。`;
+  log(s, say);
+  setResult(s, null, { title: `${c.name}の山分け`, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say, rows }, 'oath');
 }
 
 /** 学期の区切り：ペストにかかっていた子が治る */
@@ -534,6 +573,9 @@ function resolveContest(s: GameState, c: ContestCard): EventResult {
     case 'teppo':
       // 品を選ぶ番が順に回るので、ゲリラの側で始める（fireGuerrilla → startGift）
       throw new Error(`${e.type} is started by startGift`);
+    case 'oath':
+      // 義兄弟を選ぶ場面を挟むので、ゲリラの側で始める（fireGuerrilla → startOath）
+      throw new Error('oath is started by startOath');
     case 'heads':
     case 'tiers':
     case 'disaster':
@@ -799,28 +841,99 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // 中国：各クラスの一番の子が受験。合格した子はアイコンが1つ増える（MAX_ICONS まで）
-    case 'upgrade': {
+    // 三国志：Xが一番多いクラス（1クラスだけ。大船団）と、それ以外で📚が一番多いクラス（軍師。同じならポイントが少ないクラス）の勝負。軍師の📚が上回れば火攻め成功
+    case 'fireattack': {
+      const wits = ps.map((p) => attrScore(p, 'study').total);
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+      });
+      const tops = values.flatMap((v, i) => (v === best ? [i] : []));
+      if (best === 0 || tops.length > 1) {
+        rows.forEach((r) => (r.note = 'にらみ合い'));
+        tell('大船団が決まらず、にらみ合いに終わった。');
+        break;
+      }
+      const fleet = tops[0];
+      const sage = ps
+        .map((_, i) => i)
+        .filter((i) => i !== fleet)
+        .sort((x, y) => wits[y] - wits[x] || ps[x].points - ps[y].points || x - y)[0];
+      rows[sage].count = wits[sage];
+      rows[sage].uids = attrScore(ps[sage], 'study').holders.map((h) => h.uid);
+      if (wits[sage] > best) {
+        add(fleet, -e.lose);
+        add(sage, e.win);
+        attrScore(ps[sage], 'study').holders.forEach((h) => h.mvp++);
+        rows[fleet].note = '火攻めで敗北';
+        rows[sage].note = '火攻め成功';
+        tell(`${ps[sage].name}のクラスの知恵（📚${wits[sage]}）が、${ps[fleet].name}のクラスの大船団（${ATTR_ICON.fight}${best}）を火攻めで破った！`, sage);
+      } else {
+        add(fleet, e.win);
+        add(sage, -e.fail);
+        scores[fleet].holders.forEach((h) => h.mvp++);
+        rows[fleet].note = '大船団の勝利';
+        rows[sage].note = '火攻め失敗';
+        tell(`${ps[fleet].name}のクラスの大船団（${ATTR_ICON.fight}${best}）が、${ps[sage].name}のクラスの火攻め（📚${wits[sage]}）をはね返した！`, fleet);
+      }
+      break;
+    }
+    // 三国志：ポイントが一番多いクラス（1クラスだけ）が追いかける。ほかの各クラスはXが一番多い子1人が橋に立ち、need 以上なら追いかけるクラスから take 点奪う。足りなければ −lose（追いかけるクラスは得をしない）
+    case 'bridge': {
       if (c.attr === 'all') break;
       const a = c.attr;
+      const hi = Math.max(...ps.map((p) => p.points));
+      const chasers = ps.flatMap((p, i) => (p.points === hi ? [i] : []));
+      if (chasers.length > 1) {
+        rows.forEach((r) => (r.note = 'にらみ合い'));
+        tell('追いかけるクラスが決まらず、にらみ合いに終わった。');
+        break;
+      }
+      const chaser = chasers[0];
+      rows[chaser].note = '追撃';
       ps.forEach((p, i) => {
-        const top = bestOf(p, p.students.filter((x) => baseIcons(x) < MAX_ICONS), a);
-        if (!top) {
-          rows[i].note = '受験者なし';
-          return;
+        if (i === chaser) return;
+        const guard = bestOf(p, p.students, a);
+        rows[i].count = guard?.pts ?? 0;
+        rows[i].uids = guard ? [guard.student.uid] : [];
+        if (guard && guard.pts >= e.need) {
+          add(i, e.take);
+          add(chaser, -e.take);
+          guard.student.mvp++;
+          moved.push(guard.student);
+          rows[i].note = '一喝で追い返した';
+          tell(`${p.name}のクラスの${name(guard.student)}が橋の上で一喝！${ps[chaser].name}のクラスの追っ手が逃げ出した。`, i);
+        } else {
+          add(i, -e.lose);
+          rows[i].note = guard ? '突破された' : '守る子なし';
         }
-        rows[i].count = top.pts;
-        rows[i].uids = [top.student.uid];
-        if (top.pts < e.need) {
-          rows[i].note = '不合格';
-          return;
-        }
-        top.student.attrs = [...top.student.attrs, a];
-        top.student.mvp++;
-        moved.push(top.student);
-        rows[i].note = `合格 ${ATTR_ICON[a]}＋1`;
-        tell(`${p.name}のクラスの${name(top.student)}が合格！${ATTR_ICON[a]}が1つ増えた。`, i);
       });
+      break;
+    }
+    // 三国志：👑からXを引いた差が一番大きいクラス（満席は除く。同じならポイントが少ないクラス）に、諸葛亮孔明が無料で転入する。孔明は1人だけ
+    case 'kongming': {
+      if (c.attr === 'all') break;
+      const gaps = ps.map((p, i) => attrScore(p, 'charm').total - values[i]);
+      rows.forEach((r, i) => (r.count = gaps[i]));
+      // 孔明は1人だけ（捨て札を混ぜ直して同じ学期にもう一度めくられたときだけ、ここに来る）
+      if (ps.some((p) => p.students.some((x) => x.cardId === KONGMING.id))) {
+        tell('孔明はもう、どこかのクラスで軍師をしている。');
+        break;
+      }
+      const to = ps
+        .map((_, i) => i)
+        .filter((i) => ps[i].students.length < MAX_CLASS)
+        .sort((x, y) => gaps[y] - gaps[x] || ps[x].points - ps[y].points || x - y)[0];
+      if (to === undefined) {
+        tell('どのクラスも満席で、孔明を迎えられなかった。');
+        break;
+      }
+      const st = fromPoolId(s, KONGMING.id, joinedLabel(s));
+      addStudent(s, ps[to], st);
+      moved.push(st);
+      rows[to].uids = [st.uid];
+      rows[to].note = '孔明が転入';
+      tell(`${ps[to].name}のクラスに、軍師の${name(st)}がやってきた！`, to);
       break;
     }
     // 平安：一番のクラスへ、ほかの全クラスから贈り物（一番が複数なら、それぞれに贈る）
@@ -1271,7 +1384,7 @@ export function nextTurnPlayer(s: GameState): number | null {
 /** いまゲリラの最中か（転校で出ていく子を選んでいる間と、ゲリラの結果を見せている間）。誰の手番でもない */
 export function inGuerrilla(s: GameState): boolean {
   const ph = s.phase;
-  return ph.kind === 'push' || ph.kind === 'vote' || ph.kind === 'gift' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
+  return ph.kind === 'push' || ph.kind === 'vote' || ph.kind === 'gift' || ph.kind === 'oath' || (ph.kind === 'result' && ph.ctx === 'turn' && ph.player === null);
 }
 
 /** 転校：めくった人から席順に、全クラスが1人ずつ外す */
@@ -1405,6 +1518,24 @@ function nextGift(s: GameState, card: string, left: number[], items: string[], g
   );
 }
 
+/** 桃園の誓い：ポイントが一番少ないクラス（同点なら席順で先のクラス）が劉備役になり、義兄弟になるクラスを選ぶ。もう誓いが結ばれていれば何も起こらない */
+function startOath(s: GameState, c: ContestCard, max: number) {
+  const n = s.players.length;
+  if (s.oath || n < 2) {
+    const say = s.oath ? 'もう義兄弟の誓いが結ばれている。' : '誓いを結ぶ相手がいない。';
+    log(s, say);
+    setResult(s, null, { ...eraResult(s, c, s.players.map((_, i) => ({ player: i, delta: 0 }))), say }, 'turn');
+    return;
+  }
+  const leader = s.players.map((_, i) => i).sort((x, y) => s.players[x].points - s.players[y].points || x - y)[0];
+  s.phase = { kind: 'oath', player: leader, max: Math.min(max, n - 1) };
+}
+
+/** 桃園の誓いで選べる相手（自分以外のクラス） */
+export function oathTargets(s: GameState, pi: number): number[] {
+  return s.players.filter((p) => p.id !== pi).map((p) => p.id);
+}
+
 function popCard(s: GameState): string | undefined {
   if (s.eventDeck.length === 0) {
     if (s.discard.length === 0) return undefined;
@@ -1480,6 +1611,7 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
     case 'contest':
       if (c.effect.type === 'ostracism') startVote(s, pi);
       else if (c.effect.type === 'newworld' || c.effect.type === 'teppo') startGift(s, c, pi);
+      else if (c.effect.type === 'oath') startOath(s, c, c.effect.max);
       else setResult(s, null, resolveContest(s, c), 'turn');
       return;
     case 'raid':
@@ -1613,6 +1745,9 @@ export function step(prev: GameState, a: Action): GameState {
         case 'final':
           s.phase = { kind: 'gameOver' };
           log(s, 'ゲーム終了！');
+          break;
+        case 'oath':
+          advanceMonth(s);
           break;
       }
       return s;
@@ -1792,6 +1927,20 @@ export function step(prev: GameState, a: Action): GameState {
         { title: 'かぐや姫に宝を差し出した', icon: '🌙', art: 'kaguya', tone: 'personal', desc: `${st.icon}${st.name}が宝を差し出した！（+${win}）`, rows: [{ player: ph.player, delta: win, note: '差し出した', uids: [st.uid] }], students: [st] },
         'kaguya',
       );
+      return s;
+    }
+    case 'oath': {
+      if (ph.kind !== 'oath') return prev;
+      const targets = [...new Set(a.targets)];
+      if (!targets.length || targets.length > ph.max || targets.length !== a.targets.length || !targets.every((t) => oathTargets(s, ph.player).includes(t))) return prev;
+      const players = [ph.player, ...targets];
+      s.oath = { players, base: players.map((pi) => s.players[pi].points) };
+      const c = EVENT_MAP.taoyuan as ContestCard;
+      const names = players.map((pi) => s.players[pi].name).join('・');
+      const rows: ResultRow[] = s.players.map((_, i) => ({ player: i, delta: 0, note: i === ph.player ? '劉備役' : players.includes(i) ? '義兄弟' : undefined }));
+      const say = `${names}のクラスが義兄弟になった！学期の区切りまで、もうけも損も山分け。`;
+      log(s, say, ph.player);
+      setResult(s, null, { ...eraResult(s, c, rows), say }, 'turn');
       return s;
     }
     case 'equip': {

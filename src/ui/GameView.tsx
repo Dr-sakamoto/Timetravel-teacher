@@ -188,6 +188,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               targetable={targets.includes(pi)}
               targeted={pick.target === pi}
               onClick={() => pickOpponent(pi)}
+              sworn={state.oath?.players.includes(pi)}
             />
           ))}
         </div>
@@ -210,6 +211,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               year={state.year}
               slots={slots}
               variant="near"
+              sworn={state.oath?.players.includes(focus)}
               acting={!guerrilla && actor === focus}
               picking={guerrilla && actor === focus}
               upNext={upNext === focus}
@@ -242,6 +244,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               year={state.year}
               slots={slots}
               variant="peek"
+              sworn={state.oath?.players.includes(peek)}
               delta={deltas.get(peek)}
               lit={lit}
               onSeatClick={
