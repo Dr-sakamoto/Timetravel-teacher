@@ -15,7 +15,7 @@
 - ルームを作った人のスマホがゲームを進める（CPUもこのスマホが動かす）ので、その人はアプリを開いたままにしておく
 - 通信が切れても自動でつなぎ直す。読み込み直しても同じルーム・同じ席に戻れる。通信が切れた人の操作を待って止まったときだけ、ルームを作った人の画面の「1手だけ代わりに進める」でその1手だけCPUに進めてもらえる（席をCPUに渡すことはないので、その人の手番が勝手に進むことはない）
 - ルームを作った人が抜けても、「📱 通信対戦」→「前のルームを再開」で続きから遊べる（同じ部屋番号で開き直すので、参加者は自動でつながり直す）
-- 通信は WebRTC（[PeerJS](https://peerjs.com/)）でスマホどうしを直接つなぐ。つなぐ時の仲介には PeerJS の無料サーバーを使うので、自前のサーバーはいらない
+- 通信は東京の中継サーバー（[Supabase Realtime](https://supabase.com/docs/guides/realtime)）を通す。スマホどうしを直接つながないので、回線（学校・会社のWi-Fiやスマホの回線）によってつながらない、ということが起きにくい
 
 **遊ぶ：https://timetravel-teacher.vercel.app/** （PWA対応。Chrome/Edgeのアドレスバーの「インストール」でPCアプリとして使え、オフラインでも動きます）
 
@@ -75,9 +75,9 @@ npm run build   # dist/ に静的ファイルを出力
 - `src/game/` — ゲームロジック（React非依存）。`engine.ts` が状態遷移、`ai.ts` がCPU思考
 - `src/game/data/` — カード・時代・係・クラス・イベントのデータ。カードを増やすならここ
 - `src/ui/` — 画面
-- `src/net/` — 通信対戦。`host.ts` がルームを作った人の端末（ゲームを進めて全員に状態を配る）、`guest.ts` が参加した人の端末（操作を送る）、`protocol.ts` がやりとりの型と「今その人が操作してよいか」の判定
+- `src/net/` — 通信対戦。`host.ts` がルームを作った人の端末（ゲームを進めて全員に状態を配る）、`guest.ts` が参加した人の端末（操作を送る）、`protocol.ts` がやりとりの型と「今その人が操作してよいか」の判定、`relay.ts` が中継サーバーとのやりとり
 
-通信対戦の仲介サーバーを自前の [PeerJS Server](https://github.com/peers/peerjs-server) にする時は、ビルド時に `VITE_PEER_HOST`・`VITE_PEER_PORT`・`VITE_PEER_PATH`・`VITE_PEER_SECURE` を指定します。
+通信対戦の中継サーバーを別の Supabase プロジェクトにする時は、ビルド時に `VITE_RELAY_URL`（プロジェクトのURL）と `VITE_RELAY_KEY`（公開用の publishable キー）を指定します。Supabase の無料プロジェクトは、しばらく使われないと休止するので、`.github/workflows/keepalive.yml` が3日ごとにアクセスして起こしておきます。
 
 進行状況はブラウザの localStorage に自動保存され、タイトル画面の「続きから」で再開できます。
 保存データの版（`src/game/saveVersion.ts` の `SAVE_VERSION`）は「形の版＋データの指紋」です。人物・イベント・グッズ・時代などのデータを変えると指紋が自動で変わり、前の版の保存データは読み込まれなくなります（名前や説明文だけの変更では変わりません）。GameState の項目の名前や意味を変えたときだけ、`SAVE_SCHEMA` を手で上げてください。
