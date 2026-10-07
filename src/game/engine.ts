@@ -912,6 +912,58 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       tell(`${ps[win].name}のクラスが当たり！（+${e.fee * n}）`, win);
       break;
     }
+    // 江戸：くじで決まったクラスから火が出て、席順にとなりへ燃え移る。Xが need 以上のクラスが消し止める（そこで止まる）
+    case 'fire': {
+      const origin = randInt(s, n);
+      tell(`${ps[origin].name}のクラスから火が出た！`, origin);
+      for (let k = 0; k < n; k++) {
+        const i = (origin + k) % n;
+        rows[i].count = values[i];
+        if (values[i] >= e.need) {
+          add(i, e.win);
+          scores[i].holders.forEach((h) => h.mvp++);
+          rows[i].uids = scores[i].holders.map((h) => h.uid);
+          rows[i].note = '消し止めた';
+          tell(`${ps[i].name}のクラスの町火消しが火を消し止めた！（+${e.win}）`, i);
+          break;
+        }
+        add(i, -e.lose);
+        rows[i].note = '燃えた';
+      }
+      break;
+    }
+    // 江戸：Xを持つ子1人につき、ほかの全クラスから1点ずつもらう（ほかのクラスのXの子には1点ずつ払う）
+    case 'ukiyoe': {
+      if (c.attr === 'all') break;
+      const a = c.attr;
+      const sellers = ps.map((p) => p.students.filter((x) => iconsOf(x, a) > 0));
+      const total = sellers.reduce((t, x) => t + x.length, 0);
+      sellers.forEach((list, i) => {
+        add(i, n * list.length - total);
+        list.forEach((x) => x.mvp++);
+        rows[i].count = list.length;
+        rows[i].uids = list.map((x) => x.uid);
+        rows[i].note = `${list.length}人の絵が売れた`;
+      });
+      const hi = Math.max(...rows.map((r) => r.delta));
+      if (hi > 0) {
+        const i = rows.findIndex((r) => r.delta === hi);
+        tell(`${ps[i].name}のクラスの浮世絵が一番売れた！（+${hi}）`, i);
+      }
+      break;
+    }
+    // 江戸：日本の時代の子1人につき +plus、外国の時代の子1人につき −minus（どちらでもない時代の子は数えない）
+    case 'sakoku': {
+      ps.forEach((p, i) => {
+        const home = p.students.filter((x) => e.home.includes(x.era));
+        const foreign = p.students.filter((x) => e.foreign.includes(x.era));
+        add(i, home.length * e.plus - foreign.length * e.minus);
+        rows[i].count = home.length;
+        rows[i].uids = home.map((x) => x.uid);
+        rows[i].note = `日本${home.length}人・外国${foreign.length}人`;
+      });
+      break;
+    }
     // 近代：全校で一番の子（同点なら全員）が受賞。その子のクラスに+win（1クラス1回まで）
     case 'prize': {
       const champs = ps.map((p) => bestOf(p, p.students, c.attr));

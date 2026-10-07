@@ -711,6 +711,44 @@ describe('engine', () => {
       expect([...r.delta].sort((x, y) => x - y)).toEqual([-3, -3, 6]);
     });
 
+    it('taika: the fire spreads seat by seat until a class with enough 🏃 puts it out', () => {
+      // 火を消せるクラスがなければ全クラスが燃える
+      expect(run('taika', [[mk('a', ['sports', 'sports'])], [mk('b', ['sports'])], []]).delta).toEqual([-4, -4, -4]);
+      // 2組（🏃5）が消し止める。火元によって、そこまでに燃えるクラスが変わる（火元から席順に、2組より手前のクラスだけ燃える）
+      const fires = new Set<string>();
+      const rng0 = base.rng;
+      for (let seed = 0; seed < 20; seed++) {
+        base.rng = seed * 7919 + 1;
+        const r = run('taika', [[mk('a', ['sports'])], [mk('b', ['sports', 'sports', 'sports']), mk('b2', ['sports', 'sports'])], [mk('c', ['art'])]]);
+        expect(r.delta[1]).toBe(5);
+        expect([[0, 5, 0], [-4, 5, 0], [-4, 5, -4]]).toContainEqual(r.delta);
+        fires.add(r.delta.join(','));
+      }
+      base.rng = rng0;
+      expect(fires.size).toBeGreaterThan(1);
+      // 体育委員の🏃は2倍に数えるので、それで5に届けば消し止められる
+      const r2 = run('taika', [[], [mk('b', ['sports', 'sports', 'sports'])], []], [10, 10, 10], [[], [{ role: 'pe', uid: 'b' }], []]);
+      expect(r2.delta[1]).toBe(5);
+    });
+
+    it('ukiyoe: each 🎨 student sells a print to every other class', () => {
+      // 🎨の子：3人・1人・0人。1人につきほかの2クラスから1点ずつもらい、ほかのクラスの🎨の子には1点ずつ払う
+      const r = run('ukiyoe', [[mk('a', ['art', 'art']), mk('a2', ['art']), mk('a3', ['art', 'study'])], [mk('b', ['art'])], [mk('c', ['study'])]]);
+      expect(r.delta).toEqual([5, -1, -4]);
+      // 点はクラスどうしでやりとりするだけ（合計は動かない）
+      expect(r.delta.reduce((t, x) => t + x, 0)).toBe(0);
+    });
+
+    it('sakoku: Japanese-era students score, foreign-era students lose points, others do not count', () => {
+      // アイコンなしの埋め合わせの子（現代）3人も日本の子として数える
+      const r = run('sakoku', [
+        [mk('g', ['study'], 'greece'), mk('e', ['art'], 'edo')],
+        [mk('t', ['fight'], 'cretaceous'), mk('f', ['study'], 'future')],
+        [mk('m', ['study'], 'modern'), mk('c', ['study'], 'china')],
+      ]);
+      expect(r.delta).toEqual([4 - 2, 3, 3 - 4]);
+    });
+
     it('nobel: the single best 📚 student in the school wins for their class', () => {
       expect(run('nobel', [[mk('a', ['study', 'study', 'study'])], [mk('b', ['study']), mk('b2', ['study', 'study'])], []]).delta).toEqual([12, 0, 0]);
       // 同点なら全員が受賞

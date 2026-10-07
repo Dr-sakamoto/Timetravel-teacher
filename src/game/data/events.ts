@@ -1,4 +1,5 @@
 import { ATTR_ICON, type Attr, type EraId } from '../types';
+import { ERAS } from './eras';
 
 /** 通常カード（○○の時間）：場から取った人だけ、クラス全員のそのアイコンの合計数（＋係ボーナス）が入る。全時代共通 */
 export interface NormalCard {
@@ -59,6 +60,9 @@ export interface SwingCard {
  *   newworld  … 中世「Xの多いクラスから順に、新大陸の品を1つと、それを装備させる子（グッズのない子）を選ぶ。品は早い者勝ち」
  *   gekokujo  … 戦国「Xが一番多いクラスが、ポイントが一番多いクラスから amount 点奪う」
  *   lottery   … 江戸「全クラスが fee 点ずつ出し、くじで当たった1クラスが総取り」
+ *   fire      … 江戸「くじで決まったクラスから火が出て、席順にとなりへ燃え移る。Xが need 以上のクラスが消し止めて +win（そこで止まる）、燃えたクラスは −lose」
+ *   ukiyoe    … 江戸「Xを持つ子1人につき、ほかの全クラスから1点ずつもらう（ほかのクラスのXの子には1点ずつ払う）」
+ *   sakoku    … 江戸「日本の時代（home）の子1人につき +plus、外国の時代（foreign）の子1人につき −minus」
  *   prize     … 近代「全校でXが一番多い子が受賞し、その子のクラスに +win」
  *   elect     … 現代「全校でXが一番多い子が当選し、Xが1つ増える」（同点なら全員）
  *   alien     … 未来「点は動かない。空いている席があるクラス全部に、アイコンのない火星人が1人ずつ転入する」
@@ -88,6 +92,9 @@ export type EraEffect =
   | { type: 'newworld' }
   | { type: 'gekokujo'; amount: number }
   | { type: 'lottery'; fee: number }
+  | { type: 'fire'; need: number; win: number; lose: number }
+  | { type: 'ukiyoe' }
+  | { type: 'sakoku'; home: EraId[]; foreign: EraId[]; plus: number; minus: number }
   | { type: 'prize'; win: number }
   | { type: 'alien' };
 
@@ -318,9 +325,11 @@ export const ERA_CARDS: ContestCard[] = [
   // 戦国：👊👑。人望を集めたクラスが、天下を握るクラスを引きずり下ろす
   C('sekigahara', '関ヶ原の戦い', '⚔️', 'fight', { type: 'battle', win: 15, second: 5, lose: 10 }, '天下分け目の大合戦。勝てば大出世、負ければ大損。', 'sengoku'),
   C('gekokujo', '下剋上', '🏯', 'charm', { type: 'gekokujo', amount: 8 }, '人望を集めた者が、天下を握る者を引きずり下ろす。', 'sengoku'),
-  // 江戸・幕末：🎨🏃。運だけの富くじ
-  C('tomikuji', '富くじ', '🎫', 'all', { type: 'lottery', fee: 3 }, '江戸の町じゅうが熱狂した宝くじ。当たれば総取り。', 'edo'),
-  C('ino', '伊能忠敬の日本地図測量', '🗾', 'sports', { type: 'heads', per: 2 }, '日本中を歩いて測る。歩ける子が多いほど地図が早くできる。', 'edo'),
+  // 江戸：🎨🏃。火事はとなりのクラスへ燃え移り、浮世絵はクラスどうしで売り買いする。鎖国では外国の時代の子が肩身のせまい思いをする
+  C('taika', '江戸の大火と町火消し', '🔥', 'sports', { type: 'fire', need: 5, win: 5, lose: 4 }, '「火事と喧嘩は江戸の華」。火はとなりの家へどんどん燃え移る。走って駆けつける町火消しのいるクラスが、火を消し止める。', 'edo', 1),
+  C('ukiyoe', '浮世絵の大流行', '🖌️', 'art', { type: 'ukiyoe' }, '町の人たちがこぞって版画の浮世絵を買った。絵の描ける子が多いクラスほど、よそのクラスによく売れる。', 'edo', 1),
+  C('tomikuji', '富くじ', '🎫', 'all', { type: 'lottery', fee: 3 }, '江戸の町じゅうが熱狂した宝くじ。当たれば総取り。', 'edo', 1),
+  C('sakoku', '鎖国', '⚓', 'all', { type: 'sakoku', home: ['heian', 'sengoku', 'edo', 'present'], foreign: ['egypt', 'greece', 'china', 'europe', 'modern'], plus: 1, minus: 2 }, '幕府は外国との行き来を止めた。日本の子はのびのび、外国から来た子は肩身がせまい。', 'edo', 1),
   // 近代：📚👑。クラスではなく、たった1人の天才が賞を取る
   C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'prize', win: 12 }, '受賞するのは全校でたった1人。その子のクラスが名誉を手にする。', 'modern'),
   C('rokumeikan', '鹿鳴館の舞踏会', '💃', 'charm', { type: 'heads', per: 2 }, '文明開化の社交界。踊りに誘われる子が多いほど評判が上がる。', 'modern'),
@@ -392,6 +401,11 @@ export function cardRule(c: EventCard): string {
   }
 }
 
+/** 時代のマークを並べる（鎖国の日本の時代・外国の時代） */
+function eraIcons(ids: EraId[]): string {
+  return ids.map((id) => ERAS.find((e) => e.id === id)!.icon).join('');
+}
+
 /** 時代イベントの効果の説明文（1文） */
 export function eraEffectRule(c: ContestCard): string {
   const a = c.attr === 'all' ? 'アイコン' : ATTR_ICON[c.attr];
@@ -441,6 +455,12 @@ export function eraEffectRule(c: ContestCard): string {
       return `${a}が一番多いクラスが、ポイントが一番多いクラスから${e.amount}点奪う`;
     case 'lottery':
       return `全クラスが${e.fee}点ずつ出し、くじで当たった1クラスが総取り`;
+    case 'fire':
+      return `くじで決まったクラスから火が出て、席順にとなりへ燃え移る。${a}が${e.need}以上のクラスが消し止めて+${e.win}（そこで止まる）、燃えたクラスは−${e.lose}`;
+    case 'ukiyoe':
+      return `${a}を持つ子1人につき、ほかの全クラスから1点ずつもらう（ほかのクラスの${a}の子には1点ずつ払う）`;
+    case 'sakoku':
+      return `日本の時代（${eraIcons(e.home)}）の子1人につき+${e.plus}、外国の時代（${eraIcons(e.foreign)}）の子1人につき−${e.minus}`;
     case 'prize':
       return `全校で${a}が一番多い子が受賞：その子のクラスに+${e.win}`;
     case 'alien':
@@ -530,6 +550,12 @@ function contestGlyph(c: ContestCard): string {
       return `${a}🥇 ⟵${e.amount}点 ポイント🥇`;
     case 'lottery':
       return `全員−${e.fee} → 🎫当たり総取り`;
+    case 'fire':
+      return `🔥 → となりへ　${a}${e.need}↑で消火 +${e.win}／燃えたら−${e.lose}`;
+    case 'ukiyoe':
+      return `🧑${a} → ほかのクラスから1点ずつ`;
+    case 'sakoku':
+      return `🗾🧑 +${e.plus}ずつ　🌏🧑 −${e.minus}ずつ`;
     case 'prize':
       return `全校の🧑${a}🥇 → +${e.win}`;
     case 'alien':
