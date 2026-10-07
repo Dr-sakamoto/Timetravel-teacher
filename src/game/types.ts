@@ -176,7 +176,8 @@ export interface Pyramid {
 }
 
 export interface GameState {
-  version: 26;
+  /** 保存データの版（saveVersion.ts の SAVE_VERSION。データを変えると自動で変わる） */
+  version: string;
   /** その年の3学期それぞれの時代（ERASのindex） */
   yearEras: number[];
   /** まだ使っていない時代の山（毎年ここから引く） */

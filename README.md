@@ -80,4 +80,5 @@ npm run build   # dist/ に静的ファイルを出力
 通信対戦の仲介サーバーを自前の [PeerJS Server](https://github.com/peers/peerjs-server) にする時は、ビルド時に `VITE_PEER_HOST`・`VITE_PEER_PORT`・`VITE_PEER_PATH`・`VITE_PEER_SECURE` を指定します。
 
 進行状況はブラウザの localStorage に自動保存され、タイトル画面の「続きから」で再開できます。
+保存データの版（`src/game/saveVersion.ts` の `SAVE_VERSION`）は「形の版＋データの指紋」です。人物・イベント・グッズ・時代などのデータを変えると指紋が自動で変わり、前の版の保存データは読み込まれなくなります（名前や説明文だけの変更では変わりません）。GameState の項目の名前や意味を変えたときだけ、`SAVE_SCHEMA` を手で上げてください。
 `main` ブランチへの push で GitHub Pages にデプロイされます（`.github/workflows/deploy.yml`）。
