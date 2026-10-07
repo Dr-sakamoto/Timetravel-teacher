@@ -32,7 +32,7 @@ export function loadHostSave(): HostSave | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as HostSave;
-    return s.state?.version === 25 && s.state.phase.kind !== 'gameOver' ? s : null;
+    return s.state?.version === 26 && s.state.phase.kind !== 'gameOver' ? s : null;
   } catch {
     return null;
   }
