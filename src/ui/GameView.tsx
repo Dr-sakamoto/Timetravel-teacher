@@ -5,7 +5,7 @@ import type { Action, GameState } from '../game/types';
 import type { Pick } from './Center';
 import { Center } from './Center';
 import { GameOver } from './GameOver';
-import { OpponentSeat, Playmat } from './Playmat';
+import { OpponentSeat, Playmat, type EraMark } from './Playmat';
 import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
 import { useGameFx } from './useGameFx';
@@ -23,6 +23,18 @@ interface Props {
   offline?: (pi: number) => boolean;
   /** 通信対戦：画面の上に出す通信の状態など */
   banner?: ReactNode;
+}
+
+/** 名札に出す時代の印：近代の電球の特許💡と、飾っているひまわりの絵🖼️ */
+function eraMarks(state: GameState, pi: number): EraMark[] {
+  const out: EraMark[] = [];
+  if (state.patent === pi) out.push({ icon: '💡', title: '電球の特許：ほかのクラスが授業カードを取るたびに特許料が入る（学期の区切りまで）' });
+  const art = state.sunflower?.find((x) => x.player === pi);
+  if (art) {
+    const st = state.players[pi].students.find((x) => x.uid === art.uid);
+    out.push({ icon: '🖼️', title: st ? `ゴッホのひまわり：${st.name}の絵を飾っている（学期の区切りに値打ちが出る）` : 'ゴッホのひまわり：描いた子が転校してしまった' });
+  }
+  return out;
 }
 
 export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner }: Props) {
@@ -189,6 +201,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               targeted={pick.target === pi}
               onClick={() => pickOpponent(pi)}
               sworn={state.oath?.players.includes(pi)}
+              marks={eraMarks(state, pi)}
             />
           ))}
         </div>
@@ -212,6 +225,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               slots={slots}
               variant="near"
               sworn={state.oath?.players.includes(focus)}
+              marks={eraMarks(state, focus)}
               acting={!guerrilla && actor === focus}
               picking={guerrilla && actor === focus}
               upNext={upNext === focus}
@@ -245,6 +259,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               slots={slots}
               variant="peek"
               sworn={state.oath?.players.includes(peek)}
+              marks={eraMarks(state, peek)}
               delta={deltas.get(peek)}
               lit={lit}
               onSeatClick={

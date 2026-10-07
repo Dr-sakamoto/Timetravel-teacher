@@ -791,27 +791,64 @@ const SCENES: Record<string, () => ReactNode> = {
       <P d="M79 54 H85 M79 57 H85 M79 60 H83" sw={0.8} />
     </g>
   ),
-  rokumeikan: () => (
+  patent: () => (
     <g>
-      <Bg sky="#2c2a4a" ground="#8a5a3a" y={58} />
-      <P d="M50 0 V8" sw={1} />
-      <P d="M36 8 H64 L58 16 H42Z" fill="#f2c94c" />
-      {[38, 44, 50, 56, 62].map((x) => (
-        <C key={x} x={x} y={18} r={1.6} fill="#fff3b0" sw={0.7} />
+      <Bg sky="#2c2a4a" ground="#7a5a3a" y={60} />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+        <P key={a} d={`M${50 + Math.cos((a * Math.PI) / 180) * 20} ${26 + Math.sin((a * Math.PI) / 180) * 20} L${50 + Math.cos((a * Math.PI) / 180) * 27} ${26 + Math.sin((a * Math.PI) / 180) * 27}`} stroke="#ffd34d" sw={2} />
       ))}
-      {[8, 88].map((x) => (
+      <C x={50} y={26} r={14} fill="#fff3b0" />
+      <P d="M45 30 L48 22 L50 28 L52 22 L55 30" stroke="#ff8a3d" sw={1.2} />
+      <R x={43} y={38} w={14} h={5} fill="#b8bcc4" sw={1.1} />
+      <R x={44} y={43} w={12} h={4} fill="#8a8f98" sw={1.1} />
+      <R x={8} y={42} w={24} h={26} fill="#fbf4e2" sw={1.2} />
+      <P d="M12 48 H28 M12 52 H28 M12 56 H24" sw={0.8} />
+      <C x={25} y={62} r={3.4} fill="#e5534b" sw={1} />
+      <R x={68} y={46} w={22} h={14} fill="#c99a32" sw={1.2} />
+      <C x={74} y={53} r={2.4} fill="#f2c94c" sw={0.9} />
+      <C x={82} y={53} r={2.4} fill="#f2c94c" sw={0.9} />
+    </g>
+  ),
+  expo: () => (
+    <g>
+      <Bg sky="#bfe3ff" ground="#9ccf6a" y={58} />
+      <P d="M50 4 L40 58 H46 Q50 46 54 58 H60Z" fill="#a0683a" />
+      <P d="M44 34 H56 M42 46 H58 M47 20 H53" sw={1.2} />
+      <P d="M50 0 V6" sw={1.2} />
+      {[14, 28, 72, 86].map((x, i) => (
         <g key={x}>
-          <R x={x - 5} y={20} w={10} h={30} fill="#3a5a8c" rx={5} />
-          <P d={`M${x} 20 V50 M${x - 5} 35 H${x + 5}`} sw={0.8} />
+          <Stick x1={x} y1={58} x2={x} y2={36} w={1} color="#7a5a3a" />
+          <R x={x} y={36} w={9} h={6} fill={['#e5534b', '#fbfbf7', '#3a5a8c', '#f2c94c'][i]} sw={1} />
         </g>
       ))}
-      <P d="M30 64 C30 48 36 40 42 40 C46 40 48 48 48 64Z" fill="#e5737b" />
-      <C x={42} y={32} r={6} fill="#ffd9b8" />
-      <P d="M36 30 C36 22 48 22 48 30" fill="#7a4e2e" sw={1.1} />
-      <P d="M52 64 L54 44 C56 40 62 40 64 44 L66 64Z" fill="#2f2a2a" />
-      <C x={59} y={33} r={6} fill="#ffd9b8" />
-      <P d="M53 31 C53 25 65 25 65 31" fill="#2f2a2a" sw={1.1} />
-      <Stick x1={46} y1={46} x2={56} y2={46} w={2} color="#ffd9b8" />
+      <C x={30.5} y={39} r={1.6} fill="#e5534b" sw={0.6} />
+      <Mini x={22} y={60} c="#3a5a8c" s={0.9} />
+      <Mini x={36} y={62} c="#e5737b" s={0.9} />
+      <Mini x={64} y={62} c="#6fb35a" s={0.9} />
+      <Mini x={78} y={60} c="#2f2a2a" s={0.9} />
+    </g>
+  ),
+  sunflower: () => (
+    <g>
+      <Bg sky="#7aa9d6" ground="#8a5a3a" y={62} />
+      <R x={20} y={4} w={60} h={56} fill="#c99a32" sw={1.6} />
+      <R x={25} y={9} w={50} h={46} fill="#f2d16b" sw={1.1} />
+      <P d="M40 55 L42 40 H58 L60 55Z" fill="#e8a33a" sw={1.1} />
+      {[
+        [42, 26],
+        [52, 20],
+        [60, 30],
+        [47, 36],
+      ].map(([x, y]) => (
+        <g key={`${x}-${y}`}>
+          <C x={x} y={y} r={6} fill="#ffcc33" sw={1} />
+          <C x={x} y={y} r={2.8} fill="#8a5a2a" sw={0.8} />
+        </g>
+      ))}
+      <P d="M47 40 L47 36 M52 40 L52 26 M57 40 L59 34" stroke="#6fb35a" sw={1.4} />
+      <R x={8} y={60} w={14} h={10} fill="#fbf4e2" sw={1} />
+      <P d="M11 64 H19" stroke="#e5534b" sw={1.4} />
+      <P d="M90 40 L98 50 H93 V62 H87 V50 H82Z" fill="#6fb35a" sw={1.1} />
     </g>
   ),
 

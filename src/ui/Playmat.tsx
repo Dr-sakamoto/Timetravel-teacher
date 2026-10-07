@@ -53,6 +53,14 @@ interface Props {
   lit?: Set<string>;
   /** 桃園の誓いで義兄弟になっている */
   sworn?: boolean;
+  /** 名札に出す時代の印（近代の電球の特許・ゴッホのひまわりなど） */
+  marks?: EraMark[];
+}
+
+/** 名札に出す印 */
+export interface EraMark {
+  icon: string;
+  title: string;
 }
 
 function parseDrop(v: string): DropTo {
@@ -121,6 +129,11 @@ export function Playmat(props: Props) {
           {player.isCpu && <small>🤖</small>}
           {props.sworn && <small title="桃園の誓い：義兄弟（学期の区切りで点を山分け）">🍑</small>}
           {player.freeGoods && <small title="楽市楽座：次に取るグッズ1つがタダ">🪙</small>}
+          {props.marks?.map((m) => (
+            <small key={m.icon} title={m.title}>
+              {m.icon}
+            </small>
+          ))}
         </span>
         <span className="plate-class">
           {className(player.id, year)} 👥{view.students.length}/{MAX_CLASS}
@@ -203,10 +216,12 @@ interface SeatProps {
   onClick: () => void;
   /** 桃園の誓いで義兄弟になっている */
   sworn?: boolean;
+  /** 名札に出す時代の印（近代の電球の特許・ゴッホのひまわりなど） */
+  marks?: EraMark[];
 }
 
 /** 相手の席：小さく畳んだ教室（名札と12席の埋まり具合）。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
-export function OpponentSeat({ player, year, acting, picking, upNext, offline, delta, rank, litIcons, targetable, targeted, onClick, sworn }: SeatProps) {
+export function OpponentSeat({ player, year, acting, picking, upNext, offline, delta, rank, litIcons, targetable, targeted, onClick, sworn, marks }: SeatProps) {
   return (
     <button
       data-pid={player.id}
@@ -222,6 +237,11 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
           {offline && <small title="通信が切れています">📵</small>}
           {sworn && <small title="桃園の誓い：義兄弟（学期の区切りで点を山分け）">🍑</small>}
           {player.freeGoods && <small title="楽市楽座：次に取るグッズ1つがタダ">🪙</small>}
+          {marks?.map((m) => (
+            <small key={m.icon} title={m.title}>
+              {m.icon}
+            </small>
+          ))}
         </span>
         <span className="opp-class">{className(player.id, year)}</span>
         <span className="opp-pts">{player.points}</span>

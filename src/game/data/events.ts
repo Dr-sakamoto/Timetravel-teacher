@@ -71,6 +71,9 @@ export interface SwingCard {
  *   rakuichi  … 戦国「Xが一番多いクラス（1クラスだけ）は、次に取るグッズ1つがタダになる」
  *   lottery   … 江戸「全クラスが fee 点ずつ出し、くじで当たった1クラスが総取り」
  *   prize     … 近代「全校でXが一番多い子が受賞し、その子のクラスに +win」
+ *   patent    … 近代「Xが一番多いクラス（1クラスだけ）が特許をとる。学期の区切りまで、ほかのクラスが授業カードを取るたびに、そのクラスから fee 点もらう」
+ *   expo      … 近代「クラスにあるアイコンの種類（📚🏃🎨👑👊のうち何種類か）が steps[i][0] 以上なら +steps[i][1]（届いた一番上の段だけ）」
+ *   sunflower … 近代「各クラスのXが一番多い子が絵を描いて飾る（その場では点なし）。学期の区切りにその子がまだクラスにいれば、描いたときのXの点 × per」
  *   elect     … 現代「全校でXが一番多い子が当選し、Xが1つ増える」（同点なら全員）
  *   alien     … 未来「点は動かない。空いている席があるクラス全部に、アイコンのない火星人が1人ずつ転入する」
  *   machine   … 未来「機械の子（機械の人物・サイボーグ・機械のグッズを装備した子）は、Xが1つ増える」
@@ -110,6 +113,9 @@ export type EraEffect =
   | { type: 'rakuichi' }
   | { type: 'lottery'; fee: number }
   | { type: 'prize'; win: number }
+  | { type: 'patent'; fee: number }
+  | { type: 'expo'; steps: [kinds: number, win: number][] }
+  | { type: 'sunflower'; per: number }
   | { type: 'alien' };
 
 /** カードに載るアイコンの上限（生徒会長選挙・シンギュラリティ・活版印刷で増えるのもここまで。グッズの＋1は別） */
@@ -268,7 +274,7 @@ export const GOODS_CARDS: GoodsCard[] = [
   G('g_fugaku', '北斎の『富嶽三十六景』', '🗻', 'art', 'edo'),
   G('g_ryoteisha', '伊能忠敬の量程車', '🛞', 'sports', 'edo'),
   G('g_bulb', 'エジソンの電球', '💡', 'study', 'modern'),
-  G('g_legion', 'レジオンドヌール勲章', '🎖️', 'charm', 'modern'),
+  G('g_violin', 'ストラディバリウスのバイオリン', '🎻', 'art', 'modern'),
   G('g_chip', '電脳チップ', '💾', 'study', 'future'),
 ];
 
@@ -365,9 +371,11 @@ export const ERA_CARDS: ContestCard[] = [
   // 江戸・幕末：🎨🏃。運だけの富くじ
   C('tomikuji', '富くじ', '🎫', 'all', { type: 'lottery', fee: 3 }, '江戸の町じゅうが熱狂した宝くじ。当たれば総取り。', 'edo'),
   C('ino', '伊能忠敬の日本地図測量', '🗾', 'sports', { type: 'heads', per: 2 }, '日本中を歩いて測る。歩ける子が多いほど地図が早くできる。', 'edo'),
-  // 近代：📚👑。クラスではなく、たった1人の天才が賞を取る
-  C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'prize', win: 12 }, '受賞するのは全校でたった1人。その子のクラスが名誉を手にする。', 'modern'),
-  C('rokumeikan', '鹿鳴館の舞踏会', '💃', 'charm', { type: 'heads', per: 2 }, '文明開化の社交界。踊りに誘われる子が多いほど評判が上がる。', 'modern'),
+  // 近代：📚🎨。西洋の発明と芸術の時代。賞を取るのは全校でたった1人、特許料は学期のあいだ入り続け、ひまわりの絵は学期の区切りに値打ちが出る
+  C('nobel', 'ノーベル賞', '🏅', 'study', { type: 'prize', win: 12 }, 'トンネル工事などに使うダイナマイトを発明したノーベルが、自分の財産で作った賞。1901年から、世界のためになる発見をした人に贈られる。受賞するのは全校でたった1人。', 'modern', 1),
+  C('patent', '電球の特許', '💡', 'study', { type: 'patent', fee: 1 }, '1879年、エジソンが長く光る電球を作った。発明した人は「特許」をとると、その発明を使う人からお礼のお金をもらえる。教室で電灯をつけて授業をするたびに、特許料がはいる。', 'modern', 1),
+  C('expo', 'パリ万国博覧会', '🗼', 'all', { type: 'expo', steps: [[4, 4], [5, 10]] }, '世界中の国が自慢の品を持ちよった大博覧会。1867年のパリ万博には日本も初めて出展し、浮世絵がヨーロッパで大人気になった。いろんな得意を持つ子がそろったクラスほど、見に来る人でにぎわう。', 'modern', 1),
+  C('sunflower', 'ゴッホのひまわり', '🌻', 'art', { type: 'sunflower', per: 3 }, 'ゴッホはひまわりの絵を何枚も描いたが、生きているあいだはほとんど売れなかった。今では世界中の美術館の宝もの。描いた絵は、あとになってから値打ちが出る。', 'modern', 1),
   // 未来：📚。ロボコンとシンギュラリティが📚の枠
   C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'threshold', need: 8, win: 10, lose: 4 }, 'ロボットを作って出場。頭脳が足りないと動かない。', 'future', 1),
   C('singularity', 'シンギュラリティ', '🧠', 'study', { type: 'machine' }, 'AIが人間の知能を超えた。機械の子たちが一気に賢くなる。', 'future', 1),
@@ -513,6 +521,12 @@ export function eraEffectRule(c: ContestCard): string {
       return `全クラスが${e.fee}点ずつ出し、くじで当たった1クラスが総取り`;
     case 'prize':
       return `全校で${a}が一番多い子が受賞：その子のクラスに+${e.win}`;
+    case 'patent':
+      return `${a}が一番多いクラスが特許をとる：学期の区切りまで、ほかのクラスが授業カードを取るたびに${e.fee}点もらう`;
+    case 'expo':
+      return `クラスにあるアイコンの種類が${e.steps.map(([n, w]) => `${n}種類で+${w}`).join('、')}`;
+    case 'sunflower':
+      return `各クラスの${a}が一番多い子が絵を飾る：学期の区切りにその子がまだいれば、${a}の数×${e.per}`;
     case 'alien':
       return '空いている席に、アイコンのない火星人が1人ずつ来る';
   }
@@ -622,6 +636,12 @@ function contestGlyph(c: ContestCard): string {
       return `全員−${e.fee} → 🎫当たり総取り`;
     case 'prize':
       return `全校の🧑${a}🥇 → +${e.win}`;
+    case 'patent':
+      return `${a}🥇 ⟵ 授業1回につき${e.fee}点`;
+    case 'expo':
+      return e.steps.map(([n, w]) => `${n}種類+${w}`).join('／');
+    case 'sunflower':
+      return `🧑${a}🥇 → 🖼️ → 学期末 ${a}×${e.per}`;
     case 'alien':
       return '🪑 → 👽';
   }

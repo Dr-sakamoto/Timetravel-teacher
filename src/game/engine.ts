@@ -305,6 +305,7 @@ function order(s: GameState): number[] {
 
 function startTerm(s: GameState, first = false) {
   kaguyaLeaves(s);
+  patentExpires(s);
   s.queue = termOrder(s, first);
   s.queueIdx = 0;
   const t = termOfMonth(MONTHS[s.monthIdx]);
@@ -434,6 +435,11 @@ function advanceMonth(s: GameState) {
     settleOath(s);
     return;
   }
+  // ゴッホのひまわり：学期の区切りの前に、飾った絵の値打ちを見せる（次へで、もう一度ここに来て先へ進む）
+  if (s.sunflower && termBreakNext(s)) {
+    settleSunflower(s);
+    return;
+  }
   s.monthIdx++;
   if (s.monthIdx >= MONTHS.length) {
     yearEnd(s);
@@ -444,6 +450,53 @@ function advanceMonth(s: GameState) {
     curePlague(s);
     startTerm(s);
   } else startTurns(s);
+}
+
+// ---------- 近代：電球の特許とゴッホのひまわり ----------
+
+/** 電球の特許：特許をとったクラス以外が授業カードを取ったら、特許料を払う（結果に1行足す） */
+function payPatent(s: GameState, pi: number, r: EventResult): EventResult {
+  const holder = s.patent;
+  if (holder === undefined || holder === pi) return r;
+  const c = EVENT_MAP.patent as ContestCard;
+  const fee = c.effect.type === 'patent' ? c.effect.fee : 0;
+  s.players[pi].points -= fee;
+  s.players[holder].points += fee;
+  const say = `💡特許料：${s.players[pi].name}のクラスから${s.players[holder].name}のクラスへ${fee}点。`;
+  log(s, say, pi);
+  const rows = r.rows.map((x) => (x.player === pi ? { ...x, delta: x.delta - fee, note: `特許料−${fee}` } : x));
+  return { ...r, say: `${r.say ?? ''} ${say}`.trim(), rows: [...rows, { player: holder, delta: fee, note: `💡特許料+${fee}` }] };
+}
+
+/** 学期の頭：前の学期の特許は切れる */
+function patentExpires(s: GameState) {
+  if (s.patent === undefined) return;
+  log(s, `${s.players[s.patent].name}のクラスの電球の特許が切れた。`);
+  delete s.patent;
+}
+
+/** ゴッホのひまわり：学期の区切りに、飾った絵の値打ちが出る（描いた子がまだクラスにいれば、描いたときの点×per） */
+function settleSunflower(s: GameState) {
+  const paintings = s.sunflower!;
+  delete s.sunflower;
+  const c = EVENT_MAP.sunflower as ContestCard;
+  const per = c.effect.type === 'sunflower' ? c.effect.per : 0;
+  const shown: Student[] = [];
+  const rows: ResultRow[] = paintings.map(({ player, uid, pts }) => {
+    const p = s.players[player];
+    const st = p.students.find((x) => x.uid === uid);
+    if (!st) return { player, count: pts, delta: 0, note: '描いた子が転校して、絵も行方知れず' };
+    const delta = pts * per;
+    p.points += delta;
+    st.mvp++;
+    shown.push(st);
+    return { player, count: pts, delta, note: `${st.name}の絵が値上がり`, uids: [uid] };
+  });
+  sortRows(rows);
+  logRows(s, `${c.name}の値打ち`, rows);
+  const say = '学期が終わり、飾っていたひまわりの絵に値打ちが出た！';
+  log(s, say);
+  setResult(s, null, { title: `${c.name}の値打ち`, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say, rows, students: shown }, 'sunflower');
 }
 
 /** 次の月から新しい学期（または次の学年）になるか */
@@ -1229,6 +1282,61 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
+    // 近代：一番のクラス（1クラスだけ）が特許をとる。学期の区切りまで、ほかのクラスが授業カードを取るたびに特許料が入る（payPatent）
+    case 'patent': {
+      rows.forEach((r, i) => {
+        r.count = values[i];
+        r.uids = scores[i].holders.map((h) => h.uid);
+      });
+      const tops = values.flatMap((v, i) => (v === best ? [i] : []));
+      if (best === worst || tops.length > 1) {
+        rows.forEach((r) => (r.note = '互角'));
+        break;
+      }
+      const win = tops[0];
+      s.patent = win;
+      scores[win].holders.forEach((h) => h.mvp++);
+      rows[win].note = '💡特許';
+      tell(`${ps[win].name}のクラスが電球の特許をとった！学期の区切りまで、ほかのクラスが授業をするたびに特許料${e.fee}点が入る。`, win);
+      break;
+    }
+    // 近代：クラスにあるアイコンの種類の数で、届いた一番上の段の点
+    case 'expo': {
+      ps.forEach((p, i) => {
+        const kinds = new Set(p.students.flatMap((x) => counted(x))).size;
+        const step = [...e.steps].sort((x, y) => y[0] - x[0]).find(([k]) => kinds >= k);
+        rows[i].count = kinds;
+        rows[i].uids = p.students.filter((x) => counted(x).length > 0).map((x) => x.uid);
+        rows[i].note = `${kinds}種類`;
+        if (step) add(i, step[1]);
+      });
+      const hi = Math.max(...rows.map((r) => r.delta));
+      if (hi > 0) tell(`${rows.filter((r) => r.delta === hi).map((r) => ps[r.player].name).join('・')}のクラスの展示が大にぎわい！（+${hi}）`);
+      break;
+    }
+    // 近代：各クラスの一番の描き手が絵を飾る。点は学期の区切り（settleSunflower）に、その子がまだいれば入る
+    case 'sunflower': {
+      const paintings = (s.sunflower ?? []).slice();
+      ps.forEach((p, i) => {
+        const top = bestOf(p, p.students, c.attr);
+        if (!top) {
+          rows[i].note = '描き手なし';
+          return;
+        }
+        // 同じ学期にもう一度めくられたら、そのクラスの絵は描き直し
+        const k = paintings.findIndex((x) => x.player === i);
+        if (k >= 0) paintings.splice(k, 1);
+        paintings.push({ player: i, uid: top.student.uid, pts: top.pts });
+        top.student.mvp++;
+        moved.push(top.student);
+        rows[i].count = top.pts;
+        rows[i].uids = [top.student.uid];
+        rows[i].note = `🖼️ 学期末に+${top.pts * e.per}`;
+        tell(`${p.name}のクラスの${name(top.student)}がひまわりの絵を飾った。`, i);
+      });
+      if (paintings.length) s.sunflower = paintings;
+      break;
+    }
   }
   const result = eraResult(s, c, rows, { students: moved });
   // 何も起きなかったときはカードの効果を出す
@@ -1680,7 +1788,7 @@ function takeCard(s: GameState, pi: number, slot: number) {
   switch (c.kind) {
     case 'normal':
       takeFromMarket(s, slot);
-      setResult(s, pi, resolveNormal(s, c, pi), 'turn');
+      setResult(s, pi, payPatent(s, pi, resolveNormal(s, c, pi)), 'turn');
       return;
     case 'goods':
       s.phase = { kind: 'equip', player: pi, card: id, slot };
@@ -1747,6 +1855,7 @@ export function step(prev: GameState, a: Action): GameState {
           log(s, 'ゲーム終了！');
           break;
         case 'oath':
+        case 'sunflower':
           advanceMonth(s);
           break;
       }
