@@ -10,7 +10,7 @@ export interface NormalCard {
   count: number;
 }
 
-/** カチコミ：場から取った人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させる */
+/** カチコミ：場から取った人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させ、👊の数 × drain だけ自分に吸い取る（ドレイン） */
 export interface KachikomiCard {
   id: string;
   kind: 'kachikomi';
@@ -18,6 +18,8 @@ export interface KachikomiCard {
   icon: string;
   /** 減点の倍率 */
   mult: number;
+  /** 自分に入る倍率（ドレイン） */
+  drain: number;
   count: number;
 }
 
@@ -228,10 +230,11 @@ export const NORMAL_CARDS: NormalCard[] = [
   N('charm', '学活の時間', '🙋', 4),
 ];
 
-export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, count: 3 }];
+export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, drain: 1, count: 3 }];
 
+// 共通イベントはいったん休止中（時代イベントが出やすいように、山札に入れない）。戻すときは count を 1 に
 const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | undefined, desc: string, per?: number): SwingCard => ({
-  id, kind: 'swing', name, icon, plus, minus, desc, per, count: 1,
+  id, kind: 'swing', name, icon, plus, minus, desc, per, count: 0,
 });
 export const SWING_CARDS: SwingCard[] = [
   W('poptest', '抜き打ちテスト', '📝', 'study', undefined, '日ごろの勉強がものを言う。'),
@@ -426,7 +429,7 @@ export function cardRule(c: EventCard): string {
     case 'normal':
       return `取った人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
+      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させ、👊の数×${c.drain}だけ自分に加点（ドレイン）`;
     case 'swing':
       if (c.per) return `全クラス：${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       if (!c.minus) return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点`;
@@ -547,7 +550,7 @@ export function cardGlyph(c: EventCard): string {
     case 'normal':
       return `${ATTR_ICON[c.attr]} → +`;
     case 'kachikomi':
-      return `👊×${c.mult} → 😵`;
+      return `👊×${c.mult} → 😵　👊×${c.drain} → +`;
     case 'swing':
       if (c.per) return `🧑${ATTR_ICON[c.plus]} → +${c.per}ずつ`;
       return c.minus ? `+${ATTR_ICON[c.plus]}　−${ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
@@ -657,7 +660,7 @@ export function shortRule(c: EventCard): string {
     case 'normal':
       return `${ATTR_ICON[c.attr]}の数だけ得点`;
     case 'kachikomi':
-      return `相手に👊×${c.mult}のダメージ`;
+      return `相手に👊×${c.mult}のダメージ、👊×${c.drain}を吸い取る`;
     case 'swing':
       if (c.per) return `${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       return c.minus ? `${ATTR_ICON[c.plus]}で得点、${ATTR_ICON[c.minus]}で減点` : `${ATTR_ICON[c.plus]}の数だけ得点`;

@@ -1939,11 +1939,13 @@ export function step(prev: GameState, a: Action): GameState {
       takeFromMarket(s, ph.slot);
       const sc = attrScore(p, 'fight');
       const damage = sc.total * KACHIKOMI_CARDS[0].mult;
+      const drain = sc.total * KACHIKOMI_CARDS[0].drain;
       const to = s.players[a.target];
       to.points -= damage;
+      p.points += drain;
       sc.holders.forEach((h) => h.mvp++);
       const rows: ResultRow[] = [
-        { player: ph.player, count: sc.total, delta: 0, note: 'カチコミ', uids: sc.holders.map((h) => h.uid) },
+        { player: ph.player, count: sc.total, delta: drain, note: 'カチコミ（ドレイン）', uids: sc.holders.map((h) => h.uid) },
         { player: a.target, delta: -damage, note: '被害' },
       ];
       logRows(s, `カチコミ（${p.name}→${to.name}）`, rows);

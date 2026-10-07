@@ -316,7 +316,7 @@ describe('engine', () => {
     expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(3 - 4);
   });
 
-  it('kachikomi is taken from the market for free and takes 3× the taker\'s 👊 count from the chosen school', () => {
+  it('kachikomi is taken from the market for free, takes 3× the taker\'s 👊 count from the chosen school and drains 1× to the taker', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -341,7 +341,7 @@ describe('engine', () => {
     expect(step(k, { type: 'kachikomi', target: pi })).toBe(k);
     const done = step(k, { type: 'kachikomi', target });
     expect(done.players[target].points - t.players[target].points).toBe(-9);
-    expect(done.players[pi].points).toBe(t.players[pi].points);
+    expect(done.players[pi].points - t.players[pi].points).toBe(3);
     expect(done.market).toEqual([]);
     // 👊がいなければ取れない
     const u = structuredClone(t);

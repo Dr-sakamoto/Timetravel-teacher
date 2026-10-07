@@ -21,7 +21,7 @@ export function classScore(p: Player): number {
   for (const c of SWING_CARDS) {
     const plus = attrScore(p, c.plus).total;
     const minus = c.minus ? attrScore(p, c.minus).total : 0;
-    v += plus - minus;
+    v += (plus - minus) * c.count;
   }
   v += (attrScore(p, 'study').total - countAttr(p, 'fight') * TEST_YANKEE_PENALTY) * 2;
   return v;
@@ -130,8 +130,8 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
     case 'cyborg':
       return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;
     case 'kachikomi':
-      // 相手1クラスを減点するだけなので、相手の数で割って自分の加点と比べる
-      return (attrScore(p, 'fight').total * c.mult) / (s.players.length - 1);
+      // 相手1クラスの減点は相手の数で割って自分の加点と比べる。ドレインの分はそのまま自分の加点
+      return attrScore(p, 'fight').total * (c.mult / (s.players.length - 1) + c.drain);
     case 'exchange':
       return Math.max(...exchangePairs(s, pi).map((x) => gain(s, p, swap(x.uid, s.players[x.target].students.find((y) => y.uid === x.theirUid)!))));
     default:
