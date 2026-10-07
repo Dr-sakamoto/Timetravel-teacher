@@ -250,8 +250,11 @@ export const MOVE_CARDS: MoveCard[] = [
 ];
 
 const G = (id: string, name: string, icon: string, attr: Attr, era?: EraId): GoodsCard => ({ id, kind: 'goods', name, icon, attr, era, count: 1 });
-/** グッズ：時代ごとに2種（時代のグッズはその時代の優遇アイコン。歴史の時代は実在の品。未来の片方はサイボーグ化）。平安だけは竹取物語の5つの宝（かぐや姫の難題） */
+/** グッズ：全時代共通3種＋時代ごとに2種（時代のグッズはその時代の優遇アイコン。歴史の時代は実在の品。未来の片方はサイボーグ化）。平安だけは竹取物語の5つの宝（かぐや姫の難題） */
 export const GOODS_CARDS: GoodsCard[] = [
+  G('g_book', '参考書', '📕', 'study'),
+  G('g_shoes', 'スポーツシューズ', '👟', 'sports'),
+  G('g_paint', '絵の具セット', '🖍️', 'art'),
   G('g_phone', 'スマホ', '📱', 'charm', 'present'),
   G('g_tablet', 'タブレット', '💻', 'study', 'present'),
   G('g_fang', 'ティラノサウルスの牙', '🦷', 'fight', 'cretaceous'),
