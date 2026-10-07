@@ -81,14 +81,23 @@ export function canAct(s: GameState, seat: number, a: Action): boolean {
     if (ph.player !== null && !s.players[ph.player].isCpu) return ph.player === seat;
     return true;
   }
+  // 係決めは一斉：自分のクラスの準備OKだけ
+  if (ph.kind === 'roles') return a.type === 'setRoles' && a.player === seat && !ph.ready[seat];
   return actingPlayer(s) === seat && a.type !== 'continue';
 }
 
-/** 今だれの操作を待っているか（CPUの番や、CPU・全員向けの結果なら null） */
+/** 今だれの操作を待っているか（CPUの番や、CPU・全員向けの結果、一斉の係決めなら null） */
 export function waitingOn(s: GameState): number | null {
   const ph = s.phase;
   if (ph.kind === 'gameOver' || ph.player === null) return null;
   return s.players[ph.player].isCpu ? null : ph.player;
+}
+
+/** その人の操作を待って止まっているか（一斉の係決めでは、まだ準備OKでない人間みんな） */
+export function waitsFor(s: GameState, seat: number): boolean {
+  const ph = s.phase;
+  if (ph.kind === 'roles') return !s.players[seat].isCpu && !ph.ready[seat];
+  return waitingOn(s) === seat;
 }
 
 /** 端末ID（この端末でずっと同じ。つなぎ直した時に同じ席へ戻るため） */

@@ -24,10 +24,10 @@ export function KaguyaStay({ state }: { state: GameState }) {
   const lines = state.players.map((p, i) => {
     const id = asks[i];
     const g = id ? EVENT_MAP[id] : null;
-    return { p, text: g ? `${g.icon}${g.name}` : '差し出した', icon: g ? g.icon : '✓' };
+    return { p, text: g ? g.name : '差し出した', icon: g ? g.icon : '✓' };
   });
   return (
-    <div className="mcard person kaguya-stay" title={`🌙 かぐや姫が滞在中（学期の終わりに月へ帰る）\n${lines.map((x) => `${x.p.name}：${x.text}`).join('\n')}`}>
+    <div className="mcard person kaguya-stay" title={`かぐや姫が滞在中（学期の終わりに月へ帰る）\n${lines.map((x) => `${x.p.name}：${x.text}`).join('\n')}`}>
       <TcgCard student={KAGUYA} size="mini" />
       <div className="kaguya-asks">
         {lines.map((x, i) => (

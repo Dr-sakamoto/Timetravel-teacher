@@ -47,9 +47,11 @@ function planOf(s: GameState, me: number): Plan | null {
   const row = r.rows.find((x) => x.player === pid);
   if (!row) return null;
   const p = s.players[pid];
-  const card = { attr: a, era: r.era, threat: r.threat, minus: r.minus };
-  // 時代イベントの代表戦などは、点に関わった子（row.uids）だけを見せる
-  const list = contributions(p, a).filter((x) => r.tone !== 'era' || !row.uids || row.uids.includes(x.student.uid));
+  const card = { attr: a, era: r.era, threat: r.threat, minus: r.minus, perHead: r.perHead };
+  // 時代イベントの代表戦などは、点に関わった子（row.uids）だけを見せる。「1人につき」なら1人ずつ同じ点
+  const list = contributions(p, a)
+    .filter((x) => r.tone !== 'era' || !row.uids || row.uids.includes(x.student.uid))
+    .map((x) => (r.perHead ? { ...x, pts: r.perHead, era: false, role: false } : x));
   const minus = r.minus ? minusList(p.students, r.minus === 'heads' ? null : contributions(p, r.minus)) : [];
   const variant = variantFor(card, r.tone === 'normal');
   const base = { start: START, list, minusList: minus, card, delta: row.delta, total: list.reduce((x, c) => x + c.pts, 0), all: p.students.map((x) => x.uid) };

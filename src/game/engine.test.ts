@@ -3,7 +3,7 @@ import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
 import { BENKEI, CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
-import { ERA_CARDS, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
+import { ERA_CARDS, EVENT_MAP, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL } from './data/modern';
 import { MONTHS, canBuild, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
@@ -328,7 +328,7 @@ describe('engine', () => {
     expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(3 - 4);
   });
 
-  it('kachikomi is taken from the market for free and takes 3× the taker\'s 👊 count from the chosen school', () => {
+  it('kachikomi is taken from the market for free, takes 3× the taker\'s 👊 count from the chosen school and drains 1× to the taker', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -353,7 +353,7 @@ describe('engine', () => {
     expect(step(k, { type: 'kachikomi', target: pi })).toBe(k);
     const done = step(k, { type: 'kachikomi', target });
     expect(done.players[target].points - t.players[target].points).toBe(-9);
-    expect(done.players[pi].points).toBe(t.players[pi].points);
+    expect(done.players[pi].points - t.players[pi].points).toBe(3);
     expect(done.market).toEqual([]);
     // 👊がいなければ取れない
     const u = structuredClone(t);
@@ -436,7 +436,7 @@ describe('engine', () => {
     expect(step(again, { type: 'cyborg', uid: mine.uid })).toBe(again);
   });
 
-  it('battles pay 1st +15, 2nd +5, 3rd 0, last -10 (ties share a place)', () => {
+  it('battles pay 1st +15, 2nd +5, and losers lose nothing (ties share a place)', () => {
     let s = newGame(['A', 'B', 'C', 'D'].map((name) => ({ name, isCpu: true })), 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const run = (fights: number[]) => {
@@ -449,9 +449,9 @@ describe('engine', () => {
       const after = step(t, pass);
       return after.players.map((p, i) => p.points - t.players[i].points);
     };
-    expect(run([4, 3, 2, 1])).toEqual([15, 5, 0, -10]);
+    expect(run([4, 3, 2, 1])).toEqual([15, 5, 0, 0]);
     // 1位が2クラスなら、次のクラスは3位（0点）
-    expect(run([3, 3, 2, 1])).toEqual([15, 15, 0, -10]);
+    expect(run([3, 3, 2, 1])).toEqual([15, 15, 0, 0]);
     // 全クラス同点なら引き分け
     expect(run([2, 2, 2, 2])).toEqual([0, 0, 0, 0]);
   });
@@ -472,13 +472,13 @@ describe('engine', () => {
     const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
     const B = [mk('b1', ['sports', 'sports'])];
     const C = [mk('c1', ['study'])];
-    // 大移動：👊6以上で+6、足りなければ−3
-    expect(run('migration', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, -3, -3]);
+    // 大移動：👊6以上で+6、足りなくても減点なし
+    expect(run('migration', [[mk('y', ['fight', 'fight', 'fight']), mk('z', ['fight', 'fight', 'fight'])], [mk('w', ['fight', 'fight'])], C])).toEqual([6, 0, 0]);
     // 古代オリンピック：🏃の数で勝負、1位+12・2位+5、負けても減点なし
     expect(run('olympia', [A, B, C])).toEqual([12, 5, 0]);
-    // 関ヶ原の戦い：👑＋👊の数で勝負、1位+15・2位+5・最下位−10
-    expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 5, -10]);
-    expect(run('sekigahara', [[mk('y', ['fight']), mk('x', ['charm', 'charm'])], [mk('z', ['charm', 'fight'])], C])).toEqual([15, 5, -10]);
+    // 関ヶ原の戦い：👑＋👊の数で勝負、1位+15・2位+5（負けても減点なし）
+    expect(run('sekigahara', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], C])).toEqual([15, 5, 0]);
+    expect(run('sekigahara', [[mk('y', ['fight']), mk('x', ['charm', 'charm'])], [mk('z', ['charm', 'fight'])], C])).toEqual([15, 5, 0]);
     // 文化祭：🎨を持つ子1人につき+2（その時代の子も同じ）
     expect(run('bunkasai', [[mk('c', ['charm', 'art'], 'present'), mk('d', ['art', 'art'])], B, C])).toEqual([4, 0, 0]);
     // 体育祭：🏃を持つ子1人につき+2
@@ -601,9 +601,11 @@ describe('engine', () => {
       };
     };
 
-    it('trex_hunt: the strongest pack takes points from the weakest', () => {
-      const r = run('trex_hunt', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study', 'study', 'art'])]]);
-      expect(r.delta).toEqual([8, 0, -8]);
+    it('trex_hunt: the strongest pack takes points from the class with the most points', () => {
+      const r = run('trex_hunt', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study', 'study', 'art'])]], [5, 20, 10]);
+      expect(r.delta).toEqual([8, -8, 0]);
+      // 狩る側がポイント1位なら、満腹で何もしない
+      expect(run('trex_hunt', [[mk('y', ['fight', 'fight'])], [mk('z', ['fight'])], [mk('c', ['study'])]], [20, 10, 5]).delta).toEqual([0, 0, 0]);
       // 生徒は動かない
       expect(r.uids).toEqual([['y'], ['z'], ['c']]);
       // 一番が並んだら何も起こらない
@@ -647,7 +649,7 @@ describe('engine', () => {
     });
 
     it('mummy: each child with 👑 wearing goods is buried with treasure and scores', () => {
-      const withGoods = (u: string, attrs: Attr[]) => ({ ...mk(u, attrs), goods: { id: 'g_book', name: '参考書', icon: '📕', attr: 'study' as const } });
+      const withGoods = (u: string, attrs: Attr[]) => ({ ...mk(u, attrs), goods: { id: 'g_tablet', name: 'タブレット', icon: '💻', attr: 'study' as const } });
       const r = run('mummy', [[withGoods('a', ['charm']), withGoods('b', ['charm', 'charm'])], [withGoods('c', ['charm']), withGoods('d', ['art'])], [mk('e', ['charm', 'charm', 'charm'])]]);
       // 👑のない子のグッズ・グッズのない👑の子は数えない
       expect(r.delta).toEqual([8, 4, 0]);
@@ -655,18 +657,18 @@ describe('engine', () => {
       expect(r.after.players[0].students.filter((x) => x.goods).map((x) => x.uid)).toEqual(['a', 'b']);
     });
 
-    it('colosseum: each class\'s best fighter (🏃+👊) enters the arena; the winner scores and every other class loses points', () => {
-      expect(run('colosseum', [[mk('a', ['sports', 'fight', 'fight'])], [mk('b', ['sports', 'sports'])], []]).delta).toEqual([12, -4, -4]);
+    it('colosseum: each class\'s best fighter (🏃+👊) enters the arena; the winner scores and the others lose nothing', () => {
+      expect(run('colosseum', [[mk('a', ['sports', 'fight', 'fight'])], [mk('b', ['sports', 'sports'])], []]).delta).toEqual([12, 0, 0]);
       // 1位が並べば両方+12
-      expect(run('colosseum', [[mk('a', ['fight', 'fight'])], [mk('b', ['sports', 'sports'])], [mk('c', ['sports'])]]).delta).toEqual([12, 12, -4]);
+      expect(run('colosseum', [[mk('a', ['fight', 'fight'])], [mk('b', ['sports', 'sports'])], [mk('c', ['sports'])]]).delta).toEqual([12, 12, 0]);
       // だれも出せなければ引き分け
       expect(run('colosseum', [[mk('a', ['study'])], [mk('b', ['art'])], []]).delta).toEqual([0, 0, 0]);
     });
 
-    it('socratic: each class\'s best scholar talks with Socrates; 📚4 or more scores, less is refuted', () => {
-      // 代表の📚：4（+8）／3（−3）／代表なし（−3）
+    it('socratic: each class\'s best scholar talks with Socrates; 📚4 or more scores', () => {
+      // 代表の📚：4（+8）／3（0）／代表なし（0）
       const r = run('socratic', [[mk('a', ['study', 'study', 'study', 'study']), mk('a2', ['study'])], [mk('b', ['study', 'study', 'study'])], [mk('c', ['art'])]]);
-      expect(r.delta).toEqual([8, -3, -3]);
+      expect(r.delta).toEqual([8, 0, 0]);
       // 学習係の係ボーナスも乗る（📚📚×2＝4）
       const roles = run('socratic', [[mk('a', ['study', 'study'])], [], []], [10, 10, 10], [[{ role: 'study', uid: 'a' }], [], []]);
       expect(roles.delta[0]).toBe(8);
@@ -760,11 +762,11 @@ describe('engine', () => {
     });
 
     it('changban: the class with the most points gives chase; each other class holds the bridge with its best 👊 student', () => {
-      // A が一番ポイントが多い。B は👊2の子で追い返して A から4点奪う。C は👊1しかいないので −2（A は得をしない）
+      // A が一番ポイントが多い。B は👊2の子で追い返して A から4点奪う。C は👊1しかいないので何もない
       const r = run('changban', [[mk('a', ['study'])], [mk('b', ['fight', 'fight']), mk('b2', ['fight'])], [mk('c', ['fight'])]], [20, 10, 10]);
-      expect(r.delta).toEqual([-4, 4, -2]);
-      // 👊を持つ子がいないクラスも −2。2クラスとも追い返せば、追いかけるクラスは2回奪われる
-      expect(run('changban', [[], [mk('b', ['study'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([-4, -2, 4]);
+      expect(r.delta).toEqual([-4, 4, 0]);
+      // 2クラスとも追い返せば、追いかけるクラスは2回奪われる
+      expect(run('changban', [[], [mk('b', ['study'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([-4, 0, 4]);
       expect(run('changban', [[], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight'])]], [20, 10, 10]).delta).toEqual([-8, 4, 4]);
       // ポイントの一番が並べば、にらみ合いで何も起こらない
       expect(run('changban', [[], [mk('b', ['study'])], []]).delta).toEqual([0, 0, 0]);
@@ -821,10 +823,10 @@ describe('engine', () => {
       });
     });
 
-    it('mochizuki: every other class sends gifts to the class with the most 👑', () => {
-      expect(run('mochizuki', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, -3, -3]);
-      // 一番が2クラスなら、残りのクラスがそれぞれに贈る
-      expect(run('mochizuki', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([3, 3, -6]);
+    it('mochizuki: the class with the most 👑 is invited to the feast (no one pays)', () => {
+      expect(run('mochizuki', [[mk('a', ['charm', 'charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, 0, 0]);
+      // 一番が2クラスなら両方
+      expect(run('mochizuki', [[mk('a', ['charm'])], [mk('b', ['charm'])], []]).delta).toEqual([6, 6, 0]);
     });
 
     it('genji: the school\'s best 🎨 writer\'s class scores 3 per 👑 reader in that class', () => {
@@ -883,15 +885,15 @@ describe('engine', () => {
       const yoshitsune = CARDS.find((c) => c.id === 'yoshitsune')!;
       expect(yoshitsune.attrs.filter((a) => a === 'fight')).toHaveLength(3);
       const r = run('gojo', [[mk('y', [...yoshitsune.attrs])], [mk('b', ['fight', 'fight'])], [mk('c', ['fight', 'fight']), mk('d', ['fight', 'fight'])]]);
-      // 👊4のクラス2が弁慶を連れて帰る。クラス0も勝ちで減点なし、クラス1は届かず−2
-      expect(r.delta).toEqual([0, -2, 0]);
+      // 👊4のクラス2が弁慶を連れて帰る。届かないクラスも減点なし
+      expect(r.delta).toEqual([0, 0, 0]);
       expect(benkei(r.after)).toEqual([0, 0, 1]);
       const st = r.after.players[2].students.find((x) => x.cardId === 'benkei')!;
       expect(st.attrs).toEqual(['fight', 'fight', 'fight']);
       // 同点ならポイントが少ないクラスへ
       const tie = run('gojo', [[mk('a', ['fight', 'fight', 'fight'])], [mk('b', ['fight', 'fight', 'fight'])], []], [20, 5, 10]);
       expect(benkei(tie.after)).toEqual([0, 1, 0]);
-      expect(tie.delta).toEqual([0, 0, -2]);
+      expect(tie.delta).toEqual([0, 0, 0]);
       // 弁慶がもういれば何も起こらない
       const t = structuredClone(r.after);
       t.phase = base.phase;
@@ -1011,7 +1013,7 @@ describe('engine', () => {
 
     it('teppo: a class whose students all carry goods gets none', () => {
       const t = structuredClone(base);
-      const geared = (uid: string): Student => ({ ...mk(uid, ['study']), goods: { id: 'g_book', name: '参考書', icon: '📕', attr: 'study' } });
+      const geared = (uid: string): Student => ({ ...mk(uid, ['study']), goods: { id: 'g_tablet', name: 'タブレット', icon: '💻', attr: 'study' } });
       t.players.forEach((p, i) => {
         p.students = [geared(`g${i}`), ...(i === 1 ? [mk('b', ['charm'])] : [])];
         p.roles = [];
@@ -1033,14 +1035,14 @@ describe('engine', () => {
       // グッズを取ると0点で、タダは1回きり
       let t = structuredClone(r.after);
       t.phase = { kind: 'draw', player: 0 };
-      t.market = ['g_book', 'g_shoes'];
-      expect(marketCost('g_book', t.players[0])).toBe(0);
-      expect(marketCost('g_book', t.players[1])).toBe(2);
+      t.market = ['g_tablet', 'g_sledge'];
+      expect(marketCost('g_tablet', t.players[0])).toBe(0);
+      expect(marketCost('g_tablet', t.players[1])).toBe(2);
       t = step(t, { type: 'take', slot: 0 });
       t = step(t, { type: 'equip', uid: 'a' });
       expect(t.players[0].points).toBe(10);
       expect(t.players[0].freeGoods).toBeFalsy();
-      expect(marketCost('g_shoes', t.players[0])).toBe(2);
+      expect(marketCost('g_sledge', t.players[0])).toBe(2);
     });
 
     it('tomikuji: everyone pays in and one class takes the pot', () => {
@@ -1188,7 +1190,7 @@ describe('engine', () => {
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
     s.players[pi].points = 10;
-    s = take(s, 'g_book');
+    s = take(s, 'g_tablet');
     expect(s.phase.kind).toBe('equip');
     // やめたら手番の選び直し（ポイントも払わない）
     const back = step(s, { type: 'equip', uid: null });
@@ -1200,11 +1202,11 @@ describe('engine', () => {
     const st = next.players[pi].students.find((x) => x.uid === uid)!;
     expect(st.attrs).toHaveLength(before + 1);
     expect(st.goods?.attr).toBe('study');
-    expect(next.players[pi].points).toBe(10 - marketCost('g_book'));
+    expect(next.players[pi].points).toBe(10 - marketCost('g_tablet'));
     // もう装備している子にはつけられない
     const again = structuredClone(next);
-    again.market[0] = 'g_shoes';
-    again.phase = { kind: 'equip', player: pi, card: 'g_shoes', slot: 0 };
+    again.market[0] = 'g_sledge';
+    again.phase = { kind: 'equip', player: pi, card: 'g_sledge', slot: 0 };
     expect(step(again, { type: 'equip', uid })).toBe(again);
   });
 
@@ -1213,11 +1215,56 @@ describe('engine', () => {
     while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
     const f = s.queue[0];
     const uid = s.players[f].students[0].uid;
-    expect(step(s, { type: 'setRoles', roles: [] })).toBe(s);
-    expect(step(s, { type: 'setRoles', roles: [{ role: 'pe', uid }], unlock: ['study'] })).toBe(s);
-    const next = step(s, { type: 'setRoles', roles: [{ role: 'study', uid }], unlock: ['study'] });
+    expect(step(s, { type: 'setRoles', player: f, roles: [] })).toBe(s);
+    expect(step(s, { type: 'setRoles', player: f, roles: [{ role: 'pe', uid }], unlock: ['study'] })).toBe(s);
+    const next = step(s, { type: 'setRoles', player: f, roles: [{ role: 'study', uid }], unlock: ['study'] });
     expect(next.players[f].unlocked).toEqual(['study']);
     expect(next.players[f].roles).toEqual([{ role: 'study', uid }]);
+  });
+
+  it('each term deals all of the era\'s events near the top of the deck, the first one always within reach', () => {
+    for (const n of [2, 5]) {
+      let s = newGame(Array.from({ length: n }, (_, i) => ({ name: `P${i}`, isCpu: true })), 3, 21 + n);
+      let terms = 0;
+      for (let i = 0; i < 20000 && s.phase.kind !== 'gameOver'; i++) {
+        if (s.phase.kind === 'roles' && s.phase.ready.every((r) => !r)) {
+          const era = s.eventDeck.flatMap((id, k) => (!id.startsWith('person:') && EVENT_MAP[id].kind === 'contest' ? [s.eventDeck.length - 1 - k] : []));
+          const id = ERAS[currentEra(s)].id;
+          // ピラミッドは山札に入らず場の横に残る
+          expect(era).toHaveLength(ERA_CARDS.filter((c) => c.era === id && c.effect.type !== 'pyramid').reduce((a, c) => a + c.count, 0));
+          const term = termOfMonth(MONTHS[s.monthIdx]);
+          const months = MONTHS.slice(s.monthIdx).filter((m) => termOfMonth(m) === term).length;
+          // 一番浅いカード（次にめくるのが深さ0）は、手番の数より浅い＝必ずめくられる
+          expect(Math.min(...era)).toBeLessThan(n * months);
+          terms++;
+        }
+        s = step(s, cpuAction(s)!);
+        while (s.phase.kind === 'roles' && !s.phase.ready.every((r) => !r)) s = step(s, cpuAction(s)!);
+      }
+      expect(terms).toBe(9);
+    }
+  });
+
+  it('roles are set by every class at once; turns start when everyone is ready', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }, { name: 'C', isCpu: true }], 1, 11);
+    while (s.phase.kind !== 'roles') s = step(s, cpuAction(s)!);
+    const set = (t: typeof s, pi: number) => {
+      const uid = t.players[pi].students[0].uid;
+      return step(t, { type: 'setRoles', player: pi, roles: [{ role: 'study', uid }], unlock: ['study'] });
+    };
+    // 順番は決まっていない：手番の最後の人間からでも準備OKにできる
+    const humans = s.queue.filter((i) => !s.players[i].isCpu);
+    const last = humans[humans.length - 1];
+    let t = set(s, last);
+    expect(t.phase.kind).toBe('roles');
+    if (t.phase.kind === 'roles') expect(t.phase.ready[last]).toBe(true);
+    // 準備OKの人はもう一度は決められない
+    expect(set(t, last)).toBe(t);
+    t = set(t, humans[0]);
+    expect(t.phase.kind).toBe('roles');
+    // CPUが決めて全員そろったら手番へ
+    t = step(t, cpuAction(t)!);
+    expect(t.phase.kind).not.toBe('roles');
   });
 
   it('exchange swaps students with the same number of printed icons; the other side must have no role', () => {
@@ -1240,7 +1287,7 @@ describe('engine', () => {
     expect(step(s, { type: 'exchange', uid: a1.uid, target: 1, theirUid: b1.uid })).toBe(s);
     // グッズの＋1は数えない
     const g = structuredClone(s);
-    g.players[0].students[1] = { ...a1, attrs: ['study', 'study', 'study'], goods: { id: 'g_book', name: '参考書', icon: '📕', attr: 'study' } };
+    g.players[0].students[1] = { ...a1, attrs: ['study', 'study', 'study'], goods: { id: 'g_tablet', name: 'タブレット', icon: '💻', attr: 'study' } };
     expect(exchangePairs(g, 0).some((x) => x.uid === a1.uid && x.theirUid === b1.uid)).toBe(false);
     // 自分の側は係の子でも出せる
     const next = step(s, { type: 'exchange', uid: a0.uid, target: 1, theirUid: b1.uid });

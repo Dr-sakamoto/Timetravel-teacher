@@ -21,7 +21,7 @@ export function classScore(p: Player): number {
   for (const c of SWING_CARDS) {
     const plus = attrScore(p, c.plus).total;
     const minus = c.minus ? attrScore(p, c.minus).total : 0;
-    v += plus - minus;
+    v += (plus - minus) * c.count;
   }
   v += (attrScore(p, 'study').total - countAttr(p, 'fight') * TEST_YANKEE_PENALTY) * 2;
   return v;
@@ -130,8 +130,8 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
     case 'cyborg':
       return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;
     case 'kachikomi':
-      // 相手1クラスを減点するだけなので、相手の数で割って自分の加点と比べる
-      return (attrScore(p, 'fight').total * c.mult) / (s.players.length - 1);
+      // 相手1クラスの減点は相手の数で割って自分の加点と比べる。ドレインの分はそのまま自分の加点
+      return attrScore(p, 'fight').total * (c.mult / (s.players.length - 1) + c.drain);
     case 'exchange':
       return Math.max(...exchangePairs(s, pi).map((x) => gain(s, p, swap(x.uid, s.players[x.target].students.find((y) => y.uid === x.theirUid)!))));
     default:
@@ -160,15 +160,23 @@ function leader(s: GameState, candidates: number[]): number {
   return [...candidates].sort((x, y) => s.players[y].points - s.players[x].points)[0];
 }
 
+/** そのクラスの係をおまかせで決めて準備OKにする（CPU・通信が切れた人の代わり） */
+export function rolesAction(s: GameState, pi: number): Action {
+  const p = s.players[pi];
+  const unlock = autoUnlock(p, slotsNow(s));
+  return { type: 'setRoles', player: pi, unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
+}
+
 export function cpuAction(s: GameState): Action | null {
   const ph = s.phase;
   switch (ph.kind) {
     case 'memberDraw':
       return { type: 'drawMember' };
     case 'roles': {
-      const p = s.players[ph.player];
-      const unlock = autoUnlock(p, slotsNow(s));
-      return { type: 'setRoles', unlock, roles: autoRoles(p, [...p.unlocked, ...unlock]) };
+      // 係決めは一斉：まだ準備OKでないCPUのクラスから決める（CPUがみな決めていれば、まだの人のクラスを代わりに）
+      const cpu = s.players.findIndex((p, i) => p.isCpu && !ph.ready[i]);
+      const pi = cpu >= 0 ? cpu : ph.ready.indexOf(false);
+      return pi < 0 ? null : rolesAction(s, pi);
     }
     case 'draw': {
       // かぐや姫に頼まれた宝を持っていれば、先に差し出す（手番は終わらない）

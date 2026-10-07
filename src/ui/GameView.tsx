@@ -56,9 +56,11 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   /** ゲリラの最中（誰の手番でもない。転校で選んでいる人も手番の光り方にしない） */
   const guerrilla = inGuerrilla(state);
   const upNext = guerrilla ? nextTurnPlayer(state) : null;
-  const cpuTurn = actor !== null && state.players[actor].isCpu && ph.kind !== 'result';
+  // 係決めは一斉：まだ準備OKでないCPUがいれば、CPUが決める
+  const cpuRoles = ph.kind === 'roles' && state.players.some((p, i) => p.isCpu && !ph.ready[i]);
+  const cpuTurn = (actor !== null && state.players[actor].isCpu && ph.kind !== 'result') || cpuRoles;
   /** 通信対戦で、ほかの人の番（自分は見ているだけ） */
-  const othersTurn = online && actor !== mySeat && ph.kind !== 'result';
+  const othersTurn = online && actor !== mySeat && ph.kind !== 'result' && ph.kind !== 'roles';
   // 結果の「次へ」：手番の人が人間ならその人、CPUや全員向けの結果なら誰でも
   const resultOwner = ph.kind === 'result' && ph.player !== null && !state.players[ph.player].isCpu ? ph.player : null;
   const canContinue = !online || (mySeat !== undefined && !state.players[mySeat].isCpu && (resultOwner === null || resultOwner === mySeat));
@@ -67,7 +69,12 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   useEffect(() => {
     if (online) return;
     if (actor !== null && !state.players[actor].isCpu) setFocus(actor);
-  }, [actor, state.players, online]);
+    // 係決め（一斉）：手前の人が準備OKなら、まだの人間に席をゆずる
+    if (ph.kind === 'roles' && (state.players[focus].isCpu || ph.ready[focus])) {
+      const next = state.players.findIndex((p, i) => !p.isCpu && !ph.ready[i]);
+      if (next >= 0) setFocus(next);
+    }
+  }, [actor, state.players, online, ph, focus]);
 
   useEffect(() => {
     setPick({ uid: null, target: null, theirUid: null });
@@ -148,7 +155,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const matLit = (i: number) => fx?.lit(i) ?? lit;
   const fxDim = (i: number) => (fx?.dims(i) ? (u: string) => fx.dims(i)!.has(u) : undefined);
   const me = state.players[focus];
-  const editingRoles = ph.kind === 'roles' && ph.player === focus && !me.isCpu && !othersTurn;
+  const editingRoles = ph.kind === 'roles' && !ph.ready[focus] && !me.isCpu;
 
   return (
     <div className="table-wrap">
@@ -207,7 +214,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
         </div>
         {/* 相手の教室は卓に出さない（名札をタップしたときだけ開く） */}
         <div className="stage">
-          <Center state={state} dispatch={dispatch} cpuBusy={cpuTurn || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} />
+          <Center state={state} dispatch={dispatch} cpuBusy={(cpuTurn && ph.kind !== 'roles') || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} />
         </div>
         <div className="near-seat">
           {editingRoles ? (
@@ -216,7 +223,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               player={me}
               year={state.year}
               slots={slots}
-              onConfirm={(roles, unlock) => dispatch({ type: 'setRoles', roles, unlock })}
+              onConfirm={(roles, unlock) => dispatch({ type: 'setRoles', player: focus, roles, unlock })}
             />
           ) : (
             <Playmat
@@ -252,7 +259,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
             <button className="modal-close" onClick={() => setPeek(null)} aria-label="閉じる">
               ✕
             </button>
-            {peekPicking && <div className="peek-hint">🔁 こちらのクラスに来てもらう生徒をタップ（アイコンの数が同じ子だけ。係の子は選べない）</div>}
+            {peekPicking && <div className="peek-hint">こちらのクラスに来てもらう生徒をタップ（アイコンの数が同じ子だけ。係の子は選べない）</div>}
             <Playmat
               player={state.players[peek]}
               year={state.year}

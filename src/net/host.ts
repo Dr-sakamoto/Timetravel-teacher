@@ -1,9 +1,9 @@
 import { Relay } from './relay';
-import { cpuAction } from '../game/ai';
+import { cpuAction, rolesAction } from '../game/ai';
 import { calendarLabel, newGame, step } from '../game/engine';
 import { SAVE_VERSION } from '../game/saveVersion';
 import type { Action, GameState } from '../game/types';
-import { canAct, waitingOn, MAX_SEATS, PING_MS, TIMEOUT_MS, type Lobby, type Seat, type ToGuest, type ToHost, type ToHostEnvelope } from './protocol';
+import { canAct, waitsFor, MAX_SEATS, PING_MS, TIMEOUT_MS, type Lobby, type Seat, type ToGuest, type ToHost, type ToHostEnvelope } from './protocol';
 
 const SAVE_KEY = 'jikuu-saikyou-host-v1';
 
@@ -176,7 +176,9 @@ export class HostRoom {
         return;
       case 'action': {
         const s = this.snap.state;
-        if (!s || m.seq !== this.snap.seq || !canAct(s, i, m.action)) {
+        // 係決めは一斉なので、ほかの人の準備OKで版が進んでいても受け付ける（canAct が二重を防ぐ）
+        const simultaneous = m.action.type === 'setRoles' && s?.phase.kind === 'roles';
+        if (!s || (m.seq !== this.snap.seq && !simultaneous) || !canAct(s, i, m.action)) {
           this.sendOne(cid, i);
           return;
         }
@@ -276,7 +278,8 @@ export class HostRoom {
   /** 部屋を作った人の操作・CPUの操作（seq は画面に出ていた状態の番号。古い画面からの操作は捨てる） */
   apply(a: Action, seq: number) {
     const s = this.snap.state;
-    if (!s || seq !== this.snap.seq) return;
+    const simultaneous = a.type === 'setRoles' && s?.phase.kind === 'roles';
+    if (!s || (seq !== this.snap.seq && !simultaneous)) return;
     this.commit(step(s, a));
   }
 
@@ -287,8 +290,8 @@ export class HostRoom {
   stepFor(i: number) {
     const s = this.snap.state;
     const seat = this.snap.lobby.seats[i];
-    if (!s || seat?.kind !== 'guest' || seat.online || waitingOn(s) !== i) return;
-    const a = cpuAction(s);
+    if (!s || seat?.kind !== 'guest' || seat.online || !waitsFor(s, i)) return;
+    const a = s.phase.kind === 'roles' ? rolesAction(s, i) : cpuAction(s);
     if (!a) return;
     const next = step(s, a);
     if (next === s) return;

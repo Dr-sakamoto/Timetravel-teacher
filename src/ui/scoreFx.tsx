@@ -26,6 +26,8 @@ export interface FxCard {
   threat?: number;
   /** 共通イベント：引かれるアイコン（または人数） */
   minus?: Attr | 'heads';
+  /** 「持つ子1人につき+N」：アイコンの数や×2に関係なく、1人ずつ同じ点 */
+  perHead?: number;
 }
 
 export interface FxRects {
@@ -93,7 +95,7 @@ function fly(a: Pt, b: Pt, p: number, arc = 70): Pt {
 }
 const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 const isRaid = (card: FxCard) => card.threat !== undefined;
-const minusIcon = (m: Attr | 'heads') => (m === 'heads' ? '👥' : ATTR_ICON[m]);
+const minusIcon = (m: Attr | 'heads') => (m === 'heads' ? '人' : ATTR_ICON[m]);
 const iconRects = (rects: FxRects, u: string, a: Attr) => (rects.icons[u] ?? []).filter((x) => x.a === a).map((x) => x.r);
 
 /** 共通イベントで引かれる分：アイコンなら1枚ずつの数、人数なら1人1つ */
@@ -107,15 +109,16 @@ function dimOthers(c: FxCtx, f: Frame) {
   for (const u of c.all) if (!c.list.some((x) => x.student.uid === u)) f.dim.add(u);
 }
 
-/** 内訳のラベル：🏃×3 ⚔️時代×2 係×2 */
+/** 内訳のラベル：🏃×3 時代×2 係×2 */
 export function why(c: Contribution, card: FxCard): ReactNode {
+  if (card.perHead) return <span>1人</span>;
   const era = card.era ? ERAS.find((e) => e.id === card.era)! : null;
   return (
     <>
       <span>
         {ATTR_ICON[card.attr]}×{c.icons}
       </span>
-      {c.era && era && <span className="fx-mul era">{era.icon}時代×2</span>}
+      {c.era && era && <span className="fx-mul era">時代×2</span>}
       {c.role && <span className="fx-mul role">係×2</span>}
     </>
   );
@@ -140,7 +143,8 @@ function finale(c: FxCtx, from: Pt, t0: number, f: Frame) {
   const { t, delta, total, card, rects } = c;
   if (t < t0) return;
   const raid = isRaid(card);
-  if (raid) {
+  // 襲来の式は、点が名札へ飛び終わったら消す（あとは結果の明細に残る）
+  if (raid && t < t0 + 900 + FINALE_FLY) {
     const q = back((t - t0) / 300);
     f.overlay.push(
       <div key="raid-eq" className="fx-raid-eq" style={{ left: (rects.ecard?.right ?? 0) + 16, top: from.y, transform: `translate(0,-50%) scale(${q})` }}>
@@ -218,7 +222,7 @@ export const popFly: Variant = {
       key: x.student.uid,
       from: top(rects.cards[x.student.uid]),
       to,
-      label: raid ? `🛡️${x.pts}` : `+${x.pts}`,
+      label: raid ? `${x.pts}` : `+${x.pts}`,
       why: why(x, card),
       shield: raid,
     }));
@@ -266,7 +270,7 @@ export const stamp: Variant = {
           className={`fx-stamp ${raid ? 'shield' : ''}`}
           style={{ left: at.x, top: at.y, opacity: q, transform: `translate(-50%,-50%) rotate(${-14 + 6 * (i % 3)}deg) scale(${2.4 - 1.4 * ease(q)})` }}
         >
-          <b>{raid ? `🛡️${x.pts}` : `+${x.pts}`}</b>
+          <b>{raid ? `${x.pts}` : `+${x.pts}`}</b>
           <small>{why(x, card)}</small>
         </div>,
       );
@@ -319,13 +323,13 @@ export const receipt: Variant = {
               {x.student.icon} {x.student.name}
             </span>
             <span className="fx-row-why">{why(x, card)}</span>
-            <span className="fx-row-pts">{raid ? `🛡️${x.pts}` : `+${x.pts}`}</span>
+            <span className="fx-row-pts">{raid ? `${x.pts}` : `+${x.pts}`}</span>
           </div>
         ))}
         {list.length === 0 && t >= start && <div className="fx-row empty">{ATTR_ICON[card.attr]}を持つ子がいない…</div>}
         {raid && t >= end && (
           <div className="fx-row enemy">
-            <span className="fx-row-who">😠 敵の強さ</span>
+            <span className="fx-row-who">敵の強さ</span>
             <span className="fx-row-why" />
             <span className="fx-row-pts">−{card.threat}</span>
           </div>

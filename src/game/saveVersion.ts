@@ -9,7 +9,7 @@ import * as roles from './data/roles';
  * 項目の名前や意味を変えて、前の版の保存データが読めなくなるときだけ手で上げる（任意の項目を足すだけなら上げなくてよい）。
  * 人物・イベント・グッズ・時代などのデータを変えたときは、下の DATA_HASH が自動で変わるので上げなくてよい
  */
-export const SAVE_SCHEMA = 26;
+export const SAVE_SCHEMA = 27;
 
 /** 遊び方に関わらない文章（名前・説明・時代の空気など）。直しても保存データはそのまま読めるので、指紋に入れない */
 const TEXT_KEYS = new Set(['name', 'title', 'flavor', 'desc', 'motto', 'when']);

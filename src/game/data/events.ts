@@ -10,7 +10,7 @@ export interface NormalCard {
   count: number;
 }
 
-/** カチコミ：場から取った人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させる */
+/** カチコミ：場から取った人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させ、👊の数 × drain だけ自分に吸い取る（ドレイン） */
 export interface KachikomiCard {
   id: string;
   kind: 'kachikomi';
@@ -18,6 +18,8 @@ export interface KachikomiCard {
   icon: string;
   /** 減点の倍率 */
   mult: number;
+  /** 自分に入る倍率（ドレイン） */
+  drain: number;
   count: number;
 }
 
@@ -100,7 +102,7 @@ export type EraEffect =
   | { type: 'kongming' }
   | { type: 'bridge'; need: number; take: number; lose: number }
   | { type: 'oath'; max: number }
-  | { type: 'tribute'; per: number }
+  | { type: 'tribute'; win: number }
   | { type: 'genji'; also: Attr; per: number }
   | { type: 'kaguya'; win: number }
   | { type: 'benkei'; need: number; lose: number }
@@ -228,10 +230,11 @@ export const NORMAL_CARDS: NormalCard[] = [
   N('charm', '学活の時間', '🙋', 4),
 ];
 
-export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, count: 3 }];
+export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, drain: 1, count: 3 }];
 
+// 共通イベントはいったん休止中（時代イベントが出やすいように、山札に入れない）。戻すときは count を 1 に
 const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | undefined, desc: string, per?: number): SwingCard => ({
-  id, kind: 'swing', name, icon, plus, minus, desc, per, count: 1,
+  id, kind: 'swing', name, icon, plus, minus, desc, per, count: 0,
 });
 export const SWING_CARDS: SwingCard[] = [
   W('poptest', '抜き打ちテスト', '📝', 'study', undefined, '日ごろの勉強がものを言う。'),
@@ -335,8 +338,8 @@ export const ERA_CARDS: ContestCard[] = [
   C('shugakuryoko', '修学旅行', '🚌', 'all', { type: 'tiers', steps: [[12, 5], [18, 10], [24, 15]] }, 'いろんな子がいるクラスほど、旅の思い出がふくらむ。', 'present', 1),
   // 白亜紀：👊が中心。弱肉強食の時代と、恐竜を絶滅させた隕石。卵から孵る恐竜（EGG_DINOS）はここに出てくる恐竜
   C('meteor', '巨大隕石の衝突', '☄️', 'sports', { type: 'disaster', lose: 8, per: 2 }, '恐竜の時代を終わらせた隕石。生き延びたのは、すばしこく逃げ回れた者たち。', 'cretaceous', 1),
-  C('trex_hunt', 'ティラノサウルスの狩り', '🦖', 'fight', { type: 'plunder', amount: 8 }, '強い者が、一番弱い者を狩っていく。', 'cretaceous', 1),
-  C('migration', '大移動', '🦕', 'fight', { type: 'threshold', need: 6, win: 6, lose: 3 }, 'パラサウロロフスの群れが大地を渡る。群れを守り切れるか。', 'cretaceous', 1),
+  C('trex_hunt', 'ティラノサウルスの狩り', '🦖', 'fight', { type: 'plunder', amount: 8 }, 'ティラノサウルスは、一番肥えた獲物を狙う。一番強い群れが、一番ポイントを持っているクラスに襲いかかる。', 'cretaceous', 1),
+  C('migration', '大移動', '🦕', 'fight', { type: 'threshold', need: 6, win: 6, lose: 0 }, 'パラサウロロフスの群れが大地を渡る。群れを守り切れるか。', 'cretaceous', 1),
   C('egg_theft', 'オヴィラプトルの卵泥棒', '🥚', 'sports', { type: 'egg' }, '一番すばしこいクラスが、恐竜の卵をこっそり持ち帰る。何が孵るかはお楽しみ。', 'cretaceous', 1),
   // 古代エジプト：🏃👑。ピラミッドは場の横に残り、みんなで少しずつ積む。ナイルの氾濫のあとは大豊作。書記はえらい役人、ミイラの副葬品は王や貴族のもの
   C('giza', 'ギザの大ピラミッド建設', '🔺', 'sports', { type: 'pyramid', need: 7, steps: [[7, 20], [14, 30]] }, '学期のあいだ、みんなで少しずつ石を積む。働く人はパンとビールを給料にもらっていた。完成すれば、たくさん積んだクラスほど大きなほうび。学期が終わるまでに完成しなければ、積んだ石はむだになる。', 'egypt', 1),
@@ -345,19 +348,19 @@ export const ERA_CARDS: ContestCard[] = [
   C('mummy', 'ミイラづくり', '⚱️', 'charm', { type: 'burial', per: 4 }, '70日かけてミイラをつくり、あの世で使う宝物（副葬品）といっしょにお墓に納める。りっぱなお墓に宝物を入れてもらえたのは、王や貴族だけ。', 'egypt', 1),
   // ギリシャ・ローマ：🏃📚。オリンピックは負けても減点なし、剣闘は負けると減点。陶片追放は秘密投票で1クラスだけ転校
   C('olympia', '古代オリンピック', '🏛️', 'sports', { type: 'battle', win: 12, second: 5, lose: 0 }, 'オリーブ冠を手にするのは、一番速いクラスだけ。参加することに意義がある。', 'greece', 1),
-  C('colosseum', 'コロッセオの剣闘', '⚔️', 'sports', { type: 'arena', also: 'fight', win: 12, lose: 4 }, '各クラスの一番の剣闘士が闘技場へ。勝てば喝采、負ければ大恥。', 'greece', 1),
-  C('socratic', 'ソクラテスの問答', '🧔', 'study', { type: 'dialogue', need: 4, win: 8, lose: 3 }, '「きみは何を知っている？」 クラスの代表がソクラテスと対話する。答えに詰まれば論破される。', 'greece', 1),
+  C('colosseum', 'コロッセオの剣闘', '⚔️', 'sports', { type: 'arena', also: 'fight', win: 12, lose: 0 }, '各クラスの一番の剣闘士が闘技場へ。勝てば喝采。', 'greece', 1),
+  C('socratic', 'ソクラテスの問答', '🧔', 'study', { type: 'dialogue', need: 4, win: 8, lose: 0 }, '「きみは何を知っている？」 クラスの代表がソクラテスと対話する。', 'greece', 1),
   C('ostracism', '陶片追放', '🏺', 'all', { type: 'ostracism' }, '陶器のかけらに名前を書いて、こっそり投票。票が一番集まったクラスから、1人がアテネを去る。', 'greece', 1),
   // 三国志：📚👊。腕っぷしの大船団と知恵の軍師がぶつかり、孔明は知恵の足りないクラスへ来て、義兄弟はもうけも損も分け合う
   C('chibi', '赤壁の戦い', '⛵', 'fight', { type: 'fireattack', win: 10, lose: 10, fail: 5 }, '208年、曹操の大船団に、周瑜と孔明が知恵の火攻めで挑んだ。腕っぷしの大軍か、知恵の軍師か。', 'china', 1),
   C('sangu', '三顧の礼', '🏠', 'study', { type: 'kongming' }, '人望はあっても知恵の足りなかった劉備は、諸葛亮の家を3回たずねて、やっと軍師に迎えた。', 'china', 1),
-  C('changban', '長坂の戦い', '🌉', 'fight', { type: 'bridge', need: 2, take: 4, lose: 2 }, '208年、曹操の大軍に追われた劉備軍。張飛はたった一人で橋の上に立ち、大声で一喝して追っ手を止めた。', 'china', 1),
+  C('changban', '長坂の戦い', '🌉', 'fight', { type: 'bridge', need: 2, take: 4, lose: 0 }, '208年、曹操の大軍に追われた劉備軍。張飛はたった一人で橋の上に立ち、大声で一喝して追っ手を止めた。', 'china', 1),
   C('taoyuan', '桃園の誓い', '🍑', 'all', { type: 'oath', max: 2 }, '物語『三国志演義』では、まだ何者でもなかった劉備が、関羽・張飛と桃の園で義兄弟になった。生まれた日はちがっても、喜びも苦しみも分け合う。', 'china', 1),
   // 平安：🎨👑。物語を書く子と読む貴族、権力者への贈り物、かぐや姫の難題、五条大橋の弁慶（👊だけはこの1枚）
   C('genji', '源氏物語', '📖', 'art', { type: 'genji', also: 'charm', per: 3 }, '紫式部が書いた光源氏の物語。宮中の貴族たちが続きを楽しみに回し読みした。', 'heian', 1),
-  C('mochizuki', '藤原道長の望月の歌', '🌕', 'charm', { type: 'tribute', per: 3 }, '「この世をば わが世とぞ思ふ 望月の 欠けたることも なしと思へば」。道長に一番気に入られたクラスへ、ほかのクラスから贈り物が届く。', 'heian', 1),
+  C('mochizuki', '藤原道長の望月の歌', '🌕', 'charm', { type: 'tribute', win: 6 }, '「この世をば わが世とぞ思ふ 望月の 欠けたることも なしと思へば」。道長に一番気に入られたクラスが、宴に招かれる。', 'heian', 1),
   C('kaguya', '竹取物語・かぐや姫の難題', '🌙', 'all', { type: 'kaguya', win: 5 }, 'かぐや姫が学校にやってきて「この宝を持ってきてください」。持ってこられなければ、学期の終わりに月へ帰ってしまう。', 'heian', 1),
-  C('gojo', '五条大橋の弁慶', '🪓', 'fight', { type: 'benkei', need: 3, lose: 2 }, '京の五条大橋で、弁慶が通る人の刀を奪っている。力を合わせて倒せば、弁慶が家来になる。', 'heian', 1),
+  C('gojo', '五条大橋の弁慶', '🪓', 'fight', { type: 'benkei', need: 3, lose: 0 }, '京の五条大橋で、弁慶が通る人の刀を奪っている。力を合わせて倒せば、弁慶が家来になる。', 'heian', 1),
   // 中世・ルネサンス：🎨📚。ペストにかかった子は走れなくなり、新大陸の品は早い者勝ち
   C('monalisa', 'モナ・リザ制作', '🖼️', 'art', { type: 'masterpiece', per: 3 }, '何年もかけて仕上げられた、謎の微笑み。名画を生むのはクラス一番の描き手の腕前。', 'europe', 1),
   C('printing', '活版印刷', '📘', 'study', { type: 'printing' }, 'グーテンベルクの印刷機で、本が安く刷れるようになった。本を読んだことのない子も、みんな学び始める。', 'europe', 1),
@@ -365,7 +368,7 @@ export const ERA_CARDS: ContestCard[] = [
   C('columbus', 'コロンブスの新大陸到達', '🌎', 'study', { type: 'newworld' }, '1492年、大西洋の向こうに新しい大陸が見つかった。見たこともない品が、物知りのクラスから順に届く。', 'europe', 1),
   // 戦国：👑👊。合戦は👑と👊を合わせて数える。鉄砲はどのクラスにも届き、楽市楽座では人望のあるクラスにグッズがタダで届く
   { ...C('okehazama', '桶狭間の戦い', '🌧️', 'charm', { type: 'gekokujo', amount: 8 }, '大雨の中の奇襲。勢いに乗ったクラスが、天下に一番近い大大名・今川義元の本陣を討つ。', 'sengoku', 1), also: 'fight' },
-  { ...C('sekigahara', '関ヶ原の戦い', '⚔️', 'charm', { type: 'battle', win: 15, second: 5, lose: 10 }, '天下分け目の大合戦。味方を集めた人望と腕っぷしで、東軍と西軍がぶつかる。', 'sengoku', 1), also: 'fight' },
+  { ...C('sekigahara', '関ヶ原の戦い', '⚔️', 'charm', { type: 'battle', win: 15, second: 5, lose: 0 }, '天下分け目の大合戦。味方を集めた人望と腕っぷしで、東軍と西軍がぶつかる。', 'sengoku', 1), also: 'fight' },
   C('teppo', '鉄砲伝来', '🔫', 'fight', { type: 'teppo' }, '1543年、種子島に流れ着いたポルトガル人が鉄砲を伝えた。どのクラスにも1丁ずつ届く。', 'sengoku', 1),
   C('rakuichi', '楽市楽座', '🪙', 'charm', { type: 'rakuichi' }, '城下町で誰でも自由に商売ができるようになった。人望を集めたクラスには、商人が品をタダで持ってくる。', 'sengoku', 1),
   // 江戸・幕末：🎨🏃。運だけの富くじ
@@ -377,7 +380,7 @@ export const ERA_CARDS: ContestCard[] = [
   C('expo', 'パリ万国博覧会', '🗼', 'all', { type: 'expo', steps: [[4, 4], [5, 10]] }, '世界中の国が自慢の品を持ちよった大博覧会。1867年のパリ万博には日本も初めて出展し、浮世絵がヨーロッパで大人気になった。いろんな得意を持つ子がそろったクラスほど、見に来る人でにぎわう。', 'modern', 1),
   C('sunflower', 'ゴッホのひまわり', '🌻', 'art', { type: 'sunflower', per: 3 }, 'ゴッホはひまわりの絵を何枚も描いたが、生きているあいだはほとんど売れなかった。今では世界中の美術館の宝もの。描いた絵は、あとになってから値打ちが出る。', 'modern', 1),
   // 未来：📚。ロボコンとシンギュラリティが📚の枠
-  C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'threshold', need: 8, win: 10, lose: 4 }, 'ロボットを作って出場。頭脳が足りないと動かない。', 'future', 1),
+  C('robocon', 'ロボコン2300', '🤖', 'study', { type: 'threshold', need: 8, win: 10, lose: 0 }, 'ロボットを作って出場。頭脳が足りないと動かない。', 'future', 1),
   C('singularity', 'シンギュラリティ', '🧠', 'study', { type: 'machine' }, 'AIが人間の知能を超えた。機械の子たちが一気に賢くなる。', 'future', 1),
   C('martian', '火星からの留学生', '👽', 'all', { type: 'alien' }, '空いている席に、何もできない火星人が留学してくる。', 'future', 1),
   C('timemachine', 'タイムマシン完成', '⏳', 'all', { type: 'timemachine' }, 'いちばん困っているクラスに、どこかの時代から助っ人がやってくる。', 'future', 1),
@@ -426,7 +429,7 @@ export function cardRule(c: EventCard): string {
     case 'normal':
       return `取った人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させる`;
+      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させ、👊の数×${c.drain}だけ自分に加点（ドレイン）`;
     case 'swing':
       if (c.per) return `全クラス：${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       if (!c.minus) return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点`;
@@ -466,19 +469,19 @@ export function eraEffectRule(c: ContestCard): string {
     case 'elect':
       return `全校で${a}が一番多い子が当選し、${a}が1つ増える`;
     case 'machine':
-      return `機械の子（機械の人物・サイボーグ・📱💻💾を装備した子）は${a}が1つ増える`;
+      return `機械の子（機械の人物・サイボーグ・スマホ・タブレット・電脳チップを装備した子）は${a}が1つ増える`;
     case 'timemachine':
       return 'ポイントが一番少ないクラスに、どこかの時代の人物が1人、無料で転入する';
     case 'threshold':
-      return `${a}が${e.need}以上なら+${e.win}、足りないと−${e.lose}`;
+      return `${a}が${e.need}以上なら+${e.win}${e.lose ? `、足りないと−${e.lose}` : ''}`;
     case 'battle':
       return `${a}の数で勝負：1位+${e.win}、2位+${e.second}${e.lose ? `、最下位−${e.lose}` : '（負けても減点なし）'}`;
     case 'arena':
-      return `各クラスの${a}${ATTR_ICON[e.also]}の合計が一番多い子が戦う：1位+${e.win}、負けたクラスは−${e.lose}`;
+      return `各クラスの${a}${ATTR_ICON[e.also]}の合計が一番多い子が戦う：1位+${e.win}${e.lose ? `、負けたクラスは−${e.lose}` : '（負けても減点なし）'}`;
     case 'dialogue':
-      return `各クラスの${a}が一番多い子が代表でソクラテスと対話：${a}${e.need}以上なら+${e.win}、足りないと論破されて−${e.lose}`;
+      return `各クラスの${a}が一番多い子が代表でソクラテスと対話：${a}${e.need}以上なら+${e.win}${e.lose ? `、足りないと論破されて−${e.lose}` : ''}`;
     case 'plunder':
-      return `${a}が一番多いクラスが、一番少ないクラスから${e.amount}点奪う`;
+      return `${a}が一番多いクラスが、ポイントが一番多いクラスから${e.amount}点奪う（自分がポイント1位なら何も起こらない）`;
     case 'pyramid':
       return `手番で選ぶと、クラスの${a}の数だけ石を積む（その手番は点なし）。全クラスで${e.need}×クラス数に届いたら完成：積んだ石が${e.steps.map(([n, w]) => `${n}個以上で+${w}`).join('、')}。学期中に完成しなければむだ`;
     case 'scribe':
@@ -492,17 +495,17 @@ export function eraEffectRule(c: ContestCard): string {
     case 'kongming':
       return `👑の数から${a}の数を引いた差が一番大きいクラスに、諸葛亮孔明が軍師として無料で転入（満席のクラスは除く）`;
     case 'bridge':
-      return `ポイントが一番多いクラスが追いかける。ほかの各クラスは${a}が一番多い子1人が橋に立ち、${a}${e.need}以上なら一喝して追いかけるクラスから${e.take}点奪う、足りなければ−${e.lose}`;
+      return `ポイントが一番多いクラスが追いかける。ほかの各クラスは${a}が一番多い子1人が橋に立ち、${a}${e.need}以上なら一喝して追いかけるクラスから${e.take}点奪う${e.lose ? `、足りなければ−${e.lose}` : ''}`;
     case 'oath':
       return `ポイントが一番少ないクラスが、ほかのクラスを${e.max}つまで選んで義兄弟に。学期の区切りまで、義兄弟のもうけと損は山分け`;
     case 'tribute':
-      return `${a}が一番多いクラスに、ほかの全クラスが${e.per}点ずつ贈る`;
+      return `${a}が一番多いクラスに+${e.win}`;
     case 'genji':
       return `全校で${a}が一番多い子が作者に：作者のクラスで${ATTR_ICON[e.also]}を持つ子1人につき+${e.per}`;
     case 'kaguya':
-      return `かぐや姫が学期の終わりまで滞在し、宝（${KAGUYA_TREASURES.map((t) => t.icon).join('')}）をクラスごとに1つずつ頼む：頼まれた宝を装備していれば、手番で差し出して+${e.win}（宝は消える）`;
+      return `かぐや姫が学期の終わりまで滞在し、宝（${KAGUYA_TREASURES.map((t) => t.name).join('・')}）をクラスごとに1つずつ頼む：頼まれた宝を装備していれば、手番で差し出して+${e.win}（宝は消える）`;
     case 'benkei':
-      return `${a}の合計が${e.need}以上のクラスが弁慶を倒し、一番多いクラスに弁慶（${a}${a}${a}）が転入。届かないクラスは−${e.lose}`;
+      return `${a}の合計が${e.need}以上のクラスが弁慶を倒し、一番多いクラスに弁慶（${a}${a}${a}）が転入${e.lose ? `。届かないクラスは−${e.lose}` : ''}`;
     case 'masterpiece':
       return `各クラスの${a}が一番多い子1人の、${a}の数×${e.per}`;
     case 'printing':
@@ -510,7 +513,7 @@ export function eraEffectRule(c: ContestCard): string {
     case 'plague':
       return `各クラスの係でない子1人（ランダム）がペストにかかり、学期の区切りまで${a}を数えない`;
     case 'newworld':
-      return `${a}の多いクラスから順に新大陸の品（${NEW_WORLD_GOODS.map((g) => g.icon + ATTR_ICON[g.attr]).join('')}）を1つ選び、グッズを持っていない子1人に装備（早い者勝ち）`;
+      return `${a}の多いクラスから順に新大陸の品（${NEW_WORLD_GOODS.map((g) => g.name + ATTR_ICON[g.attr]).join('・')}）を1つ選び、グッズを持っていない子1人に装備（早い者勝ち）`;
     case 'gekokujo':
       return `${a}が一番多いクラスが、ポイントが一番多いクラスから${e.amount}点奪う`;
     case 'teppo':
@@ -539,17 +542,17 @@ export function fixedRule(f: FixedEvent): string {
 }
 
 /**
- * カードの効果を絵文字の式で（文章を読まなくても分かるように）。
- * 例：授業「👑 → +」、共通イベント「🏃 − 👥」、時代イベント「🥇👊×2」、襲来「👊 − 8」
+ * カードの効果を短い式で（文章を読まなくても分かるように）。絵文字は5つのアイコン（📚🏃🎨👑👊）だけ使う。
+ * 例：授業「👑 → +」、時代イベント「👊1位 +12」、襲来「👊 − 8」
  */
 export function cardGlyph(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
       return `${ATTR_ICON[c.attr]} → +`;
     case 'kachikomi':
-      return `👊×${c.mult} → 😵`;
+      return `相手 −👊×${c.mult}　自分 +👊×${c.drain}`;
     case 'swing':
-      if (c.per) return `🧑${ATTR_ICON[c.plus]} → +${c.per}ずつ`;
+      if (c.per) return `${ATTR_ICON[c.plus]}の子1人 +${c.per}`;
       return c.minus ? `+${ATTR_ICON[c.plus]}　−${ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
     case 'contest':
       return contestGlyph(c);
@@ -558,11 +561,11 @@ export function cardGlyph(c: EventCard): string {
     case 'goods':
       return `装備 ${ATTR_ICON[c.attr]}＋1`;
     case 'cyborg':
-      return '🧑 → 🦾';
+      return '1人をサイボーグに';
     case 'push':
-      return '👥 → 👋🧑';
+      return '全クラス 1人転校';
     case 'exchange':
-      return '🧑 ⇄ 🧑';
+      return '1人ずつ交換';
   }
 }
 
@@ -571,84 +574,84 @@ function contestGlyph(c: ContestCard): string {
   const e = c.effect;
   switch (e.type) {
     case 'heads':
-      return `🧑${a} → +${e.per}ずつ`;
+      return `${a}の子1人 +${e.per}`;
     case 'disaster':
-      return `全員−${e.lose}　🧑${a} → +${e.per}ずつ`;
+      return `全員−${e.lose}　${a}の子1人 +${e.per}`;
     case 'egg':
-      return `${a}🥇 ⟵ 🥚 → 🦖`;
+      return `${a}1位 → 卵が来る`;
     case 'tiers':
-      return e.steps.map(([n, w]) => `${n}↑+${w}`).join('／');
+      return e.steps.map(([n, w]) => `${n}以上+${w}`).join('／');
     case 'elect':
-      return `全校の🧑${a}🥇 → ${a}＋1`;
+      return `全校の${a}1位の子 → ${a}＋1`;
     case 'machine':
-      return `🤖🦾📱 → ${a}＋1`;
+      return `機械の子 → ${a}＋1`;
     case 'timemachine':
-      return 'ポイント最下位 ⟵ ⏳🧑';
+      return 'ポイント最下位に1人転入';
     case 'threshold':
-      return `${a}${e.need}↑ +${e.win}／−${e.lose}`;
+      return `${a}${e.need}以上 +${e.win}${e.lose ? `／未満 −${e.lose}` : ''}`;
     case 'battle':
-      return `${a}で勝負 🥇+${e.win} 🥈+${e.second}${e.lose ? ` 最下位−${e.lose}` : ''}`;
+      return `${a}1位 +${e.win}　2位 +${e.second}${e.lose ? `　最下位 −${e.lose}` : ''}`;
     case 'arena':
-      return `🧑${a}${ATTR_ICON[e.also]} 剣闘 🥇+${e.win} 負け−${e.lose}`;
+      return `代表の${a}＋${ATTR_ICON[e.also]}　1位 +${e.win}${e.lose ? `　負け −${e.lose}` : ''}`;
     case 'dialogue':
-      return `🧑${a}🥇 vs 🧔${e.need}　+${e.win}／−${e.lose}`;
+      return `代表の${a}${e.need}以上 +${e.win}${e.lose ? `／未満 −${e.lose}` : ''}`;
     case 'plunder':
-      return `${a}🥇 ⟵${e.amount}点 ${a}最下位`;
+      return `${a}1位がポイント1位から${e.amount}点奪う`;
     case 'pyramid':
-      return `${a} → 🧱 → 🔺完成で ${e.steps.map(([n, w]) => `🧱${n}↑+${w}`).join('／')}`;
+      return `${a}の数だけ石を積む　完成で ${e.steps.map(([n, w]) => `${n}個以上+${w}`).join('／')}`;
     case 'scribe':
-      return `🧑${a}${ATTR_ICON[e.also]} → +${e.per}ずつ`;
+      return `${a}と${ATTR_ICON[e.also]}の子1人 +${e.per}`;
     case 'burial':
-      return `🧑${c.attr === 'all' ? '' : a}💍 → +${e.per}ずつ`;
+      return `グッズ持ちの子1人 +${e.per}`;
     case 'ostracism':
-      return '🗳️ 票🥇のクラス → 👋🧑';
+      return '投票1位のクラス 1人転校';
     case 'fireattack':
-      return `${a}🥇 vs 📚🥇 🔥 +${e.win}／−${e.lose}`;
+      return `${a}1位 vs 📚1位　+${e.win}／−${e.lose}`;
     case 'kongming':
-      return `👑−${a} 🥇 ⟵ 🪶孔明`;
+      return `👑−${a} 1位に孔明が転入`;
     case 'bridge':
-      return `🌉🧑${a}${e.need}↑ ⟵${e.take}点 ポイント🥇／−${e.lose}`;
+      return `代表の${a}${e.need}以上でポイント1位から${e.take}点奪う${e.lose ? `／未満 −${e.lose}` : ''}`;
     case 'oath':
-      return `ポイント最下位 🍑 義兄弟 → 点を山分け`;
+      return 'ポイント最下位が義兄弟を選ぶ → 点を山分け';
     case 'tribute':
-      return `${a}🥇 ⟵ ${e.per}点ずつ`;
+      return `${a}1位 +${e.win}`;
     case 'genji':
-      return `🧑${a}🥇 → 🧑${ATTR_ICON[e.also]}×${e.per}`;
+      return `${a}1位の子のクラス ${ATTR_ICON[e.also]}の子1人 +${e.per}`;
     case 'kaguya':
-      return `🌙 ⟵ ${KAGUYA_TREASURES.map((t) => t.icon).join('')}？ → +${e.win}`;
+      return `頼まれた宝を差し出す +${e.win}`;
     case 'benkei':
-      return `${a}${e.need}↑ → 🪓🧑　届かず−${e.lose}`;
+      return `${a}${e.need}以上 弁慶が家来に${e.lose ? `／未満 −${e.lose}` : ''}`;
     case 'masterpiece':
-      return `🧑${a}🥇 → ${a}×${e.per}`;
+      return `一番の子の${a} ×${e.per}`;
     case 'printing':
-      return `📖 → ${a}なしの🧑全員 ${a}＋1`;
+      return `${a}のない子 ${a}＋1`;
     case 'plague':
-      return `🐀 → 🧑 ${a}✖️`;
+      return `1人 ${a}が数えられない`;
     case 'newworld':
-      return `${a}🥇から → ${NEW_WORLD_GOODS.map((g) => g.icon).join('')}`;
+      return `${a}の多い順に新大陸の品`;
     case 'gekokujo':
-      return `${a}🥇 ⟵${e.amount}点 ポイント🥇`;
+      return `${a}1位がポイント1位から${e.amount}点奪う`;
     case 'teppo':
-      return `全クラス ⟵ ${TEPPO_GOODS.icon}${ATTR_ICON[TEPPO_GOODS.attr]}＋1`;
+      return `全クラスに鉄砲 ${ATTR_ICON[TEPPO_GOODS.attr]}＋1`;
     case 'rakuichi':
-      return `${a}🥇 → 次のグッズ0点`;
+      return `${a}1位 次のグッズ0点`;
     case 'lottery':
-      return `全員−${e.fee} → 🎫当たり総取り`;
+      return `全員−${e.fee}　当たり総取り`;
     case 'prize':
-      return `全校の🧑${a}🥇 → +${e.win}`;
+      return `全校の${a}1位の子 +${e.win}`;
     case 'patent':
-      return `${a}🥇 ⟵ 授業1回につき${e.fee}点`;
+      return `${a}1位 授業1回につき${e.fee}点`;
     case 'expo':
       return e.steps.map(([n, w]) => `${n}種類+${w}`).join('／');
     case 'sunflower':
-      return `🧑${a}🥇 → 🖼️ → 学期末 ${a}×${e.per}`;
+      return `一番の子の${a}×${e.per}（学期末）`;
     case 'alien':
-      return '🪑 → 👽';
+      return '空席に火星人';
   }
 }
 
 export function fixedGlyph(f: FixedEvent): string {
-  return f.rule === 'test' ? `📚 − 👊🧑×${TEST_YANKEE_PENALTY}　🥇🥈🥉` : 'アイコンの数　🥇🥈🥉';
+  return f.rule === 'test' ? `📚 − 👊の子×${TEST_YANKEE_PENALTY}　順位` : 'アイコンの数　順位';
 }
 
 /** カードの一言説明（選んだとき・めくったときに出す）。式だけで足りるものは空 */
@@ -657,7 +660,7 @@ export function shortRule(c: EventCard): string {
     case 'normal':
       return `${ATTR_ICON[c.attr]}の数だけ得点`;
     case 'kachikomi':
-      return `相手に👊×${c.mult}のダメージ`;
+      return `相手に👊×${c.mult}のダメージ、👊×${c.drain}を吸い取る`;
     case 'swing':
       if (c.per) return `${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       return c.minus ? `${ATTR_ICON[c.plus]}で得点、${ATTR_ICON[c.minus]}で減点` : `${ATTR_ICON[c.plus]}の数だけ得点`;
