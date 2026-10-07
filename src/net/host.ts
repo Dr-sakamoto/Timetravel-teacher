@@ -1,11 +1,9 @@
-import type Peer from 'peerjs';
-import type { DataConnection } from 'peerjs';
-import { makePeer } from './peer';
+import { Relay } from './relay';
 import { cpuAction } from '../game/ai';
 import { calendarLabel, newGame, step } from '../game/engine';
 import { SAVE_VERSION } from '../game/saveVersion';
 import type { Action, GameState } from '../game/types';
-import { canAct, waitingOn, MAX_SEATS, PEER_PREFIX, TIMEOUT_MS, type Lobby, type Seat, type ToGuest, type ToHost } from './protocol';
+import { canAct, waitingOn, MAX_SEATS, PING_MS, TIMEOUT_MS, type Lobby, type Seat, type ToGuest, type ToHost, type ToHostEnvelope } from './protocol';
 
 const SAVE_KEY = 'jikuu-saikyou-host-v1';
 
@@ -49,8 +47,7 @@ export function clearHostSave() {
 
 /** 部屋を作った人の端末：ゲームを進める本体。参加した人の操作を受け取り、新しい状態を全員に配る */
 export class HostRoom {
-  private peer: Peer | null = null;
-  private conns = new Map<string, DataConnection>();
+  private relay: Relay;
   private lastSeen = new Map<string, number>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private closed = false;
@@ -70,35 +67,35 @@ export class HostRoom {
       const auto = resume.auto;
       this.snap.state = { ...this.snap.state, players: this.snap.state.players.map((p, j) => (auto.includes(j) ? { ...p, isCpu: false } : p)) };
     }
-    this.open(0);
-    this.timer = setInterval(() => this.checkAlive(), 2000);
+    this.relay = new Relay(
+      this.snap.code,
+      (event, payload) => {
+        if (event !== 'h' || this.closed) return;
+        const { cid, m } = payload as ToHostEnvelope;
+        if (typeof cid === 'string' && m) this.receive(cid, m);
+      },
+      (s) => {
+        if (this.closed) return;
+        this.set({ status: s === 'open' ? 'open' : 'opening' });
+        // つながった（つなぎ直した）ら、今の状態を全員に配り直す
+        if (s === 'open') this.broadcast();
+      },
+    );
+    this.timer = setInterval(() => this.heartbeat(), PING_MS);
+    document.addEventListener('visibilitychange', this.onWake);
+    window.addEventListener('online', this.onWake);
   }
 
-  private open(tries: number) {
-    if (this.closed) return;
-    const peer = makePeer(PEER_PREFIX + this.snap.code);
-    this.peer = peer;
-    peer.on('open', () => this.set({ status: 'open', error: undefined }));
-    peer.on('connection', (c) => this.accept(c));
-    // 通信が切れたら（スマホがスリープした時など）つなぎ直す
-    peer.on('disconnected', () => {
-      if (!this.closed && !peer.destroyed) setTimeout(() => !peer.destroyed && peer.reconnect(), 1000);
-    });
-    peer.on('error', (e) => {
-      const type = (e as { type?: string }).type;
-      if (type === 'unavailable-id') {
-        // 読み込み直した直後は、前のIDがまだ残っていることがある
-        peer.destroy();
-        if (tries < 6) setTimeout(() => this.open(tries + 1), 2500);
-        else this.set({ status: 'error', error: 'この部屋番号は使われています。ルームを作り直してください' });
-        return;
-      }
-      if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
-        if (!this.snap.state) this.set({ status: 'error', error: '通信サーバーにつながりません。電波を確認してください' });
-        return;
-      }
-      if (type === 'browser-incompatible') this.set({ status: 'error', error: 'このブラウザは通信対戦に対応していません' });
-    });
+  /** スマホが画面に戻った時・電波が戻った時は、すぐ中継サーバーとのつながりを確かめる */
+  private onWake = () => {
+    if (document.visibilityState === 'visible') this.relay.wake();
+  };
+
+  /** 生存確認：全員に「まだいるよ」を送り、参加した人がつながっているかを見直す */
+  private heartbeat() {
+    // 参加した人がいない時は送らない（中継サーバーのメッセージ数を抑える）
+    if (this.snap.lobby.seats.some((s) => s.kind === 'guest')) this.relay.send('g', { to: '*', m: { t: 'pong', seq: this.snap.seq } });
+    this.checkAlive();
   }
 
   private set(p: Partial<HostSnap>) {
@@ -122,53 +119,45 @@ export class HostRoom {
     }
   }
 
-  private accept(c: DataConnection) {
-    let cid: string | null = null;
-    c.on('data', (raw) => {
-      const m = raw as ToHost;
-      if (m.t === 'hello') {
-        cid = m.cid;
-        const old = this.conns.get(cid);
-        if (old && old !== c) old.close();
-        this.conns.set(cid, c);
-        this.lastSeen.set(cid, Date.now());
-        this.hello(c, cid, m.name);
-        return;
-      }
-      if (!cid) return;
+  private receive(cid: string, m: ToHost) {
+    if (m.t === 'hello') {
       this.lastSeen.set(cid, Date.now());
-      this.message(cid, m);
-    });
-    c.on('close', () => {
-      if (cid && this.conns.get(cid) === c) {
-        this.conns.delete(cid);
-        this.checkAlive();
-      }
-    });
+      this.hello(cid, m.name);
+      return;
+    }
+    if (this.seatOf(cid) < 0) return;
+    this.lastSeen.set(cid, Date.now());
+    this.message(cid, m);
   }
 
   private seatOf(cid: string): number {
     return this.snap.lobby.seats.findIndex((s) => s.kind === 'guest' && s.cid === cid);
   }
 
-  private hello(c: DataConnection, cid: string, name: string) {
+  private hello(cid: string, name: string) {
     const seats = this.snap.lobby.seats;
-    let i = this.seatOf(cid);
+    const i = this.seatOf(cid);
     if (i < 0) {
-      if (this.snap.state) return this.sendTo(c, { t: 'reject', reason: 'このルームのゲームはもう始まっています' });
-      if (seats.length >= MAX_SEATS) return this.sendTo(c, { t: 'reject', reason: '満員です（5人まで）' });
-      i = seats.length;
-      this.setSeats([...seats, { name: cleanName(name, i), kind: 'guest', cid, online: true }]);
-    } else {
-      this.setSeats(seats.map((s, j) => (j === i ? { ...s, online: true, name: this.snap.state ? s.name : cleanName(name, j) } : s)));
+      if (this.snap.state) return this.sendTo(cid, { t: 'reject', reason: 'このルームのゲームはもう始まっています' });
+      if (seats.length >= MAX_SEATS) return this.sendTo(cid, { t: 'reject', reason: '満員です（5人まで）' });
+      this.setSeats([...seats, { name: cleanName(name, seats.length), kind: 'guest', cid, online: true }]);
+      this.broadcast();
+      return;
     }
-    this.broadcast();
+    const seat = seats[i];
+    const nextName = this.snap.state ? seat.name : cleanName(name, i);
+    if (!seat.online || seat.name !== nextName) {
+      this.setSeats(seats.map((s, j) => (j === i ? { ...s, online: true, name: nextName } : s)));
+      this.broadcast();
+    } else {
+      // 名乗り直し（つなぎ直し）：その人にだけ今の状態を送る
+      this.sendOne(cid, i);
+    }
   }
 
   private message(cid: string, m: ToHost) {
     const i = this.seatOf(cid);
     if (i < 0) return;
-    const c = this.conns.get(cid);
     switch (m.t) {
       case 'rename':
         if (!this.snap.state) {
@@ -177,16 +166,18 @@ export class HostRoom {
         }
         return;
       case 'ping':
-        if (c) this.sendTo(c, { t: 'pong', seq: this.snap.seq });
-        if (c && this.snap.state && m.seq !== this.snap.seq) this.sendState(c, i);
+        // 「通信切れ」になっていた人が戻ってきた
+        if (!this.snap.lobby.seats[i].online) this.checkAlive();
+        // 見逃した手があれば、その人にだけ送り直す
+        if (this.snap.state && m.seq !== this.snap.seq) this.sendState(cid, i);
         return;
       case 'sync':
-        if (c) this.sendOne(c, i);
+        this.sendOne(cid, i);
         return;
       case 'action': {
         const s = this.snap.state;
         if (!s || m.seq !== this.snap.seq || !canAct(s, i, m.action)) {
-          if (c) this.sendOne(c, i);
+          this.sendOne(cid, i);
           return;
         }
         this.commit(step(s, m.action));
@@ -201,8 +192,7 @@ export class HostRoom {
     let changed = false;
     const seats = this.snap.lobby.seats.map((s) => {
       if (s.kind !== 'guest' || !s.cid) return s;
-      const c = this.conns.get(s.cid);
-      const online = !!c && c.open && now - (this.lastSeen.get(s.cid) ?? 0) < TIMEOUT_MS;
+      const online = now - (this.lastSeen.get(s.cid) ?? 0) < TIMEOUT_MS;
       if (online === s.online) return s;
       changed = true;
       return { ...s, online };
@@ -223,29 +213,23 @@ export class HostRoom {
     this.broadcast();
   }
 
-  private sendTo(c: DataConnection, m: ToGuest) {
-    if (!c.open) return;
-    try {
-      c.send(m);
-    } catch {
-      /* 切れかけの接続には送れないことがある */
-    }
+  private sendTo(to: string, m: ToGuest) {
+    this.relay.send('g', { to, m });
   }
 
-  private sendState(c: DataConnection, you: number) {
-    if (this.snap.state) this.sendTo(c, { t: 'state', seq: this.snap.seq, state: this.snap.state, you, seats: this.snap.lobby.seats });
+  private sendState(to: string, you: number) {
+    if (this.snap.state) this.sendTo(to, { t: 'state', seq: this.snap.seq, state: this.snap.state, you, seats: this.snap.lobby.seats });
   }
 
-  private sendOne(c: DataConnection, you: number) {
-    if (this.snap.state) this.sendState(c, you);
-    else this.sendTo(c, { t: 'lobby', lobby: this.snap.lobby, you });
+  private sendOne(to: string, you: number) {
+    if (this.snap.state) this.sendState(to, you);
+    else this.sendTo(to, { t: 'lobby', lobby: this.snap.lobby, you });
   }
 
+  /** 全員に1通で配る（席番号は受け取った側が端末IDから探す） */
   private broadcast() {
-    this.snap.lobby.seats.forEach((s, i) => {
-      const c = s.cid ? this.conns.get(s.cid) : undefined;
-      if (c) this.sendOne(c, i);
-    });
+    if (!this.snap.lobby.seats.some((s) => s.kind === 'guest')) return;
+    this.sendOne('*', -1);
   }
 
   // ---------- 部屋を作った人の画面から ----------
@@ -262,9 +246,8 @@ export class HostRoom {
     if (this.snap.state || i === 0 || !seats[i]) return;
     const cid = seats[i].cid;
     if (cid) {
-      const c = this.conns.get(cid);
-      if (c) this.sendTo(c, { t: 'reject', reason: 'ルームから外されました' });
-      this.conns.delete(cid);
+      this.sendTo(cid, { t: 'reject', reason: 'ルームから外されました' });
+      this.lastSeen.delete(cid);
     }
     this.setSeats(seats.filter((_, j) => j !== i));
     this.broadcast();
@@ -314,12 +297,15 @@ export class HostRoom {
   }
 
   close() {
+    if (this.closed) return;
+    this.sendTo('*', { t: 'closed' });
     this.closed = true;
-    for (const c of this.conns.values()) this.sendTo(c, { t: 'closed' });
     if (this.timer) clearInterval(this.timer);
+    document.removeEventListener('visibilitychange', this.onWake);
+    window.removeEventListener('online', this.onWake);
     // 「閉じました」が届くのを少し待ってから切る
-    const peer = this.peer;
-    setTimeout(() => peer?.destroy(), 300);
+    const relay = this.relay;
+    setTimeout(() => relay.close(), 300);
   }
 }
 
