@@ -125,7 +125,8 @@ export function Playmat(props: Props) {
     >
       <div className="plate">
         <span className="plate-name">
-          {player.name}
+          {/* 名前が長いときは名前だけを省略記号で切り、印（🤖🍑🪙💡🖼️）は残す */}
+          <span className="name-text">{player.name}</span>
           {player.isCpu && <small>🤖</small>}
           {props.sworn && <small title="桃園の誓い：義兄弟（学期の区切りで点を山分け）">🍑</small>}
           {player.freeGoods && <small title="楽市楽座：次に取るグッズ1つがタダ">🪙</small>}
@@ -232,7 +233,7 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
     >
       <span className="opp-plate">
         <span className="opp-name">
-          {player.name}
+          <span className="name-text">{player.name}</span>
           {player.isCpu && <small>🤖</small>}
           {offline && <small title="通信が切れています">📵</small>}
           {sworn && <small title="桃園の誓い：義兄弟（学期の区切りで点を山分け）">🍑</small>}
