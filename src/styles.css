@@ -3498,8 +3498,8 @@ body:has(.title-screen) {
   max-width: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* はみ出す札（転入・転校）の分だけ上に余白 */
-  padding-top: 0.45rem;
+  /* はみ出す札（転入・転校）やグッズの印の分だけ上と左右に余白 */
+  padding: 0.45rem 6px 0;
 }
 .reveal-foot {
   flex: none;
@@ -4177,5 +4177,71 @@ body:has(.title-screen) {
   }
   .playmat.pm-peek .seat.empty {
     display: none;
+  }
+}
+
+/* 結果に並べる生徒カードには名前を出す（結果の一言には子の名前を書かないので、だれかはカードで分かるように） */
+.deal .tcg.mini .tcg-head {
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  padding: 1px 2px;
+}
+.deal .tcg.mini .tcg-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  font-size: min(0.62rem, 15cqw);
+  text-align: center;
+}
+
+/* 横持ちのスマホ：結果の生徒カードは名前が読める幅を残す（明細のほうを詰める） */
+@media (orientation: landscape) and (max-height: 600px) {
+  .reveal .deal-card {
+    min-width: 38px;
+  }
+  .reveal .tally {
+    min-width: min(6.5rem, 30cqw);
+  }
+  .reveal .tally-count {
+    max-width: 4.5em;
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  /* 生徒カードの列は縮めず、明細の列のほうを縮める（重ならないように） */
+  .reveal-body:has(.tally):has(.deal) {
+    grid-template-columns: minmax(5rem, 1fr) minmax(min-content, auto);
+  }
+  .reveal .tally {
+    min-width: 0;
+    width: 100%;
+  }
+  .reveal .deal-card {
+    min-width: 34px;
+  }
+  .reveal .deal-more {
+    font-size: 0.6rem;
+  }
+}
+
+/* 卓の中央が狭いとき（横持ちの小さいスマホ）：明細と生徒カードを横に並べず、上下に積む（はみ出す分は縦にスクロール） */
+@container (max-width: 520px) {
+  .reveal-body,
+  .reveal-body:has(.tally):has(.deal) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .reveal .tally {
+    width: 100%;
+    max-width: 16rem;
+  }
+  /* 主役は生徒カード：明細より先に出す（明細は下にスクロールして見る） */
+  .reveal .deal {
+    order: 1;
+    width: 100%;
+    justify-content: center;
+  }
+  .reveal .tally {
+    order: 2;
   }
 }
