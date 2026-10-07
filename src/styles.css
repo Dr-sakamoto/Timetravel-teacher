@@ -4081,10 +4081,9 @@ body:has(.title-screen) {
   }
 }
 
-/* 場が低くつぶれたとき（転校・品を配るなどで操作の欄が大きい）は、山札と場を出さない（小さすぎて重なるので） */
-@container (max-height: 64px) {
-  .board > .piles,
-  .board > .market {
+/* 場が低くつぶれたとき（転校・品を配るなどで操作の欄が大きい）は、山札と場を出さない（小さすぎて重なるので。場から選ぶ手番と初期メンバーを引くときは除く） */
+@container (max-height: 96px) {
+  .center:not(.ph-draw):not(.ph-memberDraw) .board > :is(.piles, .market) {
     display: none;
   }
 }
