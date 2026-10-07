@@ -1067,17 +1067,17 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       });
       break;
     }
-    // 平安：かぐや姫が学期の区切りまで滞在し、各クラスに宝（平安のグッズ）を1つずつ、重ならないようにくじで頼む。差し出すかどうかは各クラスが手番で選ぶ（+win）
+    // 平安：かぐや姫が学期の区切りまで滞在し、5つの宝（平安のグッズ）を頼む。どのクラスが差し出してもよく、差し出すかどうかは手番で選ぶ（各宝1回きり。+win）
     case 'kaguya': {
-      const asks = shuffle(s, KAGUYA_TREASURES.map((g) => g.id));
-      s.kaguya = ps.map((_, i) => asks[i % asks.length]);
+      s.kaguya = KAGUYA_TREASURES.map((g) => ({ id: g.id, by: null }));
       ps.forEach((p, i) => {
-        const g = EVENT_MAP[s.kaguya![i]!] as GoodsCard;
-        const has = p.students.find((x) => x.goods?.id === g.id);
-        rows[i].note = g.name;
-        if (has) rows[i].uids = [has.uid];
-        tell(`${p.name}のクラスは「${g.name}」を頼まれた。${has ? `${name(has)}が持っている！手番で差し出せば+${e.win}。` : ''}`, i);
+        const has = p.students.filter((x) => KAGUYA_TREASURES.some((g) => g.id === x.goods?.id));
+        if (!has.length) return;
+        rows[i].note = has.map((x) => x.goods!.name).join('・');
+        rows[i].uids = has.map((x) => x.uid);
+        tell(`${p.name}のクラスの${has.map(name).join('・')}が宝を持っている！手番で差し出せば+${e.win}。`, i);
       });
+      tell(`かぐや姫は5つの宝を待っている。場の宝を取ってそのまま差し出してもよい（+${e.win}、手番は続く）。`);
       break;
     }
     // 平安：Xの合計が need 以上のクラスが弁慶を倒す。一番多いクラス（同点ならポイントが少ないクラス。満席なら次のクラス）に弁慶が家来として転入。届かないクラスは刀を取られて −lose
@@ -1457,26 +1457,33 @@ function resolveInvasion(s: GameState, c: ContestCard): EventResult {
   return { title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows, students: aliens.slice(0, 1), inUids: aliens.slice(0, 1).map((x) => x.uid) };
 }
 
-/** かぐや姫に頼まれた宝を装備した子（いなければ null）。手番でこの子の宝を差し出せる */
-export function kaguyaGift(s: GameState, pi: number): Student | null {
-  const want = s.kaguya?.[pi];
-  return (want && s.players[pi].students.find((x) => x.goods?.id === want)) || null;
+/** かぐや姫がまだ待っている宝か */
+export function kaguyaWants(s: GameState, id: string): boolean {
+  return !!s.kaguya?.some((x) => x.id === id && x.by === null);
 }
 
-/** かぐや姫に頼まれた宝を装備した子がいれば差し出す（宝は消えて +win）。差し出した子を返す */
+/** かぐや姫が待っている宝を装備した子（いなければ null）。手番でこの子の宝を差し出せる */
+export function kaguyaGift(s: GameState, pi: number): Student | null {
+  return s.players[pi].students.find((x) => x.goods && kaguyaWants(s, x.goods.id)) || null;
+}
+
+/** かぐや姫に宝を受け取ってもらう（+win） */
+function kaguyaReceive(s: GameState, pi: number, id: string, win: number) {
+  s.kaguya!.find((x) => x.id === id)!.by = pi;
+  s.players[pi].points += win;
+}
+
+/** かぐや姫が待っている宝を装備した子がいれば差し出す（宝は消えて +win）。差し出した子を返す */
 function presentKaguya(s: GameState, pi: number, win = kaguyaWin()): Student | null {
-  const want = s.kaguya?.[pi];
-  if (!want) return null;
   const p = s.players[pi];
-  const st = p.students.find((x) => x.goods?.id === want);
+  const st = kaguyaGift(s, pi);
   if (!st) return null;
   const g = st.goods!;
   const k = st.attrs.lastIndexOf(g.attr);
   st.attrs = st.attrs.filter((_, i) => i !== k);
   delete st.goods;
   st.mvp++;
-  p.points += win;
-  s.kaguya![pi] = null;
+  kaguyaReceive(s, pi, g.id, win);
   log(s, `${p.name}のクラスの${st.name}が、かぐや姫に${g.name}を差し出した！（+${win}）`, pi);
   return st;
 }
@@ -1490,7 +1497,7 @@ function kaguyaWin(): number {
 /** 学期の区切り：滞在していたかぐや姫が月へ帰る */
 function kaguyaLeaves(s: GameState) {
   if (!s.kaguya) return;
-  log(s, s.kaguya.some((x) => x) ? '宝がそろわないまま、かぐや姫は月へ帰っていった。' : 'かぐや姫は月へ帰っていった。');
+  log(s, s.kaguya.some((x) => x.by === null) ? '宝がそろわないまま、かぐや姫は月へ帰っていった。' : 'かぐや姫は月へ帰っていった。');
   delete s.kaguya;
 }
 
@@ -1832,7 +1839,8 @@ export function canTake(s: GameState, pi: number, slot: number): boolean {
     case 'normal':
       return true;
     case 'goods':
-      return equippable(p).length > 0;
+      // かぐや姫が待っている宝なら、装備できる子がいなくてもそのまま差し出せる
+      return equippable(p).length > 0 || kaguyaWants(s, id);
     case 'cyborg':
       return cyborgable(p).length > 0;
     case 'exchange':
@@ -2123,6 +2131,25 @@ export function step(prev: GameState, a: Action): GameState {
         s,
         ph.player,
         { title: 'かぐや姫に宝を差し出した', icon: '🌙', art: 'kaguya', tone: 'personal', desc: `${st.name}が宝を差し出した！（+${win}）`, rows: [{ player: ph.player, delta: win, note: '差し出した', uids: [st.uid] }], students: [st] },
+        'kaguya',
+      );
+      return s;
+    }
+    case 'offer': {
+      if (ph.kind !== 'equip' || !kaguyaWants(s, ph.card)) return prev;
+      const p = s.players[ph.player];
+      const c = EVENT_MAP[ph.card] as GoodsCard;
+      const free = !!p.freeGoods;
+      // 宝は消える（捨て札にも戻らない）
+      p.points -= marketCost(takeFromMarket(s, ph.slot, false), p);
+      delete p.freeGoods;
+      const win = kaguyaWin();
+      kaguyaReceive(s, ph.player, c.id, win);
+      log(s, `${p.name}のクラスが、かぐや姫に${c.name}を差し出した！（+${win}）${free ? '（楽市楽座でタダ）' : ''}`, ph.player);
+      setResult(
+        s,
+        ph.player,
+        { title: 'かぐや姫に宝を差し出した', icon: '🌙', art: 'kaguya', tone: 'personal', desc: `${c.name}を差し出した！（+${win}）`, rows: [{ player: ph.player, delta: win, note: '差し出した' }] },
         'kaguya',
       );
       return s;
