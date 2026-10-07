@@ -19,7 +19,7 @@ export interface Archetype {
 }
 
 /** 絵柄が女子のアーキタイプ */
-const FEMALE_IDS = new Set(['rep', 'brass', 'dance', 'gyaru', 'sukeban', 'returnee', 'childstar', 'influencer']);
+const FEMALE_IDS = new Set(['rep', 'brass', 'dance', 'gyaru', 'sukeban', 'childstar', 'influencer']);
 
 const Y: Tag[] = ['現代', 'ヤンキー'];
 const M: Tag[] = ['現代'];
@@ -49,7 +49,6 @@ export const ARCHETYPES: Archetype[] = [
   a('furyo', '不良', '👊', 'N', 6, '=pf', '授業はサボるが体育だけは出る。'),
   a('sukeban', 'スケバン', '💄', 'N', 4, '=cf', 'スカートが長い。'),
   // 転校生限定（現代）
-  a('returnee', '帰国子女', '✈️', 'R', 4, '=spc', '英語の発音がネイティブ。向こうではサッカーもミュージカルもやっていた。'),
   a('childstar', '天才子役', '🎬', 'R', 6, '=ac', 'ドラマ撮影で早退しがち。'),
   a('topscore', '全国模試1位', '🥇', 'R', 9, '=ssc', '塾を3つ掛け持ち。教え方もうまくて、テスト前は人だかり。'),
   a('esports', 'eスポーツ選手', '🕹️', 'R', 6, '=saa', '反射神経はプロ級。'),

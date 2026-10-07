@@ -142,7 +142,6 @@ export const ART: Record<string, ArtSpec> = {
   sukeban: { back: 'long', hair: 'mid', hairColor: '#8a4a2a', outfit: 'sailor', c1: '#222', c2: '#c0392b', expr: 'cool', acc: ['mask'], prop: 'yoyo' },
   furyo: { hair: 'spiky', hairColor: blond, outfit: 'longran', c1: '#f6f4ee', acc: ['plaster'], expr: 'angry', prop: 'fist' },
   bosozoku: { hair: 'pompadour', hairColor: '#8a4a2a', outfit: 'tokko', hat: 'hachimaki', hatColor: '#e5534b', expr: 'shout' },
-  returnee: { back: 'long', hair: 'mid', hairColor: brown, outfit: 'blazer', c1: '#2c3e66', c2: '#2f7fd8', expr: 'smile', prop: 'plane' },
   childstar: { back: 'bob', hair: 'short', hairColor: '#7a4e2e', outfit: 'dress', c1: '#f59ac2', c2: '#fff', acc: ['shadesup'], expr: 'wink', prop: 'clapper' },
   topscore: { hair: 'side', hairColor: black, outfit: 'gakuran', hat: 'hachimaki', hatColor: '#e5534b', acc: ['glasses'], expr: 'angry', prop: 'pencil' },
   esports: { hair: 'messy', hairColor: '#3a6ad0', outfit: 'hoodie', c1: '#2b2b2b', acc: ['headset'], expr: 'cool', prop: 'gamepad' },
