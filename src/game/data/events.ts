@@ -49,7 +49,6 @@ export interface SwingCard {
  *   egg       … 白亜紀「Xが一番多いクラス（1クラスだけ）の空いた席に卵が置かれ、そのクラスの次の手番の始めに恐竜が孵る」
  *   pyramid   … エジプト「山札には入らず、学期のあいだ場の横に残る。手番で選ぶと、クラスのXの数だけ石を積む（その手番は点なし）。
  *               全クラスの石が need×クラス数 に届いたら完成：自分のクラスが積んだ石が steps[i][0] 以上なら +steps[i][1]（届いた一番上の段だけ）。学期中に完成しなければむだになる」
- *   together  … エジプト「全クラスのXの合計が need×クラス数 以上なら全クラス +win（Xが一番少ないクラスだけ0）、届かなければ全クラス −lose」
  *   scribe    … エジプト「Xと also を両方持つ子（書記）1人につき +per」
  *   burial    … エジプト「Xを持っていて、グッズを装備している子1人につき +per（王や貴族があの世へ持っていく副葬品）」
  *   arena     … ギリシャ「各クラスの、Xと also の合計が一番多い子が闘技場で戦う：1位 +win、負けたクラス（出せる子がいないクラスも）−lose」
@@ -82,7 +81,6 @@ export type EraEffect =
   | { type: 'plunder'; amount: number }
   | { type: 'disaster'; lose: number; per: number }
   | { type: 'egg' }
-  | { type: 'together'; need: number; win: number; lose: number }
   | { type: 'pyramid'; need: number; steps: [stones: number, win: number][] }
   | { type: 'scribe'; also: Attr; per: number }
   | { type: 'burial'; per: number }
@@ -457,8 +455,6 @@ export function eraEffectRule(c: ContestCard): string {
       return `${a}と${ATTR_ICON[e.also]}を両方持つ子（書記）1人につき+${e.per}`;
     case 'burial':
       return `${c.attr === 'all' ? '' : `${a}を持っていて、`}グッズを装備している子1人につき+${e.per}`;
-    case 'together':
-      return `全クラスの${a}の合計が${e.need}×クラス数以上なら全クラス+${e.win}（${a}が一番少ないクラスは0）、届かなければ全クラス−${e.lose}`;
     case 'ostracism':
       return '全クラスがほかのクラスに秘密で投票し、票が一番多いクラスが1人転校させる';
     case 'upgrade':
@@ -556,8 +552,6 @@ function contestGlyph(c: ContestCard): string {
       return `🧑${a}${ATTR_ICON[e.also]} → +${e.per}ずつ`;
     case 'burial':
       return `🧑${c.attr === 'all' ? '' : a}💍 → +${e.per}ずつ`;
-    case 'together':
-      return `みんなの${a} ${e.need}×クラス数↑ +${e.win}／−${e.lose}`;
     case 'ostracism':
       return '🗳️ 票🥇のクラス → 👋🧑';
     case 'upgrade':
