@@ -510,7 +510,8 @@ body:has(.title-screen) {
 }
 .peek {
   position: relative;
-  width: min(900px, 96vw);
+  /* 背景の余白（左右1rem）の内側に収める */
+  width: min(900px, calc(100vw - 2rem));
   max-height: 92dvh;
   overflow-y: auto;
 }
@@ -1475,7 +1476,7 @@ body:has(.title-screen) {
   border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 .tcg-attr {
-  font-size: 0.9rem;
+  --afs: 0.9rem;
   line-height: 1.2;
   border-radius: 4px;
   padding: 0 1px;
@@ -1535,7 +1536,7 @@ body:has(.title-screen) {
   padding: 0;
 }
 .tcg.mini .tcg-attr {
-  font-size: 0.5rem;
+  --afs: 0.5rem;
 }
 .tcg.mini .tcg-role {
   font-size: 0.5rem;
@@ -1755,7 +1756,7 @@ body:has(.title-screen) {
   min-height: 1.9em;
 }
 .tcg-attr {
-  font-size: 1rem;
+  --afs: 1rem;
   background: rgba(255, 255, 255, 0.7);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
@@ -1763,7 +1764,7 @@ body:has(.title-screen) {
 .tcg-attrs.n5 .tcg-attr,
 .tcg-attrs.n6 .tcg-attr,
 .tcg-attrs.n7 .tcg-attr {
-  font-size: 0.85rem;
+  --afs: 0.85rem;
 }
 .tcg.mini .tcg-head {
   display: none;
@@ -1773,7 +1774,7 @@ body:has(.title-screen) {
   padding: 1px 0;
 }
 .tcg.mini .tcg-attr {
-  font-size: 0.5rem;
+  --afs: 0.5rem;
   background: none;
   box-shadow: none;
 }
@@ -1932,7 +1933,7 @@ body:has(.title-screen) {
   }
   .board {
     /* 場の領域は操作の欄の残り全部。カードはその幅（4枚）と高さ（山札の段＋場の段）に収まる大きさ */
-    --cw: min(88px, calc((100cqw - 2.2rem) / 4), calc((100cqh - 2.2rem) / 2.27));
+    --cw: min(88px, calc((100cqw - var(--mk, 4) * 0.55rem) / var(--mk, 4)), calc((100cqh - 2.2rem) / 2.27));
     flex: 1 1 0;
     min-height: 0;
     align-self: stretch;
@@ -2061,7 +2062,7 @@ body:has(.title-screen) {
   .pm-near .tcg-attrs.n4 .tcg-attr,
   .pm-near .tcg-attrs.n5 .tcg-attr,
   .pm-near .tcg-attrs.n6 .tcg-attr {
-    font-size: 0.72rem;
+    --afs: 0.72rem;
     padding: 0;
   }
   .pm-near .tcg-role {
@@ -2082,7 +2083,7 @@ body:has(.title-screen) {
   .pm-stage .tcg-attrs.n4 .tcg-attr,
   .pm-stage .tcg-attrs.n5 .tcg-attr,
   .pm-stage .tcg-attrs.n6 .tcg-attr {
-    font-size: 0.72rem;
+    --afs: 0.72rem;
     padding: 0;
   }
   .pm-stage .tcg-role {
@@ -2323,7 +2324,7 @@ body:has(.title-screen) {
   .playmat.pm-stage .tcg-attrs.n4 .tcg-attr,
   .playmat.pm-stage .tcg-attrs.n5 .tcg-attr,
   .playmat.pm-stage .tcg-attrs.n6 .tcg-attr {
-    font-size: 0.5rem;
+    --afs: 0.5rem;
     padding: 0;
   }
   .playmat.pm-stage .tcg-role {
@@ -2440,7 +2441,7 @@ body:has(.title-screen) {
   :is(.near-seat, .peek) .playmat .tcg-attr,
   :is(.near-seat, .peek) .playmat .tcg-attrs.n4 .tcg-attr,
   :is(.near-seat, .peek) .playmat .tcg-attrs.n5 .tcg-attr {
-    font-size: 0.6rem;
+    --afs: 0.6rem;
     padding: 0;
   }
   :is(.near-seat, .peek) .playmat .tcg-role {
@@ -2484,7 +2485,7 @@ body:has(.title-screen) {
   }
   .board {
     /* 場の領域は操作の欄の残り全部。カードはその高さと幅（7枚並ぶ）に収まる大きさ */
-    --cw: min(88px, calc((100cqh - 1.2rem) / 1.37), calc((100cqw - 4.6rem) / 7));
+    --cw: min(88px, calc((100cqh - 1.2rem) / 1.37), calc((100cqw - 4.6rem - (var(--mk, 4) - 4) * 0.5rem) / (var(--mk, 4) + 3)));
     flex: 1 1 0;
     min-height: 0;
     container-type: size;
@@ -2601,7 +2602,7 @@ body:has(.title-screen) {
   /* さらに狭いとき：場を上の段、山札と捨て札を下の段に */
   @container (max-width: 380px) {
     .board {
-      --cw: min(76px, calc((100cqh - 2.6rem) / 2.74), calc((100cqw - 2rem) / 4));
+      --cw: min(76px, calc((100cqh - 2.6rem) / 2.74), calc((100cqw - 2rem - (var(--mk, 4) - 4) * 0.4rem) / var(--mk, 4)));
       flex-wrap: wrap;
       row-gap: 0.55rem;
     }
@@ -2687,10 +2688,6 @@ body:has(.title-screen) {
     border-left-width: 4px;
     border-radius: 5px;
   }
-  .reveal-side:has(.deal) {
-    flex-direction: row;
-    align-items: center;
-  }
   .reveal .deal {
     margin-top: 0;
     gap: 0.3rem;
@@ -2706,7 +2703,7 @@ body:has(.title-screen) {
     font-size: 0.5rem;
   }
   .reveal .deal .tcg-attr {
-    font-size: 0.65rem;
+    --afs: 0.65rem;
   }
 
   /* ログは右上に重ねて出す */
@@ -3413,9 +3410,6 @@ body:has(.title-screen) {
   }
 }
 
-.nowrap {
-  white-space: nowrap;
-}
 /* 結果に並べる生徒はカードの枠の幅に収める（.deal .tcg の大きさのままだと隣のカードに重なる） */
 .deal .deal-card .tcg {
   width: 100%;
@@ -3436,24 +3430,6 @@ body:has(.title-screen) {
     left: -4px;
   }
 }
-/* 縦持ち：めくったカードを見せている間は山札と場を隠して場所を空ける（横持ちと同じ） */
-@media (orientation: portrait) and (max-width: 900px) {
-  .center:has(.reveal) .board {
-    display: none;
-  }
-  /* 上の名札の「○人」に一言の吹き出しが重ならないように */
-  .center:has(.reveal) {
-    padding-top: 0.7rem;
-  }
-}
-/* 結果の下段：このあと誰の番か＋次へ */
-.reveal-foot {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem 0.6rem;
-  align-items: center;
-  justify-content: center;
-}
 /* 転入・転校の札（カードの上に小さく） */
 .deal-mark {
   top: -0.45rem;
@@ -3471,6 +3447,190 @@ body:has(.title-screen) {
 .deal-card.out .deal-mark {
   background: #8a8a8a;
   color: #fff;
+}
+
+/* ---------- めくったカードの結果（どの画面でも卓の中央に収める） ---------- */
+/* 結果を見せている間は山札と場を隠して場所を空ける */
+.center:has(.reveal) .board {
+  display: none;
+}
+.reveal {
+  flex-wrap: nowrap;
+  /* 高さを卓の中央の高さに合わせる（中の明細がはみ出すときは明細の中でスクロール） */
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.reveal-card {
+  flex: none;
+}
+/* ゲリラのカットインはカードの真上に載せる（卓の外へはみ出さない） */
+.reveal-card:has(.cutin) {
+  padding-top: 1.1rem;
+}
+.reveal-card .cutin {
+  top: 0;
+  bottom: auto;
+  max-width: calc(100% + 1rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 横：一言・明細・生徒（狭いときは中でスクロール）＋このあと誰の番・次へ（いつも見える） */
+.reveal-side {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+}
+.reveal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: stretch;
+  min-height: 0;
+  max-width: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* はみ出す札（転入・転校）やグッズの印の分だけ上と左右に余白 */
+  padding: 0.45rem 6px 0;
+}
+.reveal-foot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  align-items: center;
+  justify-content: center;
+}
+.reveal-foot .next-turn {
+  white-space: nowrap;
+}
+.reveal .deal {
+  flex-wrap: nowrap;
+  margin-top: 0;
+  max-width: 100%;
+}
+/* 生徒は横1列。幅が足りなければカードを縮める */
+.reveal .deal-card {
+  flex: 0 1 auto;
+  width: 88px;
+  min-width: 0;
+}
+.deal-more {
+  flex: none;
+  white-space: nowrap;
+}
+.reveal .tally {
+  max-width: 100%;
+}
+
+/* 縦持ち */
+@media (orientation: portrait) and (max-width: 900px) {
+  /* 上の名札の「○人」に一言の吹き出しが重ならないように */
+  .center:has(.reveal) {
+    padding-top: 0.7rem;
+  }
+  .reveal {
+    gap: 0.5rem;
+    width: 100%;
+    justify-content: center;
+  }
+  /* カードは卓の中央の高さと幅（4割まで）に収める */
+  .reveal .ecard,
+  .reveal .ecard:has(.has-art) {
+    width: auto;
+    height: min(220px, calc(100cqh - 1.3rem), calc(40cqw * 1.4));
+    min-height: 0;
+    aspect-ratio: 5 / 7;
+    padding: 3px;
+    border-radius: 8px;
+  }
+  .reveal .ecard-inner {
+    padding: 3px;
+    border-radius: 5px;
+  }
+  .reveal .ecard-kind {
+    font-size: 0.55rem;
+  }
+  .reveal .ecard-title {
+    font-size: 0.75rem;
+  }
+  .reveal .ecard-art {
+    font-size: 2rem;
+    min-height: 0;
+  }
+  .reveal .ecard-art.has-art {
+    flex: 1;
+    aspect-ratio: auto;
+    min-height: 30px;
+    padding: 1px 0;
+  }
+  .reveal .ecard-glyph {
+    font-size: 0.78rem;
+    line-height: 1.2;
+    padding: 0.1rem 0.2rem;
+  }
+  .reveal .ecard-text {
+    font-size: 0.6rem;
+    line-height: 1.25;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .reveal-card .cutin {
+    font-size: 0.75rem;
+    padding: 0 0.6rem;
+    letter-spacing: 0;
+  }
+  .reveal-side {
+    flex: 1 1 0;
+  }
+  .reveal-body {
+    width: 100%;
+    gap: 0.3rem;
+  }
+  .reveal-say {
+    max-width: none;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    padding: 0.2rem 0.45rem;
+  }
+  .reveal .tally {
+    width: 100%;
+    min-width: 0;
+    max-height: none;
+    overflow: visible;
+  }
+  .reveal .tally-row {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+    font-size: 0.68rem;
+    gap: 0.25rem;
+    padding: 0 0.35rem;
+  }
+  .reveal .tally-count {
+    text-align: right;
+  }
+  .reveal .deal {
+    width: 100%;
+    gap: 0.25rem;
+    justify-content: center;
+  }
+  .reveal .deal-card {
+    width: 64px;
+  }
+  .reveal-foot .next-turn {
+    font-size: 0.72rem;
+  }
+  .reveal .btn {
+    font-size: 0.85rem;
+    padding: 0.3em 1.1em;
+  }
 }
 
 /* 横持ちのスマホ：はみ出し・重なりの手直し */
@@ -3497,79 +3657,62 @@ body:has(.title-screen) {
     text-overflow: ellipsis;
   }
 
-  /* ゲリラのカットインは卓の外（時代の帯）にはみ出さないよう、カードを少し下げてその上に載せる */
-  .reveal-card:has(.cutin) {
-    padding-top: 1rem;
-  }
-  .reveal-card:has(.cutin) .ecard {
-    height: min(165px, calc(96cqh - 1rem));
-  }
-  /* 絵のあるカードも縦長のまま（横の明細が狭いと、絵の幅でカードが横に広がってしまう） */
+  /* カードは卓の中央の高さと幅（3割まで）に収める。絵のあるカードも縦長のまま */
   .reveal .ecard,
   .reveal .ecard:has(.has-art) {
+    height: min(175px, calc(100cqh - 1.2rem), calc(30cqw * 1.4));
     aspect-ratio: 5 / 7;
   }
   .reveal-card .cutin {
-    top: 0;
-    bottom: auto;
-    font-size: 0.8rem;
-    padding: 0 1rem;
+    font-size: 0.75rem;
+    padding: 0 0.6rem;
+    letter-spacing: 0;
   }
   .ecard-glyph {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     line-height: 1.2;
     padding: 0.1rem 0.2rem;
   }
 
-  /* 結果の横：一言（上）／明細と生徒（中）／このあと誰の番・次へ（下） */
-  .reveal-side,
-  .reveal-side:has(.deal) {
+  /* 横：一言（上）／明細と生徒（中）／このあと誰の番・次へ（下） */
+  .reveal-body {
     display: grid;
-    grid-template-columns: auto auto;
-    justify-content: center;
+    /* 幅が足りないときは生徒カードのほうを縮める（明細や一言を左右に切らない） */
+    grid-template-columns: minmax(0, auto) minmax(0, auto);
+    justify-content: safe center;
     justify-items: center;
     align-items: center;
     gap: 0.3rem 0.5rem;
-    max-height: 100%;
-    min-height: 0;
-  }
-  .reveal-say,
-  .reveal-foot {
-    grid-column: 1 / -1;
   }
   .reveal-say {
-    max-width: 24em;
-    max-height: calc(4 * 1.35em + 0.3rem);
-    overflow-y: auto;
+    grid-column: 1 / -1;
+    max-width: 26em;
   }
-  .tally {
+  .reveal .tally {
     grid-column: 1;
     width: auto;
-    min-width: 8rem;
+    min-width: min(8rem, 40cqw);
     max-width: 13rem;
+    max-height: none;
+    overflow: visible;
   }
   .tally-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  .tally-name {
-    overflow: visible;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   }
   .reveal .deal {
     grid-column: 2;
-    flex-wrap: nowrap;
   }
-  .reveal-side:not(:has(.tally)) .deal {
+  .reveal-body:not(:has(.tally)) .deal {
     grid-column: 1 / -1;
   }
   .reveal .deal .tcg {
-    width: 54px;
+    width: 100%;
   }
   .reveal .deal-card {
     width: 54px;
   }
   .reveal-foot .next-turn {
     font-size: 0.75rem;
-    white-space: nowrap;
   }
 
   /* 手前の教室：係の札はカードの上に出して名前に重ねない。グッズの印は絵の左下へ */
@@ -3585,5 +3728,520 @@ body:has(.title-screen) {
     bottom: 1.3rem;
     left: -4px;
     font-size: 0.65rem;
+  }
+}
+
+/* 名札：名前が長いときは名前だけを省略記号で切り、印（🤖🍑🪙💡🖼️）は残す */
+:is(.plate-name, .opp-name) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: visible;
+}
+:is(.plate-name, .opp-name) > small {
+  flex: none;
+}
+.name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 上のバー（縦持ち）：今の時代の名前が長くても、メニューのボタンを画面の外へ押し出さない */
+@media (orientation: portrait) and (max-width: 900px) {
+  .topbar .erabar {
+    min-width: 0;
+    overflow: hidden;
+    justify-content: center;
+  }
+  .era-chip.now {
+    min-width: 0;
+  }
+  .era-chip .era-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .top-actions {
+    flex: none;
+  }
+}
+
+/* 卓の中央が低いとき：手番の操作（転校・カチコミ・品を配る など）を優先して、場は隠す（場から選ぶ手番は除く） */
+@container (max-height: 230px) {
+  .center:not(.ph-draw):not(.ph-memberDraw) .board {
+    display: none;
+  }
+}
+
+/* 生徒カードのアイコンは、カードが小さいときはカードの幅に合わせて縮める（4個以上は2段まで）。下や横にはみ出して欠けないように */
+.tcg {
+  container-type: inline-size;
+}
+.tcg-attrs {
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 1px;
+}
+.tcg-attr {
+  flex: none;
+  font-size: min(var(--afs, 0.9rem), calc(60cqw / var(--n, 3)));
+}
+/* 1段に並べる数（4個以上は2段に分ける） */
+.tcg-attrs.n1 { --n: 1.5; }
+.tcg-attrs.n2 { --n: 2.2; }
+.tcg-attrs.n3 { --n: 3.2; }
+.tcg-attrs.n4 { --n: 2.4; }
+.tcg-attrs.n5 { --n: 3.2; }
+.tcg-attrs.n6 { --n: 3.2; }
+.tcg-attrs.n7 { --n: 4.2; }
+/* 名前の帯はつぶさない（縮むのは絵だけ） */
+.tcg-head {
+  flex: none;
+}
+
+/* PC・タブレット（横）：卓を画面の高さに収める（結果を出してもページが縦にのびて手前の教室が隠れないように） */
+@media (orientation: landscape) and (min-height: 601px), (orientation: portrait) and (min-width: 901px) {
+  .table-wrap {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0.6rem;
+  }
+  .table-wrap > * {
+    flex: none;
+  }
+  .table-wrap > .felt {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .opponents,
+  .near-seat {
+    flex: none;
+  }
+  .stage {
+    flex: 1 1 0;
+    min-height: 0;
+    align-items: stretch;
+  }
+  .stage > .center {
+    flex: 1 1 0;
+    min-height: 0;
+    justify-content: center;
+    container-type: size;
+  }
+  .action {
+    min-height: 0;
+  }
+  .center:has(.reveal) .action {
+    flex: 1 1 0;
+    align-items: center;
+  }
+  .reveal .ecard,
+  .reveal .ecard:has(.has-art) {
+    width: auto;
+    height: min(250px, calc(100cqh - 1.4rem), calc(30cqw * 1.4));
+    min-height: 0;
+    aspect-ratio: 5 / 7;
+  }
+  .reveal .ecard-art.has-art {
+    flex: 1;
+    aspect-ratio: auto;
+    min-height: 40px;
+  }
+  /* 横：一言（上）／明細と生徒（中）／このあと誰の番・次へ（下） */
+  .reveal-body {
+    display: grid;
+    /* 幅が足りないときは生徒カードのほうを縮める（明細や一言を左右に切らない） */
+    grid-template-columns: minmax(0, auto) minmax(0, auto);
+    justify-content: safe center;
+    justify-items: center;
+    align-items: center;
+    gap: 0.4rem 0.8rem;
+  }
+  .reveal-say {
+    grid-column: 1 / -1;
+    max-width: 30em;
+  }
+  .reveal .tally {
+    grid-column: 1;
+    max-height: none;
+    overflow: visible;
+  }
+  .reveal .deal {
+    grid-column: 2;
+  }
+  .reveal-body:not(:has(.tally)) .deal {
+    grid-column: 1 / -1;
+  }
+  /* ログは右上に重ねて出す（卓の高さを変えない） */
+  .log {
+    position: fixed;
+    top: 3rem;
+    right: 0.8rem;
+    width: min(420px, 45vw);
+    max-height: 60dvh;
+    margin: 0;
+    z-index: 40;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* 縦持ちで相手が4人のとき：名札が細いので、名前とポイントを2段にする */
+@media (orientation: portrait) and (max-width: 900px) {
+  .opponents:has(> :nth-child(4)) .opp-plate {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 0.3rem;
+    padding: 0 0.2rem;
+  }
+  .opponents:has(> :nth-child(4)) .opp-name {
+    flex: 1 1 100%;
+    justify-content: center;
+    font-size: 0.72rem;
+  }
+  .opponents:has(> :nth-child(4)) .opp-pts {
+    margin-left: 0;
+    font-size: 0.85rem;
+  }
+}
+
+/* 横持ちのスマホ：ポップアップ（投票など）は詰めて、ボタンまで見えやすく */
+@media (orientation: landscape) and (max-height: 600px) {
+  .modal {
+    max-height: 94dvh;
+    padding: 0.6rem 0.9rem;
+    line-height: 1.5;
+    border-width: 5px;
+  }
+  .modal h2 {
+    font-size: 1rem;
+    margin: 0.2rem 0 0.4rem;
+  }
+  .vote-modal p {
+    font-size: 0.72rem;
+    margin: 0.3rem 0;
+  }
+  .vote-options {
+    margin: 0.4rem 0 0.6rem;
+    gap: 0.35rem;
+  }
+  .vote-option {
+    min-width: 5.5rem;
+    padding: 0.2em 0.7em;
+    line-height: 1.3;
+  }
+}
+
+/* タップで開いた教室：閉じるボタンを枠の内側に置く（スクロールする枠の外に出すと欠ける） */
+.peek .modal-close {
+  top: 0.3rem;
+  right: 0.3rem;
+}
+.peek .pm-peek .plate {
+  margin-right: 2.2rem;
+}
+/* 縦持ち：ログは上のバーの下から */
+@media (orientation: portrait) and (max-width: 900px) {
+  .log {
+    top: 3.3rem;
+  }
+}
+/* 横持ちのスマホ：ゲーム設定は詰めて、開始ボタンまでのスクロールを短く */
+@media (orientation: landscape) and (max-height: 600px) {
+  .setup h1 {
+    font-size: 1.3rem;
+    margin: 0.4rem 0;
+  }
+  .setup section {
+    padding: 0.5rem 0.8rem;
+    margin: 0.5rem 0;
+  }
+  .setup h3 {
+    margin: 0 0 0.3rem;
+  }
+  .player-row {
+    margin: 0.3rem 0;
+  }
+  .player-row input {
+    padding: 0.3em 0.6em;
+  }
+}
+
+/* 通信対戦の帯（部屋番号・通信の状態）：メニューのボタンや手前の教室に重ねない */
+@media (orientation: landscape) and (max-height: 600px) {
+  .net-banner {
+    bottom: calc(2.4rem + 6px);
+    max-width: 9.5rem;
+  }
+}
+@media (orientation: landscape) and (min-height: 601px), (orientation: portrait) and (min-width: 901px) {
+  .table-wrap:has(.net-banner) {
+    padding-bottom: 2rem;
+  }
+}
+@media (orientation: portrait) and (max-width: 900px) {
+  .table-wrap:has(.net-banner) {
+    padding-bottom: max(1.9rem, calc(env(safe-area-inset-bottom) + 1.5rem));
+  }
+}
+
+/* 係決め：だれが準備OKかのチップは1行に収め、長い名前は省略記号で切る */
+.roles-ready .pick-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25em;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+.roles-ready .pick-chip b {
+  min-width: 0;
+  max-width: 8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (orientation: portrait) and (max-width: 900px) {
+  .roles-ready {
+    gap: 0.25rem;
+  }
+  .roles-ready .pick-chip {
+    font-size: 0.72rem;
+    padding: 0 0.45em;
+  }
+  .roles-ready .pick-chip b {
+    max-width: 5em;
+  }
+}
+/* 係の場の名前は枠からはみ出さない */
+.zone-badge {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 縦持ち：初期メンバーを引く間は場がないので、山札を1段で大きく */
+@media (orientation: portrait) and (max-width: 900px) {
+  .center.ph-memberDraw .board {
+    --cw: min(88px, calc((100cqh - 1.2rem) / 1.4), calc((100cqw - 2rem) / 3));
+  }
+}
+
+/* 手番の案内に入る先生の名前は、長くても1行に（省略記号で切る） */
+:is(.say, .reveal-say, .next-turn) b {
+  display: inline-block;
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* スマホ（縦・横）：場からカードを選ぶ手番で説明が出ても、場がつぶれないように（場に卓の中央の半分を残す） */
+@media (orientation: portrait) and (max-width: 900px), (orientation: landscape) and (max-height: 600px) {
+  .center.ph-draw .board {
+    min-height: 52%;
+  }
+  .center .action {
+    min-height: 0;
+  }
+  .say {
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .effect {
+    font-size: 1.1rem;
+    letter-spacing: 0;
+  }
+  .effect-say {
+    font-size: 0.7rem;
+    line-height: 1.3;
+  }
+  .effect-name {
+    font-size: 0.95rem;
+  }
+}
+
+/* 縦持ちでとても背の低い画面：教室のカードと名札をもう一段小さくして、卓の中央（場と操作）の場所を空ける */
+@media (orientation: portrait) and (max-width: 900px) and (max-height: 600px) {
+  .playmat:is(.pm-near, .pm-stage) .floor {
+    grid-template-columns: repeat(var(--fhalf), minmax(0, 7.6dvh));
+    row-gap: 0.65rem;
+    margin-top: 0.65rem;
+  }
+  .near-seat .playmat .plate {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .near-seat .playmat .plate-pts {
+    font-size: 1.1rem;
+  }
+}
+
+/* 場が低くつぶれたとき（転校・品を配るなどで操作の欄が大きい）は、山札と場を出さない（小さすぎて重なるので。場から選ぶ手番と初期メンバーを引くときは除く） */
+@container (max-height: 96px) {
+  .center:not(.ph-draw):not(.ph-memberDraw) .board > :is(.piles, .market) {
+    display: none;
+  }
+}
+
+/* 縦持ち：タップで開いた教室のカードも、手前の教室と同じく名前1行・種別なしにして絵とアイコンを残す */
+@media (orientation: portrait) and (max-width: 900px) {
+  .pm-peek .tcg {
+    max-width: none;
+    padding: 3px;
+  }
+  .pm-peek :is(.tcg-type, .tcg-foot) {
+    display: none;
+  }
+  .pm-peek .tcg-head {
+    min-height: 0;
+    padding: 1px 2px;
+  }
+  .pm-peek .tcg-name {
+    font-size: 0.6rem;
+    -webkit-line-clamp: 1;
+  }
+  .pm-peek .tcg-art {
+    margin: 2px;
+    border-width: 1px;
+  }
+  .pm-peek .tcg-attrs {
+    padding: 1px;
+    min-height: 0;
+  }
+}
+
+/* 場のカードを選んだときの説明：長いときは説明の中でスクロールし、「取る」「見送る」のボタンはいつも見えるように */
+.say:has(> .effect) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.say:has(> .effect) > .effect {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.say:has(> .effect) > .say-sub {
+  flex: none;
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .effect {
+    font-size: 0.95rem;
+  }
+}
+
+/* 生徒カードが細いとき（どの画面でも）：種別の行を省き、名前は1行にして絵の場所を残す */
+@container (max-width: 76px) {
+  .tcg-type,
+  .tcg-foot {
+    display: none;
+  }
+  .tcg-name {
+    -webkit-line-clamp: 1;
+    font-size: min(0.66rem, 16cqw);
+  }
+  .tcg-head {
+    min-height: 0;
+    padding: 1px 2px;
+  }
+}
+
+/* ポップアップは背景の余白の内側に必ず収める（背の低い画面で上下が欠けないように） */
+.modal,
+.peek {
+  max-height: calc(100dvh - 2rem);
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .modal-back {
+    padding: 0.5rem;
+  }
+  .modal,
+  .peek {
+    max-height: calc(100dvh - 1rem);
+  }
+  .peek {
+    width: min(900px, calc(100vw - 1rem));
+  }
+}
+
+/* 縦持ち：タップで開いた教室は空いている机を省いて2段に（カードを大きく） */
+@media (orientation: portrait) and (max-width: 900px) {
+  .playmat.pm-peek .floor {
+    grid-template-columns: repeat(var(--fhalf), minmax(0, 1fr));
+  }
+  .playmat.pm-peek .seat.empty {
+    display: none;
+  }
+}
+
+/* 結果に並べる生徒カードには名前を出す（結果の一言には子の名前を書かないので、だれかはカードで分かるように） */
+.deal .tcg.mini .tcg-head {
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  padding: 1px 2px;
+}
+.deal .tcg.mini .tcg-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  font-size: min(0.62rem, 15cqw);
+  text-align: center;
+}
+
+/* 横持ちのスマホ：結果の生徒カードは名前が読める幅を残す（明細のほうを詰める） */
+@media (orientation: landscape) and (max-height: 600px) {
+  .reveal .deal-card {
+    min-width: 38px;
+  }
+  .reveal .tally {
+    min-width: min(6.5rem, 30cqw);
+  }
+  .reveal .tally-count {
+    max-width: 4.5em;
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  /* 生徒カードの列は縮めず、明細の列のほうを縮める（重ならないように） */
+  .reveal-body:has(.tally):has(.deal) {
+    grid-template-columns: minmax(5rem, 1fr) minmax(min-content, auto);
+  }
+  .reveal .tally {
+    min-width: 0;
+    width: 100%;
+  }
+  .reveal .deal-card {
+    min-width: 34px;
+  }
+  .reveal .deal-more {
+    font-size: 0.6rem;
+  }
+}
+
+/* 卓の中央が狭いとき（横持ちの小さいスマホ）：明細と生徒カードを横に並べず、上下に積む（はみ出す分は縦にスクロール） */
+@container (max-width: 520px) {
+  .reveal-body,
+  .reveal-body:has(.tally):has(.deal) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .reveal .tally {
+    width: 100%;
+    max-width: 16rem;
+  }
+  /* 主役は生徒カード：明細より先に出す（明細は下にスクロールして見る） */
+  .reveal .deal {
+    order: 1;
+    width: 100%;
+    justify-content: center;
+  }
+  .reveal .tally {
+    order: 2;
   }
 }
