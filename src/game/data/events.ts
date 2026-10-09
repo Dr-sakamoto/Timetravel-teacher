@@ -398,6 +398,40 @@ export const ALL_EVENT_CARDS: EventCard[] = [
   ...ERA_CARDS,
 ];
 
+/**
+ * 学期が進むほどクラスは育つ（人数もアイコンも増え、授業カード1枚の点も大きくなる）ので、
+ * 時代イベントの数字（届かせる数・動く点）も学期に合わせて大きくする。
+ * 通算2学期目までは×1、そこから1学期ごとに＋0.25、最大×2
+ */
+export function eventScale(termNo: number): number {
+  return Math.min(2, Math.max(1, 1 + (termNo - 2) / 4));
+}
+
+/** もともとアイコンの数に比例して点が増えるので、倍率をかけない数 */
+const UNSCALED: Partial<Record<EraEffect['type'], string[]>> = { masterpiece: ['per'], sunflower: ['per'], oath: ['max'] };
+/** 1人の子のアイコンと比べる数（1人のアイコンはクラス全体ほど伸びないので、倍率は半分。カードのアイコンの上限まで） */
+const PER_STUDENT: Partial<Record<EraEffect['type'], string[]>> = { dialogue: ['need'], bridge: ['need'] };
+
+/** 学期の倍率 k をかけた時代イベントのカード（ほかのカードと、k が1のときはそのまま） */
+export function scaleCard<T extends EventCard>(c: T, k: number): T {
+  if (k === 1) return c;
+  const r = (v: number) => Math.round(v * k);
+  if (c.kind !== 'contest') return c;
+  const e = c.effect;
+  const keep = UNSCALED[e.type] ?? [];
+  const half = PER_STUDENT[e.type] ?? [];
+  const out: Record<string, unknown> = { ...e };
+  for (const [key, v] of Object.entries(e)) {
+    if (typeof v === 'number' && !keep.includes(key)) {
+      out[key] = half.includes(key) ? Math.min(MAX_ICONS, Math.round(v * (1 + (k - 1) / 2))) : r(v);
+    } else if (key === 'steps') {
+      // 段：届かせる数と点。博覧会の「アイコンの種類」は5種類までしかないので、点だけ大きくする
+      out[key] = (v as [number, number][]).map(([n, w]) => [e.type === 'expo' ? n : r(n), r(w)]);
+    }
+  }
+  return { ...c, effect: out as EraEffect };
+}
+
 /** そのカードが入る時代（どの時代にも入るなら undefined） */
 export function cardEra(c: EventCard): EraId | undefined {
   return c.kind === 'contest' || c.kind === 'goods' || c.kind === 'cyborg' ? c.era : undefined;

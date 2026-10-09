@@ -1,6 +1,6 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import { canBuild, canTake, currentEra, kaguyaGift, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
+import { canBuild, canTake, currentEra, kaguyaGift, kaguyaWin, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, GIFT_MAP, MARKET_SIZE, cardGlyph, kachikomiHit, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
@@ -27,12 +27,6 @@ export interface Pick {
   uid: string | null;
   target: number | null;
   theirUid: string | null;
-}
-
-/** かぐや姫に宝を差し出したときの点 */
-function kaguyaWinPts(): number {
-  const c = EVENT_MAP.kaguya;
-  return c.kind === 'contest' && c.effect.type === 'kaguya' ? c.effect.win : 0;
 }
 
 /** 場のカード1枚の見た目 */
@@ -482,7 +476,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       const gift = kaguyaGift(state, ph.player);
       const present = gift?.goods && (
         <button className="btn small" onClick={() => dispatch({ type: 'present' })} title="宝はなくなるが、手番は続く">
-          {gift.goods.name}を差し出す +{kaguyaWinPts()}
+          {gift.goods.name}を差し出す +{kaguyaWin(state)}
         </button>
       );
       if (sel === null)

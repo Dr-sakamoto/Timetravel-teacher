@@ -3,7 +3,7 @@ import { cpuAction } from './ai';
 import { MAX_CLASS, STARTING_MEMBERS, attrScore, contributions, moveToRole, roleSlots, termNo, testScore, validRoles, validUnlock } from './calc';
 import { BENKEI, CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/cards';
 import { ERAS, PRESENT_INDEX } from './data/eras';
-import { ERA_CARDS, EVENT_MAP, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
+import { ERA_CARDS, EVENT_MAP, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM, eventScale, scaleCard, type ContestCard } from './data/events';
 import { ARCHETYPES, MODERN_POOL, STARTER_POOL } from './data/modern';
 import { MONTHS, canBuild, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Attr, GameState, Player, RoleSeat, Student } from './types';
@@ -586,6 +586,19 @@ describe('engine', () => {
       expect(s.pyramid).toBeUndefined();
       expect(s.log.some((l) => l.text.includes('むだになった'))).toBe(true);
     });
+  });
+
+  it('era events grow with the term: ×1 through the 2nd term, +0.25 a term after that, up to ×2', () => {
+    expect([1, 2, 3, 4, 5, 6, 9].map(eventScale)).toEqual([1, 1, 1.25, 1.5, 1.75, 2, 2]);
+    const at = (id: string, k: number) => scaleCard(EVENT_MAP[id], k);
+    expect(at('migration', 1)).toBe(EVENT_MAP.migration);
+    expect((at('migration', 2) as ContestCard).effect).toEqual({ type: 'threshold', need: 12, win: 12, lose: 0 });
+    // 1人の子で比べる数は半分だけ、アイコンの上限まで
+    expect((at('socratic', 2) as ContestCard).effect).toMatchObject({ need: 6, win: 16 });
+    // アイコンの数をかける点と、博覧会のアイコンの種類はそのまま
+    expect((at('monalisa', 2) as ContestCard).effect).toEqual((EVENT_MAP.monalisa as ContestCard).effect);
+    expect((at('expo', 2) as ContestCard).effect).toEqual({ type: 'expo', steps: [[4, 8], [5, 20]] });
+    expect(at('n_study', 2)).toBe(EVENT_MAP.n_study);
   });
 
   describe('era special events', () => {
