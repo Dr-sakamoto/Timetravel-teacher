@@ -4284,15 +4284,63 @@ body:has(.title-screen) {
   color: #ffe58a;
   border: 1px solid #ffd43b;
 }
-/* 合体したクラス：もとの部屋に戻るとき、どちらのクラスへ帰る子か（席の背景をまるごと、帰るクラスの色に塗る） */
-.home-bg {
-  /* となりの席とのすき間（--gx）まで塗って、同じクラスへ帰る子がひとかたまりの色の面に見えるようにする */
-  background: color-mix(in srgb, var(--cc) 72%, transparent);
-  box-shadow: 0 0 0 calc(var(--gx) / 2 + 1px) color-mix(in srgb, var(--cc) 72%, transparent);
-  border-radius: 0;
+/* 合体したクラス：係の場にいる子は、敷物ごと帰るクラスの色に */
+.home-bg.role-zone::before {
+  background: color-mix(in srgb, var(--cc) 60%, #17352a);
+  border-color: var(--cc);
 }
-.home-bg.fresh {
-  background-image: repeating-linear-gradient(45deg, transparent 0 8px, rgba(255, 255, 255, 0.18) 8px 16px);
+/* 合体したクラス：左に係の場（2×2）、右に上下2段の帯（上＝部屋Aへ帰る子・下＝部屋Bへ帰る子）。帯は動かず、カードが帯の中に収まる */
+.jfloor {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 9fr);
+  gap: 0.6rem;
+  margin-top: 0.45rem;
+}
+.jroles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 1fr);
+  gap: 0.5rem;
+  align-items: end;
+}
+.jbands {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.jband {
+  --gx: 0.4rem;
+  position: relative;
+  display: grid;
+  /* 先頭の細い列は縦書きの見出し */
+  grid-template-columns: 1.4em repeat(var(--jc), minmax(0, 1fr));
+  gap: var(--gx);
+  align-items: end;
+  padding: 0.3rem 0.4rem 0.3rem 0.2rem;
+  border-radius: 12px;
+  border: 3px solid var(--cc);
+  background: color-mix(in srgb, var(--cc) 45%, #3a2a16);
+}
+.jband-label {
+  align-self: stretch;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  font-weight: bold;
+  letter-spacing: -0.05em;
+  border-radius: 8px;
+  background: var(--cc);
+  color: #111;
+}
+/* 3学期に来た子（空いているほうのクラスへ帰る）は席にしま模様 */
+.jband .seat.fresh {
+  background: repeating-linear-gradient(45deg, transparent 0 8px, rgba(255, 255, 255, 0.22) 8px 16px);
+  border-radius: 6px;
 }
 .plate-homes {
   display: inline-flex;
@@ -4305,10 +4353,6 @@ body:has(.title-screen) {
   border: 2px solid var(--cc);
   color: var(--cc);
   white-space: nowrap;
-}
-/* 係の場にいる子も、係の場の敷物ごと帰るクラスの色に */
-.home-bg.role-zone::before {
-  background: color-mix(in srgb, var(--cc) 60%, #17352a);
 }
 /* 合体したクラス：画面の下の確定ボタン（確定中は実線の枠と同じく光らせる） */
 .net-banner > .confirm-toggle.on {

@@ -129,6 +129,46 @@ export function Playmat(props: Props) {
     );
   };
 
+  const roleZones = ROLE_ORDER.map((r, i) => {
+    const def = ROLES[r];
+    const st = holderOf(r);
+    const open = view.unlocked.includes(r);
+    const unlockable = !open && !!arrange?.canUnlock(r);
+    // 係の場で置けない所は、次にいつ解放できるかを出す
+    const lockNote = view.unlocked.length < props.slots ? '選べる' : slotUnlockLabel(view.unlocked.length).replace('年', '-');
+    const droppable = !!arrange && (open || unlockable);
+    const fit = !!heldSt && droppable && heldSt.attrs.includes(def.attr) && st?.uid !== heldSt.uid;
+    const bg = homeBg(st?.uid);
+    return (
+      <div
+        key={r}
+        data-drop={droppable ? `role:${r}` : undefined}
+        style={bg.style}
+        className={`${bg.cls} role-zone ${open ? 'open' : unlockable ? 'unlockable' : 'locked'} ${arrange?.fresh.includes(r) ? 'fresh' : ''} ${fit ? 'fit' : ''} ${over === `role:${r}` ? 'over' : ''} ${i === ROLE_ORDER.length - 1 ? 'last' : ''}`}
+        title={`${def.name}：ここに置いた子は${roleDesc(r)}${open ? '' : unlockable ? '（タップで解放）' : '（まだ解放していない）'}`}
+        onClick={
+          droppable
+            ? (e) => {
+                e.stopPropagation();
+                if (!wasDrag()) arrange!.onPlace(arrange!.held, { kind: 'role', role: r });
+              }
+            : undefined
+        }
+      >
+        {st ? (
+          card(st.uid, true)
+        ) : (
+          <span className="zone-empty">
+            <span className="zone-badge">{def.name}</span>
+            <span className="zone-icon">{open ? def.icon : unlockable ? '🆕' : '🔒'}</span>
+            <span className="zone-desc">{roleDesc(r)}</span>
+            {!open && <span className="zone-note">{unlockable ? '👆' : lockNote}</span>}
+          </span>
+        )}
+      </div>
+    );
+  });
+
   return (
     <div
       data-pid={player.id}
@@ -176,57 +216,52 @@ export function Playmat(props: Props) {
         <span className="plate-pts">{player.points}</span>
         <DeltaBadge delta={delta} rank={props.rank} points={player.points} />
       </div>
-      <div className="floor">
-        {ROLE_ORDER.map((r, i) => {
-          const def = ROLES[r];
-          const st = holderOf(r);
-          const open = view.unlocked.includes(r);
-          const unlockable = !open && !!arrange?.canUnlock(r);
-          // 係の場で置けない所は、次にいつ解放できるかを出す
-          const lockNote = view.unlocked.length < props.slots ? '選べる' : slotUnlockLabel(view.unlocked.length).replace('年', '-');
-          const droppable = !!arrange && (open || unlockable);
-          const fit = !!heldSt && droppable && heldSt.attrs.includes(def.attr) && st?.uid !== heldSt.uid;
-          const bg = homeBg(st?.uid);
-          return (
-            <div
-              key={r}
-              data-drop={droppable ? `role:${r}` : undefined}
-              style={bg.style}
-              className={`${bg.cls} role-zone ${open ? 'open' : unlockable ? 'unlockable' : 'locked'} ${arrange?.fresh.includes(r) ? 'fresh' : ''} ${fit ? 'fit' : ''} ${over === `role:${r}` ? 'over' : ''} ${i === ROLE_ORDER.length - 1 ? 'last' : ''}`}
-              title={`${def.name}：ここに置いた子は${roleDesc(r)}${open ? '' : unlockable ? '（タップで解放）' : '（まだ解放していない）'}`}
-              onClick={
-                droppable
-                  ? (e) => {
-                      e.stopPropagation();
-                      if (!wasDrag()) arrange!.onPlace(arrange!.held, { kind: 'role', role: r });
-                    }
-                  : undefined
-              }
-            >
-              {st ? (
-                card(st.uid, true)
-              ) : (
-                <span className="zone-empty">
-                  <span className="zone-badge">{def.name}</span>
-                  <span className="zone-icon">{open ? def.icon : unlockable ? '🆕' : '🔒'}</span>
-                  <span className="zone-desc">{roleDesc(r)}</span>
-                  {!open && <span className="zone-note">{unlockable ? '👆' : lockNote}</span>}
-                </span>
-              )}
+      {props.homes ? (
+        // 合体したクラス（チーム戦の3学期）：上の帯（部屋Aへ帰る子）と下の帯（部屋Bへ帰る子）にきっぱり分けて座らせる
+        <div className="jfloor">
+          <div className="jroles">{roleZones}</div>
+          <div className="jbands">
+            {[0, 1].map((room) => {
+              const homes = props.homes!;
+              const half = room === 0 ? Math.floor(classCap(player) / 2) : classCap(player) - Math.floor(classCap(player) / 2);
+              const total = view.students.filter((st) => homes[st.uid]?.room === room).length;
+              return (
+                <div key={room} className="jband" style={{ '--cc': CURSOR_COLORS[room], '--jc': half } as CSSProperties}>
+                  <span className="jband-label" title={`もとの部屋に戻るとき、${props.homeNames?.[room] ?? (room ? 'B' : 'A')}のクラスへ帰る子（${total}/${half}人）`}>
+                    {props.homeNames?.[room] ?? (room ? 'B' : 'A')}へ
+                  </span>
+                  {free
+                    .filter((st) => (homes[st.uid]?.room ?? 0) === room)
+                    .map((st) => (
+                      <div key={st.uid} className={`seat ${homes[st.uid]?.fresh ? 'fresh' : ''}`}>
+                        {card(st.uid, false)}
+                      </div>
+                    ))}
+                  {Array.from({ length: Math.max(0, half - total) }, (_, i) => (
+                    <div key={`e${i}`} className="seat empty">
+                      <span className="desk" />
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="floor">
+          {roleZones}
+          {free.map((st) => (
+            <div key={st.uid} className="seat">
+              {card(st.uid, false)}
             </div>
-          );
-        })}
-        {free.map((st) => (
-          <div key={st.uid} className={`seat ${homeBg(st.uid).cls}`} style={homeBg(st.uid).style}>
-            {card(st.uid, false)}
-          </div>
-        ))}
-        {Array.from({ length: desks }, (_, i) => (
-          <div key={`e${i}`} className="seat empty">
-            <span className="desk" />
-          </div>
-        ))}
-      </div>
+          ))}
+          {Array.from({ length: desks }, (_, i) => (
+            <div key={`e${i}`} className="seat empty">
+              <span className="desk" />
+            </div>
+          ))}
+        </div>
+      )}
       {drag && heldSt && (
         <div className="drag-ghost" style={{ left: drag.x, top: drag.y, width: drag.w, height: drag.h }}>
           <TcgCard student={heldSt} owner={view} selected />
