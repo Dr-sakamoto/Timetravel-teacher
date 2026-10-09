@@ -38,7 +38,7 @@ afterEach(() => {
 describe('チーム戦の部屋を作った人', () => {
   it('参加した人は自分の部屋の状態だけを受け取り、自分の部屋で操作できる', () => {
     const room = new HostRoom('12345', 'ホスト', () => {});
-    room.setTeam(true);
+    room.setStyle('team');
     // 席1（部屋B・チーム1）に参加した人、残りは CPU
     deliver('h', { cid: 'g1', m: { t: 'hello', cid: 'g1', name: 'ゲスト' } });
     for (let i = 0; i < 6; i++) room.addCpu();
@@ -63,7 +63,7 @@ describe('チーム戦の部屋を作った人', () => {
 
   it('部屋BのCPUは部屋を作った人の端末が進め、学年末テストで両方の部屋がそろうと合同で進む', () => {
     const room = new HostRoom('12345', 'ホスト', () => {});
-    room.setTeam(true);
+    room.setStyle('team');
     for (let i = 0; i < 7; i++) room.addCpu();
     room.startGame();
     // 部屋A：部屋を作った人の席も CPU の手で進める（画面の代わり）
@@ -85,6 +85,73 @@ describe('チーム戦の部屋を作った人', () => {
     expect(a.phase.kind === 'result' && a.phase.result.title).toBe('学年末テスト（チーム合同）');
     expect(b.phase.kind).toBe('result');
     expect(a.team!.mates.map((m) => m.points)).toEqual(b.players.map((p) => p.points));
+    room.close();
+  });
+});
+
+describe('ペア担任の部屋を作った人', () => {
+  const join = (cid: string, name: string) => deliver('h', { cid, m: { t: 'hello', cid, name } });
+
+  it('参加した人は相方を待っている人のクラスに入り、入るクラスを選び直せる', () => {
+    const room = new HostRoom('12345', 'ホスト', () => {});
+    room.setStyle('pair');
+    join('g1', 'あお');
+    join('g2', 'みどり');
+    expect(room.snap.lobby.seats.map((s) => s.cls)).toEqual([0, 0, 1]);
+    // みどりが1組（満員）には入れず、3組には移れる
+    deliver('h', { cid: 'g2', m: { t: 'pick', cls: 0 } });
+    expect(room.snap.lobby.seats[2].cls).toBe(1);
+    deliver('h', { cid: 'g2', m: { t: 'pick', cls: 2 } });
+    expect(room.snap.lobby.seats[2].cls).toBe(2);
+    // CPUは1人で空いているクラスへ。CPUのクラスには入れない
+    room.addCpu();
+    expect(room.snap.lobby.seats[3].cls).toBe(1);
+    room.pickClass(1, 1);
+    expect(room.snap.lobby.seats[1].cls).toBe(0);
+    room.close();
+  });
+
+  it('2人の名前のクラスになり、どちらの端末からも操作でき、2人とも切れたときだけ代わりに進められる', () => {
+    const room = new HostRoom('12345', 'ホスト', () => {});
+    room.setStyle('pair');
+    join('g1', 'あお');
+    join('g2', 'みどり');
+    join('g3', 'きいろ');
+    room.addCpu();
+    room.startGame();
+    const s = room.snap.state!;
+    expect(s.players.map((p) => p.name)).toEqual(['ホスト・あお', 'みどり・きいろ', 'CPU1']);
+    expect(s.players.map((p) => p.isCpu)).toEqual([false, false, true]);
+    expect(room.myPlayer()).toBe(0);
+    // ゲストには全席が届き、端末IDから自分のクラスがわかる
+    const last = sent.filter((x) => x.m.t === 'state').at(-1)!;
+    expect(last.m.t === 'state' && last.m.pair).toBe(true);
+    // 2組の手番（最初の1枚）を、きいろが引く
+    expect(s.phase).toMatchObject({ kind: 'memberDraw', player: 0 });
+    room.apply({ type: 'drawMember' }, room.snap.seq);
+    expect(room.snap.state!.phase).toMatchObject({ kind: 'memberDraw', player: 1 });
+    deliver('h', { cid: 'g3', m: { t: 'action', seq: room.snap.seq, action: { type: 'drawMember' } } });
+    expect(room.snap.state!.players[1].students).toHaveLength(1);
+    // CPU1 が引いて、また1組・2組と回ってくる
+    for (let k = 0; k < 10 && (room.snap.state!.phase as { player?: number }).player !== 1; k++) room.apply({ type: 'drawMember' }, room.snap.seq);
+    expect(room.snap.state!.phase).toMatchObject({ kind: 'memberDraw', player: 1 });
+    // みどりが切れても、相方のきいろがつながっていれば待つだけ
+    for (let t = 0; t < 4; t++) {
+      vi.advanceTimersByTime(5000);
+      deliver('h', { cid: 'g1', m: { t: 'ping', seq: room.snap.seq } });
+      deliver('h', { cid: 'g3', m: { t: 'ping', seq: room.snap.seq } });
+    }
+    expect(room.snap.lobby.seats[2].online).toBe(false);
+    expect(room.waitsForSeat(2)).toBe(false);
+    // 2人とも切れたら、1手だけ代わりに進められる
+    for (let t = 0; t < 4; t++) {
+      vi.advanceTimersByTime(5000);
+      deliver('h', { cid: 'g1', m: { t: 'ping', seq: room.snap.seq } });
+    }
+    expect(room.snap.lobby.seats[3].online).toBe(false);
+    expect(room.waitsForSeat(2)).toBe(true);
+    room.stepFor(2);
+    expect(room.snap.state!.players[1].students).toHaveLength(2);
     room.close();
   });
 });

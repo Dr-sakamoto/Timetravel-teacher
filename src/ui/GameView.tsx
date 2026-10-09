@@ -23,6 +23,8 @@ interface Props {
   offline?: (pi: number) => boolean;
   /** 通信対戦：画面の上に出す通信の状態など */
   banner?: ReactNode;
+  /** 観戦（チーム戦でもう一方の部屋を見る）：何も操作できず、手番の人の教室を手前に出す */
+  spectate?: boolean;
 }
 
 /** 名札に出す時代の印：近代の電球の特許💡と、飾っているひまわりの絵🖼️ */
@@ -37,8 +39,8 @@ function eraMarks(state: GameState, pi: number): EraMark[] {
   return out;
 }
 
-export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner }: Props) {
-  const online = mySeat !== undefined;
+export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner, spectate = false }: Props) {
+  const online = mySeat !== undefined || spectate;
   const ph = state.phase;
   const actor = actingPlayer(state);
   const allCpu = state.players.every((p) => p.isCpu);
@@ -60,13 +62,18 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const cpuRoles = ph.kind === 'roles' && state.players.some((p, i) => p.isCpu && !ph.ready[i]);
   const cpuTurn = (actor !== null && state.players[actor].isCpu && ph.kind !== 'result') || cpuRoles;
   /** 通信対戦で、ほかの人の番（自分は見ているだけ） */
-  const othersTurn = online && actor !== mySeat && ph.kind !== 'result' && ph.kind !== 'roles';
+  const othersTurn = online && (spectate || actor !== mySeat) && ph.kind !== 'result' && ph.kind !== 'roles';
   // 結果の「次へ」：手番の人が人間ならその人、CPUや全員向けの結果なら誰でも
   const resultOwner = ph.kind === 'result' && ph.player !== null && !state.players[ph.player].isCpu ? ph.player : null;
-  const canContinue = !online || (mySeat !== undefined && !state.players[mySeat].isCpu && (resultOwner === null || resultOwner === mySeat));
+  const canContinue = !online || (!spectate && mySeat !== undefined && !state.players[mySeat].isCpu && (resultOwner === null || resultOwner === mySeat));
 
   // 人間の手番になったら、その人を手前に座らせる（ホットシート）。通信対戦では自分の席のまま
   useEffect(() => {
+    // 観戦：手番の人（CPUでも）を手前に出す
+    if (spectate) {
+      if (actor !== null) setFocus(actor);
+      return;
+    }
     if (online) return;
     if (actor !== null && !state.players[actor].isCpu) setFocus(actor);
     // 係決め（一斉）：手前の人が準備OKなら、まだの人間に席をゆずる
@@ -74,7 +81,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
       const next = state.players.findIndex((p, i) => !p.isCpu && !ph.ready[i]);
       if (next >= 0) setFocus(next);
     }
-  }, [actor, state.players, online, ph, focus]);
+  }, [actor, state.players, online, ph, focus, spectate]);
 
   useEffect(() => {
     setPick({ uid: null, target: null, theirUid: null });
@@ -155,7 +162,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const matLit = (i: number) => fx?.lit(i) ?? lit;
   const fxDim = (i: number) => (fx?.dims(i) ? (u: string) => fx.dims(i)!.has(u) : undefined);
   const me = state.players[focus];
-  const editingRoles = ph.kind === 'roles' && !ph.ready[focus] && !me.isCpu;
+  const editingRoles = ph.kind === 'roles' && !ph.ready[focus] && !me.isCpu && !spectate;
 
   return (
     <div className="table-wrap">

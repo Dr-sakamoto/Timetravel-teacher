@@ -4216,3 +4216,28 @@ body:has(.title-screen) {
     order: 2;
   }
 }
+/* ペア担任：ロビーのクラスごとの枠 */
+.pair-class {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 0.3rem 0.6rem;
+  margin-bottom: 0.4rem;
+}
+.pair-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+}
+.pair-head small {
+  flex: 1;
+  color: var(--chalk-dim);
+}
+.pair-move {
+  font: inherit;
+  font-size: 0.85rem;
+  background: #0f2a20;
+  color: var(--chalk);
+  border: 1px solid var(--chalk-dim);
+  border-radius: 6px;
+}

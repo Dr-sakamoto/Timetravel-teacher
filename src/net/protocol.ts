@@ -4,6 +4,10 @@ import type { Action, GameState } from '../game/types';
 export const MAX_SEATS = 5;
 /** チーム戦（2つの部屋×5クラス）の席の上限 */
 export const TEAM_MAX_SEATS = 10;
+/** ペア担任：1つのクラスを受け持てる人数 */
+export const PAIR_SIZE = 2;
+/** ペア担任（5クラス×2人）の席の上限 */
+export const PAIR_MAX_SEATS = MAX_SEATS * PAIR_SIZE;
 /** これだけ音沙汰がなければ、つながっていないとみなす */
 export const TIMEOUT_MS = 15000;
 /** 生存確認の間隔（中継サーバーのメッセージ数を抑えるため、あまり短くしない） */
@@ -17,6 +21,8 @@ export interface Seat {
   /** 参加した人の端末ID（つなぎ直しても同じ席に戻れるように） */
   cid?: string;
   online: boolean;
+  /** ペア担任：受け持つクラスの番号（0〜4） */
+  cls?: number;
 }
 
 export interface Lobby {
@@ -24,10 +30,47 @@ export interface Lobby {
   years: number;
   /** チーム戦：席を交互に部屋A・Bへ振り分け、席 2k と 2k+1 がチーム k になる */
   team?: boolean;
+  /** ペア担任：2人で1つのクラスを受け持つ（席ごとの cls で、どのクラスかを選ぶ） */
+  pair?: boolean;
 }
 
 export function maxSeats(lobby: Lobby): number {
-  return lobby.team ? TEAM_MAX_SEATS : MAX_SEATS;
+  return lobby.team ? TEAM_MAX_SEATS : lobby.pair ? PAIR_MAX_SEATS : MAX_SEATS;
+}
+
+/** ペア担任で、クラス番号ごとの席（ロビーの席番号）。空いているクラスは空の配列 */
+export function pairClasses(seats: Seat[]): number[][] {
+  const out: number[][] = Array.from({ length: MAX_SEATS }, () => []);
+  seats.forEach((s, i) => out[s.cls ?? 0]?.push(i));
+  return out;
+}
+
+/** ペア担任で、ロビーの席番号 → ゲームのクラス（プレイヤー）番号。だれもいないクラスは詰める */
+export function pairOwners(seats: Seat[]): number[] {
+  const owner: number[] = seats.map(() => -1);
+  pairClasses(seats)
+    .filter((c) => c.length)
+    .forEach((c, pi) => c.forEach((i) => (owner[i] = pi)));
+  return owner;
+}
+
+/** ペア担任で、そのクラスにまだ入れるか（2人まで。CPUのクラスには入れない） */
+export function pairHasRoom(seats: Seat[], cls: number): boolean {
+  const members = seats.filter((s) => s.cls === cls);
+  return members.length < PAIR_SIZE && !members.some((s) => s.kind === 'cpu');
+}
+
+/** ペア担任で、参加した人が入るクラス：相方を待っている人のクラス、なければ空いているクラス */
+export function pairDefaultClass(seats: Seat[]): number {
+  const cls = pairClasses(seats);
+  const lonely = cls.findIndex((c) => c.length === 1 && seats[c[0]].kind !== 'cpu');
+  return lonely >= 0 ? lonely : cls.findIndex((c) => c.length === 0);
+}
+
+/** ペア担任で、そのクラスの人がみんな通信切れか（CPU・ホストのいるクラスは切れない） */
+export function pairOffline(seats: Seat[], owner: number[], pi: number): boolean {
+  const members = seats.filter((_, i) => owner[i] === pi);
+  return members.length > 0 && members.every((s) => s.kind === 'guest' && !s.online);
 }
 
 /** チーム戦で、ロビーの席番号 → 部屋と、その部屋の中の席番号 */
@@ -49,6 +92,8 @@ export function teamReady(n: number): boolean {
 export type ToHost =
   | { t: 'hello'; cid: string; name: string }
   | { t: 'rename'; name: string }
+  /** ペア担任：ロビーで入るクラスを選ぶ */
+  | { t: 'pick'; cls: number }
   | { t: 'action'; seq: number; action: Action }
   | { t: 'ping'; seq: number }
   | { t: 'sync' };
@@ -56,7 +101,8 @@ export type ToHost =
 /** 部屋を作った人 → 参加した人 */
 export type ToGuest =
   | { t: 'lobby'; lobby: Lobby; you: number }
-  | { t: 'state'; seq: number; state: GameState; you: number; seats: Seat[] }
+  /** pair=ペア担任（seats はロビーの全席。you は受け取った側が pairOwners で自分のクラスに直す） */
+  | { t: 'state'; seq: number; state: GameState; you: number; seats: Seat[]; pair?: boolean }
   | { t: 'pong'; seq: number }
   | { t: 'reject'; reason: string }
   | { t: 'closed' };

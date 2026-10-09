@@ -1,6 +1,6 @@
 import { Relay, type RelayStatus } from './relay';
 import type { Action, GameState } from '../game/types';
-import { clientId, PING_MS, TIMEOUT_MS, type Lobby, type Seat, type ToGuestEnvelope, type ToGuest, type ToHost } from './protocol';
+import { clientId, pairOwners, PING_MS, TIMEOUT_MS, type Lobby, type Seat, type ToGuestEnvelope, type ToGuest, type ToHost } from './protocol';
 
 export interface GuestSnap {
   /** connecting=最初の接続中 reconnecting=つなぎ直し中 */
@@ -14,6 +14,10 @@ export interface GuestSnap {
   state: GameState | null;
   seq: number;
   seats: Seat[];
+  /** ペア担任：ロビーの席 → クラス番号（seats はロビーの全席） */
+  owner?: number[];
+  /** チーム戦：もう一方の部屋の最新の状態（自分の部屋が合同イベントで待っている間に観戦する） */
+  watch?: GameState;
 }
 
 const HELLO_MS = 1000;
@@ -99,8 +103,21 @@ export class GuestRoom {
         return;
       }
       case 'state': {
+        if (m.pair) {
+          const owner = pairOwners(m.seats);
+          const you = owner[m.seats.findIndex((s) => s.cid === this.cid)] ?? -1;
+          if (you < 0) return;
+          this.everJoined = true;
+          this.set({ status: 'joined', state: m.state, seq: m.seq, you, seats: m.seats, owner });
+          return;
+        }
         const you = this.seatOf(m.seats, m.you);
-        if (you < 0) return;
+        if (you < 0) {
+          // チーム戦：もう一方の部屋の状態（全員あてに流れてくる）は観戦用に取っておく
+          const mine = this.snap.state?.team;
+          if (mine && m.state.team && m.state.team.room !== mine.room) this.set({ watch: m.state });
+          return;
+        }
         this.everJoined = true;
         this.set({ status: 'joined', state: m.state, seq: m.seq, you, seats: m.seats });
         return;
@@ -138,6 +155,11 @@ export class GuestRoom {
 
   private send(m: ToHost) {
     this.relay.send('h', { cid: this.cid, m });
+  }
+
+  /** ペア担任：ロビーで入るクラスを選ぶ */
+  pick(cls: number) {
+    this.send({ t: 'pick', cls });
   }
 
   act(a: Action) {
