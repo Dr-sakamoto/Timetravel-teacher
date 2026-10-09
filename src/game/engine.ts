@@ -2046,7 +2046,7 @@ export function step(prev: GameState, a: Action): GameState {
       takeFromMarket(s, ph.slot);
       const sc = attrScore(p, 'fight');
       const to = s.players[a.target];
-      // 相手の点より多くは削れない。吸い取るのは実際に削った分の3分の2
+      // 相手の点より多くは削れない。吸い取るのは実際に削った分の半分
       const damage = -addPoints(to, -kachikomiHit(sc.total).damage);
       const drain = kachikomiDrain(damage);
       p.points += drain;
