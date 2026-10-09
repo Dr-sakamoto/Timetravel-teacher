@@ -6,7 +6,7 @@ import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, EVENT_MAP, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM } from './data/events';
 import { ARCHETYPES, MODERN_POOL, STARTER_POOL } from './data/modern';
 import { MONTHS, canBuild, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
-import type { Action, Attr, GameState, Player, RoleSeat, Student } from './types';
+import type { Attr, GameState, Player, RoleSeat, Student } from './types';
 
 function playOut(players: number, years: number, seed: number): GameState {
   let s = newGame(
@@ -26,8 +26,12 @@ function playOut(players: number, years: number, seed: number): GameState {
   return s;
 }
 
-/** 山札の一番上に積んだカードを、場の補充でめくらせる（場の1枚を見送ると補充が起こる。ゲリラはその場で起こる） */
-const pass: Action = { type: 'pass', slot: 0 };
+/** 山札の一番上に積んだカードを、場の補充でめくらせる（場の先頭を捨ててパスすると補充が起こる。ゲリラはその場で起こる） */
+function flip(s: GameState): GameState {
+  const t = structuredClone(s);
+  t.discard.push(t.market.shift()!);
+  return step(t, { type: 'pass' });
+}
 /** 場の先頭にカードを置いて、それを取る */
 function take(s: GameState, id: string): GameState {
   s.market[0] = id;
@@ -263,7 +267,7 @@ describe('engine', () => {
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     expect(s.market).toHaveLength(4);
     s.eventDeck.push('n_art', 'poptest');
-    const next = step(s, pass);
+    const next = flip(s);
     expect(next.phase.kind).toBe('result');
     expect(next.phase.kind === 'result' && next.phase.result.title).toBe('抜き打ちテスト');
     const after = step(next, { type: 'continue' });
@@ -332,10 +336,10 @@ describe('engine', () => {
     t.players[pi].students = [mk('y', ['fight', 'fight'])];
     t.players[pi].roles = [];
     t.eventDeck.push('raid_present');
-    expect(step(t, pass).players[pi].points - t.players[pi].points).toBe(2 - 4);
+    expect(flip(t).players[pi].points - t.players[pi].points).toBe(2 - 4);
     const u = structuredClone(t);
     u.players[pi].students = [mk('y', ['fight', 'fight', 'fight'], 'sengoku')];
-    expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(3 - 4);
+    expect(flip(u).players[pi].points - u.players[pi].points).toBe(3 - 4);
   });
 
   it('kachikomi is taken from the market for free, takes 3× the taker\'s 👊 count from the chosen school and drains 1× to the taker', () => {
@@ -380,15 +384,15 @@ describe('engine', () => {
     t.players[pi].roles = [];
     // 抜き打ちテストは📚の数だけ（👊では引かれない）
     t.eventDeck.push('poptest');
-    expect(step(t, pass).players[pi].points - t.players[pi].points).toBe(1);
+    expect(flip(t).players[pi].points - t.players[pi].points).toBe(1);
     // 授業参観は👑で得点、👊で減点（人数では引かない）
     const u = structuredClone(t);
     u.eventDeck.push('visit');
-    expect(step(u, pass).players[pi].points - u.players[pi].points).toBe(0 - 2);
+    expect(flip(u).players[pi].points - u.players[pi].points).toBe(0 - 2);
     // 持久走大会は🏃の数だけ（人数では引かない）
     const v = structuredClone(t);
     v.eventDeck.push('marathon');
-    expect(step(v, pass).players[pi].points - v.players[pi].points).toBe(0);
+    expect(flip(v).players[pi].points - v.players[pi].points).toBe(0);
   });
 
   it('era events compete on the era\'s favored icons (none → all icons)', () => {
@@ -412,7 +416,7 @@ describe('engine', () => {
     const sizes = s.players.map((p) => p.students.length);
     const points = s.players.map((p) => p.points);
     s.eventDeck.push('martian');
-    const next = step(s, pass);
+    const next = flip(s);
     next.players.forEach((p, i) => {
       expect(p.points).toBe(points[i]);
       expect(p.students.length).toBe(i === full ? MAX_CLASS : sizes[i] + 1);
@@ -456,7 +460,7 @@ describe('engine', () => {
         t.players[i].roles = [];
       });
       t.eventDeck.push('sekigahara');
-      const after = step(t, pass);
+      const after = flip(t);
       return after.players.map((p, i) => p.points - t.players[i].points);
     };
     expect(run([4, 3, 2, 1])).toEqual([15, 5, 0, 0]);
@@ -476,7 +480,7 @@ describe('engine', () => {
         t.players[i].roles = [];
       });
       t.eventDeck.push(id);
-      const after = step(t, pass);
+      const after = flip(t);
       return after.players.map((p, i) => p.points - t.players[i].points);
     };
     const A = [mk('a1', ['sports', 'sports', 'sports']), mk('a2', ['sports'])];
@@ -603,7 +607,7 @@ describe('engine', () => {
         t.players[i].points = points[i];
       });
       t.eventDeck.push(id);
-      const after = step(t, pass);
+      const after = flip(t);
       return {
         after,
         delta: after.players.map((p, i) => p.points - t.players[i].points),
@@ -765,7 +769,7 @@ describe('engine', () => {
       const again = structuredClone(r.after);
       again.phase = base.phase;
       again.eventDeck.push('sangu');
-      expect(kongming(step(again, pass))).toEqual([1, 0, 0]);
+      expect(kongming(flip(again))).toEqual([1, 0, 0]);
       // 満席のクラスには来ない（次に差が大きいクラスへ）
       const full = Array.from({ length: MAX_CLASS }, (_, k) => mk(`f${k}`, ['charm']));
       expect(kongming(run('sangu', [full, [mk('b', ['charm'])], [mk('c', ['study'])]]).after)).toEqual([0, 1, 0]);
@@ -804,7 +808,7 @@ describe('engine', () => {
         const t = structuredClone(base);
         t.oath = { players: [0, 1], base: [0, 0] };
         t.eventDeck.push('taoyuan');
-        const after = step(t, pass);
+        const after = flip(t);
         expect(after.phase).toMatchObject({ kind: 'result' });
         expect(after.oath).toEqual(t.oath);
       });
@@ -935,7 +939,7 @@ describe('engine', () => {
       const t = structuredClone(r.after);
       t.phase = base.phase;
       t.eventDeck.push('gojo');
-      const again = step(t, pass);
+      const again = flip(t);
       expect(again.players.map((p) => p.points)).toEqual(t.players.map((p) => p.points));
       expect(benkei(again)).toEqual([0, 0, 1]);
       // 満席なら次に強いクラスへ
@@ -1056,7 +1060,7 @@ describe('engine', () => {
         p.roles = [];
       });
       t.eventDeck.push('teppo');
-      const after = step(t, pass);
+      const after = flip(t);
       expect(after.phase).toMatchObject({ kind: 'gift', player: 1 });
       const done = step(after, { type: 'gift', item: 'g_tanegashima', uid: 'b' });
       expect(done.phase).toMatchObject({ kind: 'result', player: null });
@@ -1242,7 +1246,7 @@ describe('engine', () => {
       t.players[2].students = [];
       t.players.forEach((p) => (p.roles = []));
       t.eventDeck.push('singularity');
-      const after = step(t, pass);
+      const after = flip(t);
       const attrs = (pi: number, uid: string) => after.players[pi].students.find((x) => x.uid === uid)!.attrs;
       // オラクルも6個まで増える
       expect(attrs(0, 'o')).toHaveLength(6);
@@ -1387,7 +1391,7 @@ describe('engine', () => {
     const sitter = s.players[drawer].students[0];
     s.players[drawer].roles = [{ role: 'study', uid: sitter.uid }];
     s.eventDeck.push('push');
-    s = step(s, pass);
+    s = flip(s);
     expect(s.phase).toMatchObject({ kind: 'push', player: drawer });
     // 係の子は外せない
     expect(step(s, { type: 'push', uid: sitter.uid })).toBe(s);
@@ -1427,7 +1431,7 @@ describe('engine', () => {
       const t = structuredClone(s);
       const before = t.players.map((p) => p.points);
       t.eventDeck.push(id);
-      const after = id.startsWith('n_') ? take(t, id) : step(t, pass);
+      const after = id.startsWith('n_') ? take(t, id) : flip(t);
       return { rows: after.phase.kind === 'result' ? after.phase.result.rows.length : 0, d: after.players.map((p, i) => p.points - before[i]) };
     };
     for (const id of ['n_study', 'n_sports']) {
