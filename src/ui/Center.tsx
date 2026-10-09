@@ -519,7 +519,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         <div className="say">
           <div className="effect">{effectOf(state, ph.player, id)}</div>
           <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'pass' })} title="何も取らずに手番を終える（カードは場に残る）">
+            <button className="btn ghost" onClick={() => dispatch({ type: 'pass' })} title="何も取らずに手番を終える（カードは場に残る。全員が続けてパスしたら左端のカードが流れる）">
               パス
             </button>
             <button className="btn primary" disabled={!ok} onClick={() => dispatch({ type: 'take', slot: sel })}>

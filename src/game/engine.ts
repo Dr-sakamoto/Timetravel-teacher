@@ -1859,6 +1859,7 @@ export function canTake(s: GameState, pi: number, slot: number): boolean {
 
 /** 場からカードを抜く（取ったカードは捨て札へ。グッズは装備するので捨て札には行かない） */
 function takeFromMarket(s: GameState, slot: number, discard = true): string {
+  s.passes = 0;
   const [id] = s.market.splice(slot, 1);
   if (discard && !isPerson(id)) s.discard.push(id);
   return id;
@@ -1985,12 +1986,21 @@ export function step(prev: GameState, a: Action): GameState {
     }
     case 'build': {
       if (ph.kind !== 'draw' || !canBuild(s, ph.player)) return prev;
+      s.passes = 0;
       build(s, ph.player);
       return s;
     }
     case 'pass': {
       if (ph.kind !== 'draw') return prev;
       log(s, `${s.players[ph.player].name}はパスした。`, ph.player);
+      // 全員が続けてパスしたら、場に一番長く残っているカード（左端）が流れて入れ替わる
+      s.passes = (s.passes ?? 0) + 1;
+      if (s.passes >= s.players.length && s.market.length) {
+        s.passes = 0;
+        const [id] = s.market.splice(0, 1);
+        s.discard.push(id);
+        log(s, `全員がパスしたので、${isPerson(id) ? previewStudent(id).name : EVENT_MAP[id].name}のカードが流れた。`);
+      }
       refill(s);
       return s;
     }
