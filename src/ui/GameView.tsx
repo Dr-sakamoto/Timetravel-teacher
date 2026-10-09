@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cpuAction } from '../game/ai';
-import { MONTHS, actingPlayer, cyborgable, inGuerrilla, nextTurnPlayer, droppable, equippable, exchangePairs, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth } from '../game/engine';
-import type { Action, GameState } from '../game/types';
+import { MONTHS, actingPlayer, jointHomes, cyborgable, inGuerrilla, nextTurnPlayer, droppable, equippable, exchangePairs, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth } from '../game/engine';
+import type { Action, GameState, Player } from '../game/types';
 import type { Pick } from './Center';
 import { Center } from './Center';
 import { GameOver } from './GameOver';
@@ -173,6 +173,12 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const matLit = (i: number) => fx?.lit(i) ?? lit;
   const fxDim = (i: number) => (fx?.dims(i) ? (u: string) => fx.dims(i)!.has(u) : undefined);
   const me = state.players[focus];
+  // 合体したクラス（チーム戦の3学期）：もとの部屋に戻るとき、どちらのクラスへ帰る子かを色で分け、帰るクラスごとに並べる
+  const homesOf = (pi: number) => (state.joint ? jointHomes(state, pi) : undefined);
+  const byHome = (p: Player, homes?: Record<string, { room: number }>): Player =>
+    homes ? { ...p, students: [...p.students].sort((x, y) => (homes[x.uid]?.room ?? 0) - (homes[y.uid]?.room ?? 0)) } : p;
+  const focusHomes = homesOf(focus);
+  const peekHomes = peek !== null ? homesOf(peek) : undefined;
   const editingRoles = ph.kind === 'roles' && !ph.ready[focus] && !me.isCpu && !spectate;
 
   return (
@@ -246,7 +252,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
             />
           ) : (
             <Playmat
-              player={shown(focus)}
+              player={byHome(shown(focus), focusHomes)}
               year={state.year}
               slots={slots}
               variant="near"
@@ -267,6 +273,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               }
               selectedUid={choosing ? pick.uid : null}
               frames={cursorMarks?.uid}
+              homes={focusHomes}
+              homeNames={state.joint?.names?.[focus]}
               dimUid={selectable.length ? (uid) => !selectable.some((x) => x.uid === uid) : fxDim(focus)}
             />
           )}
@@ -281,12 +289,14 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
             </button>
             {peekPicking && <div className="peek-hint">こちらのクラスに来てもらう生徒をタップ（アイコンの数が同じ子だけ。係の子は選べない）</div>}
             <Playmat
-              player={state.players[peek]}
+              player={byHome(state.players[peek], peekHomes)}
               year={state.year}
               slots={slots}
               variant="peek"
               sworn={state.oath?.players.includes(peek)}
               marks={eraMarks(state, peek)}
+              homes={peekHomes}
+              homeNames={state.joint?.names?.[peek]}
               delta={deltas.get(peek)}
               lit={lit}
               onSeatClick={

@@ -6,7 +6,7 @@ import { className } from '../game/engine';
 import type { Player, RoleId, RoleSeat } from '../game/types';
 import { TcgCard } from './TcgCard';
 import { useCardDrag } from './useCardDrag';
-import { CursorFrames, type CursorMark } from './Proposals';
+import { CURSOR_COLORS, CursorFrames, type CursorMark } from './Proposals';
 
 /** 係決めでカードを置ける場所：係の場（'role:<係>'）・座席（'seats'）・座席のカード（'card:<uid>'） */
 export type DropTo = { kind: 'role'; role: RoleId } | { kind: 'seats' } | { kind: 'card'; uid: string };
@@ -58,6 +58,10 @@ interface Props {
   marks?: EraMark[];
   /** 合体したクラス（チーム戦の3学期）：生徒に出す選択カーソルの枠 */
   frames?: Record<string, CursorMark[]>;
+  /** 合体したクラス：生徒ごとに、もとの部屋に戻るときどちらのクラスへ帰るか（0=部屋A・1=部屋B）と、3学期に来た子か */
+  homes?: Record<string, { room: number; fresh: boolean }>;
+  /** 合体したクラス：もとの2クラスの担任の名前（部屋A・部屋B） */
+  homeNames?: [string, string];
 }
 
 /** 名札に出す印 */
@@ -109,13 +113,20 @@ export function Playmat(props: Props) {
       />
     );
     const frames = props.frames?.[st.uid];
-    return frames ? (
+    const home = props.homes?.[st.uid];
+    if (!frames && !home) return tcg;
+    return (
       <>
         {tcg}
+        {home && <span className="home-frame" style={{ '--cc': CURSOR_COLORS[home.room] } as CSSProperties} />}
+        {home && (
+          <span className={`home-tag ${home.fresh ? 'fresh' : ''}`} style={{ '--cc': CURSOR_COLORS[home.room] } as CSSProperties} title={home.fresh ? '3学期に来た子：もとの部屋に戻るとき、このクラスへ' : 'もとのクラス'}>
+            {home.fresh ? '🆕' : ''}
+            {props.homeNames?.[home.room] ?? (home.room ? 'B' : 'A')}
+          </span>
+        )}
         <CursorFrames marks={frames} />
       </>
-    ) : (
-      tcg
     );
   };
 
@@ -153,6 +164,16 @@ export function Playmat(props: Props) {
         <span className="plate-class">
           {className(player.id, year)} 👥{view.students.length}/{classCap(player)}
         </span>
+        {props.homes && (
+          // 合体したクラス：もとの部屋に戻るとき、それぞれのクラスへ帰る人数
+          <span className="plate-homes" title="もとの部屋に戻るとき、それぞれのクラスへ帰る生徒の数（🆕は3学期に来た子）">
+            {[0, 1].map((room) => (
+              <span key={room} className="home-count" style={{ '--cc': CURSOR_COLORS[room] } as CSSProperties}>
+                {props.homeNames?.[room] ?? (room ? 'B' : 'A')} {Object.values(props.homes!).filter((h) => h.room === room).length}人
+              </span>
+            ))}
+          </span>
+        )}
         <span className="plate-pts">{player.points}</span>
         <DeltaBadge delta={delta} rank={props.rank} points={player.points} />
       </div>

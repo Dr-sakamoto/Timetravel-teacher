@@ -234,6 +234,10 @@ export interface GameState {
 export interface JointInfo {
   /** 部屋Bのクラスから来た生徒（もとの部屋に戻すときに使う） */
   bUids: string[];
+  /** 部屋Aのクラスから来た生徒（なければ、部屋Bから来ていない子はみな部屋Aの子とみなす） */
+  aUids?: string[];
+  /** チーム（クラス）ごとの、もとの2クラスの担任の名前（部屋A・部屋B） */
+  names?: [string, string][];
 }
 
 export interface TeamInfo {

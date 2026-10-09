@@ -5,7 +5,7 @@ import { BENKEI, CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, EVENT_MAP, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM, eventScale, scaleCard, type ContestCard } from './data/events';
 import { ARCHETYPES, MODERN_POOL, STARTER_POOL } from './data/modern';
-import { mergeTeams, newTeamGame, splitTeams } from './engine';
+import { jointHomes, mergeTeams, newTeamGame, splitTeams } from './engine';
 import { MONTHS, canBuild, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Attr, GameState, Player, RoleSeat, Student } from './types';
 
@@ -1566,7 +1566,12 @@ describe('チーム戦（2つの部屋）', () => {
         break;
       }
       expect(done.phase).toMatchObject({ kind: 'teamWait', event: 'split' });
+      const homes = done.players.map((_, i) => jointHomes(done, i));
       const split = splitTeams(rooms, done)!;
+      // 画面に出していた「帰るクラス」のとおりに分かれる
+      done.players.forEach((_, i) => {
+        for (const [room, r] of split.entries()) for (const x of r.players[i].students) expect(homes[i][x.uid]?.room).toBe(room);
+      });
       expect(split.map((r) => r.team?.room)).toEqual([0, 1]);
       expect(split.map((r) => r.year)).toEqual([2, 2]);
       split.forEach((r) => {

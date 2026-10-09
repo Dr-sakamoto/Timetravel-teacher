@@ -1620,10 +1620,37 @@ export function mergeTeams(rooms: GameState[]): GameState | null {
   s.uidCounter = counter;
   // 人物は、どちらの部屋でもまだ来ていない子だけ
   for (const era of Object.keys(s.pools) as EraId[]) s.pools[era] = a.pools[era].filter((id) => b.pools[era].includes(id));
-  s.joint = { bUids };
+  s.joint = { bUids, aUids: a.players.flatMap((p) => p.students.map((x) => x.uid)), names: a.players.map((pa, i) => [pa.name, b.players[i].name]) };
   log(s, `3学期はチームの2クラスが合体！ ${s.players.map((p) => p.name).join('／')}`);
   startTerm(s);
   return s;
+}
+
+/**
+ * 合体したクラスの生徒を、もとの2クラスに分ける：もとのクラスの子はもとのクラスへ、3学期に来た子は人数の少ないほうへ。
+ * 定員をこえたら、もう一方へ
+ */
+function splitStudents(students: Student[], fromA: Set<string>, fromB: Set<string>, capA: number, capB: number): [Student[], Student[]] {
+  const sa = students.filter((x) => fromA.has(x.uid));
+  const sb = students.filter((x) => fromB.has(x.uid));
+  for (const x of students.filter((y) => !fromA.has(y.uid) && !fromB.has(y.uid))) (sa.length <= sb.length ? sa : sb).push(x);
+  while (sa.length > capA && sb.length < capB) sb.push(sa.pop()!);
+  while (sb.length > capB && sa.length < capA) sa.push(sb.pop()!);
+  return [sa, sb];
+}
+
+/** 合体したクラスの生徒が、もとの部屋に戻るときにどちらのクラスへ帰るか（0=部屋A・1=部屋B）と、3学期に来た子か */
+export function jointHomes(s: GameState, pi: number): Record<string, { room: number; fresh: boolean }> {
+  const j = s.joint;
+  const p = s.players[pi];
+  if (!j || !p) return {};
+  const fromB = new Set(j.bUids);
+  const fromA = new Set(j.aUids ?? p.students.filter((x) => !fromB.has(x.uid)).map((x) => x.uid));
+  const half = Math.floor(classCap(p) / 2);
+  const [sa, sb] = splitStudents(p.students, fromA, fromB, half, classCap(p) - half);
+  const out: Record<string, { room: number; fresh: boolean }> = {};
+  for (const [room, list] of [sa, sb].entries()) for (const x of list) out[x.uid] = { room, fresh: !fromA.has(x.uid) && !fromB.has(x.uid) };
+  return out;
 }
 
 /**
@@ -1650,13 +1677,7 @@ export function splitTeams(rooms: GameState[], joint: GameState): GameState[] | 
   a.players = joint.players.map((jp, i) => {
     const pa = a0.players[i];
     const pb = b0.players[i];
-    const fromA = new Set(pa.students.map((x) => x.uid));
-    const sa = jp.students.filter((x) => fromA.has(x.uid));
-    const sb = jp.students.filter((x) => fromB.has(x.uid));
-    for (const x of jp.students.filter((y) => !fromA.has(y.uid) && !fromB.has(y.uid))) (sa.length <= sb.length ? sa : sb).push(x);
-    // 定員をこえたら、もう一方へ
-    while (sa.length > classCap(pa) && sb.length < classCap(pb)) sb.push(sa.pop()!);
-    while (sb.length > classCap(pb) && sa.length < classCap(pa)) sa.push(sb.pop()!);
+    const [sa, sb] = splitStudents(jp.students, new Set(pa.students.map((x) => x.uid)), fromB, classCap(pa), classCap(pb));
     const d = jp.points - pa.points - pb.points;
     const back = (p: Player, students: Student[], gain: number): Player => ({
       ...p,

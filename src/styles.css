@@ -4284,3 +4284,46 @@ body:has(.title-screen) {
   color: #ffe58a;
   border: 1px solid #ffd43b;
 }
+/* 合体したクラス：もとの部屋に戻るとき、どちらのクラスへ帰る子か */
+.home-tag {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  font-weight: bold;
+  line-height: 1.35;
+  padding: 0 0.5em;
+  border-radius: 999px;
+  background: var(--cc);
+  color: #111;
+  pointer-events: none;
+  z-index: 2;
+}
+.home-frame {
+  position: absolute;
+  inset: 0 0 6px;
+  border: 3px solid var(--cc);
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 1;
+}
+.home-tag.fresh {
+  outline: 2px dashed #fff;
+}
+.plate-homes {
+  display: inline-flex;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+}
+.home-count {
+  padding: 0 0.5em;
+  border-radius: 999px;
+  border: 2px solid var(--cc);
+  color: var(--cc);
+  white-space: nowrap;
+}
