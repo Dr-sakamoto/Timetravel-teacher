@@ -197,8 +197,8 @@ export function cpuAction(s: GameState): Action | null {
       const bv = buildValue(s, ph.player);
       if (bv > 0 && (best === undefined || bv > marketValue(s, ph.player, best))) return { type: 'build' };
       if (best !== undefined && marketValue(s, ph.player, best) > 0) return { type: 'take', slot: best };
-      // 取りたいものがなければ、一番高いカードを捨てて見送る
-      return { type: 'pass', slot: slots.sort((x, y) => marketCost(s.market[y]) - marketCost(s.market[x]))[0] };
+      // 取りたいものがなければパスする
+      return { type: 'pass' };
     }
     case 'makeRoom':
       return { type: 'makeRoom', uid: leastWorth(s.players[ph.player])?.uid ?? null };

@@ -1,6 +1,10 @@
-import { Fragment } from 'react';
 import { ATTR_ICON, type EventResult } from '../game/types';
 import { EventArt, hasEventArt } from './art/events';
+
+/** 「📚＋1」が「＋」と「1」のあいだや「＋」の前で改行されないように、語をつなぐ文字（U+2060）を挟む */
+function glue(text: string): string {
+  return text.replace(/(\S)\s*([＋+−×])\s*(\d)/gu, '$1\u2060$2\u2060$3');
+}
 
 /** 卓の中央に出たイベントカード（取ったカード・ゲリラ・学校行事）。文字は名前と効果だけ */
 export function EventCardView({ result }: { result: EventResult }) {
@@ -20,15 +24,7 @@ export function EventCardView({ result }: { result: EventResult }) {
         <div className="ecard-title">{result.title}</div>
         <div className={`ecard-art ${hasEventArt(result.art) ? 'has-art' : ''}`}>{hasEventArt(result.art) ? <EventArt id={result.art} /> : result.icon}</div>
         {result.glyph ? (
-          <div className="ecard-glyph">
-            {/* 改行は空白のところだけ（「📚＋1」が「＋」と「1」に割れないように） */}
-            {result.glyph.split(' ').map((w, i) => (
-              <Fragment key={i}>
-                {i > 0 && ' '}
-                <span className="nowrap">{w}</span>
-              </Fragment>
-            ))}
-          </div>
+          <div className="ecard-glyph">{glue(result.glyph)}</div>
         ) : (
           descOnly && (
             <div className="ecard-text">

@@ -136,7 +136,7 @@ export type Phase =
   | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
   /** 係決め：全クラスが一斉に決め、全員の準備OK（ready）がそろったら手番に進む */
   | { kind: 'roles'; player: null; ready: boolean[] }
-  /** 手番：場のカードを1枚取る（または1枚捨てて見送る） */
+  /** 手番：場のカードを1枚取る（またはパスする） */
   | { kind: 'draw'; player: number }
   /** 満席で人物カードを取る：代わりに転校させる生徒を選ぶ（slot は場のカードの位置） */
   | { kind: 'makeRoom'; player: number; slot: number }
@@ -226,8 +226,8 @@ export type Action =
   | { type: 'setRoles'; player: number; roles: RoleSeat[]; unlock?: RoleId[] }
   /** 場のカードを取る（人物・グッズはクラスポイントを払う） */
   | { type: 'take'; slot: number }
-  /** 場のカードを1枚捨てて見送る */
-  | { type: 'pass'; slot: number }
+  /** 何も取らずに手番を終える（場のカードはそのまま） */
+  | { type: 'pass' }
   /** ピラミッドに石を積む（クラスの🏃の数だけ。場のカードは減らない） */
   | { type: 'build' }
   /** 満席で人物を迎える時に、代わりに転校させる生徒（null でやめる） */
