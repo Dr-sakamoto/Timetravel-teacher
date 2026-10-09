@@ -25,6 +25,7 @@ import {
   eventCost,
   fixedRule,
   isGuerrilla,
+  kachikomiHit,
   cardGlyph,
   fixedGlyph,
   fixedShort,
@@ -35,7 +36,6 @@ import {
   type FixedEvent,
   type GoodsCard,
   type NormalCard,
-  type RaidCard,
   type SwingCard,
 } from './data/events';
 import { ARCHETYPE_MAP, BOY_NAMES, GIRL_NAMES, MODERN_POOL, STARTER_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
@@ -1520,20 +1520,6 @@ export function cyborgable(p: Player): Student[] {
   return p.students.filter((x) => x.art !== 'cyborg');
 }
 
-/** 襲来（時代イベント・全クラス）：👊の合計 − 敵の強さ */
-function resolveRaid(s: GameState, c: RaidCard): EventResult {
-  const rows = s.players.map((p, i): ResultRow => {
-    const sc = attrScore(p, 'fight');
-    const delta = sc.total - c.threat;
-    p.points += delta;
-    if (delta >= 0) sc.holders.forEach((h) => h.mvp++);
-    return { player: i, count: sc.total, delta, note: delta >= 0 ? '撃退' : sc.total ? '突破' : '無防備', uids: sc.holders.map((h) => h.uid) };
-  });
-  sortRows(rows);
-  logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, art: c.id, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows };
-}
-
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {
   const values = s.players.map((p) => (f.rule === 'test' ? testScore(p, TEST_YANKEE_PENALTY) : totalPower(p)));
   const rows = awardRanks(s, values, f.mult);
@@ -1807,7 +1793,7 @@ function refill(s: GameState) {
   endTurn(s);
 }
 
-/** ゲリラ（共通イベント・時代イベント・襲来・転校） */
+/** ゲリラ（共通イベント・時代イベント・転校） */
 function fireGuerrilla(s: GameState, pi: number, id: string) {
   const c = EVENT_MAP[id];
   log(s, `ゲリラ発生！ ${c.name}`);
@@ -1821,9 +1807,6 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
       else if (c.effect.type === 'newworld' || c.effect.type === 'teppo') startGift(s, c, pi);
       else if (c.effect.type === 'oath') startOath(s, c, c.effect.max);
       else setResult(s, null, resolveContest(s, c), 'turn');
-      return;
-    case 'raid':
-      setResult(s, null, resolveRaid(s, c), 'turn');
       return;
     case 'push':
       startDrop(s, pi);
@@ -2034,21 +2017,21 @@ export function step(prev: GameState, a: Action): GameState {
       if (!kachikomiTargets(s, ph.player).includes(a.target)) return prev;
       takeFromMarket(s, ph.slot);
       const sc = attrScore(p, 'fight');
-      const damage = sc.total * KACHIKOMI_CARDS[0].mult;
-      const drain = sc.total * KACHIKOMI_CARDS[0].drain;
       const to = s.players[a.target];
+      const guard = attrScore(to, 'fight').total;
+      const { damage, drain } = kachikomiHit(sc.total, guard);
       to.points -= damage;
       p.points += drain;
-      sc.holders.forEach((h) => h.mvp++);
+      if (damage > 0) sc.holders.forEach((h) => h.mvp++);
       const rows: ResultRow[] = [
         { player: ph.player, count: sc.total, delta: drain, note: 'カチコミ（ドレイン）', uids: sc.holders.map((h) => h.uid) },
-        { player: a.target, delta: -damage, note: '被害' },
+        { player: a.target, count: guard, delta: -damage, note: damage ? `被害（👊${guard}で防いだ）` : `👊${guard}で防ぎきった` },
       ];
       logRows(s, `カチコミ（${p.name}→${to.name}）`, rows);
       setResult(
         s,
         ph.player,
-        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: `${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), say: shortRule(KACHIKOMI_CARDS[0]), rows },
+        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: damage ? `${to.name}のクラスに殴りこんだ！` : `${to.name}のクラスに殴りこんだが、防がれた！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), say: shortRule(KACHIKOMI_CARDS[0]), rows },
         'turn',
       );
       return s;
@@ -2232,8 +2215,6 @@ export function deckBreakdown(s: GameState): DeckRow[] {
           return { ...base, group: '時代イベント' };
         case 'contest':
           return { ...base, name: c.attr === 'all' ? c.name : `${c.name}（${ATTR_ICON[c.attr]}）`, group: '時代イベント' };
-        case 'raid':
-          return { ...base, name: `${c.name}（強さ${c.threat}）`, group: '時代イベント' };
       }
     });
   };

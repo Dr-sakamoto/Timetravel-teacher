@@ -126,7 +126,7 @@ describe('engine', () => {
     expect(attrScore(p, 'sports', 'sengoku').total).toBe(6);
   });
 
-  it('yankees defend against raids but hurt tests', () => {
+  it('yankees are strong in kachikomi but hurt tests', () => {
     const y = player([mk('a', ['sports', 'fight']), mk('b', ['fight', 'fight'])]);
     const n = player([mk('a', ['study']), mk('b', ['study', 'study'])]);
     expect(attrScore(y, 'fight').total).toBeGreaterThan(attrScore(n, 'fight').total);
@@ -328,21 +328,7 @@ describe('engine', () => {
     expect(CARDS.find((c) => c.id === 'einstein')!.attrs).toEqual(['study', 'study', 'study', 'study', 'art']);
   });
 
-  it('era raids add or take away the difference between 👊 and the threat', () => {
-    let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 8);
-    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
-    const pi = s.phase.player;
-    const t = structuredClone(s);
-    t.players[pi].students = [mk('y', ['fight', 'fight'])];
-    t.players[pi].roles = [];
-    t.eventDeck.push('raid_present');
-    expect(flip(t).players[pi].points - t.players[pi].points).toBe(2 - 4);
-    const u = structuredClone(t);
-    u.players[pi].students = [mk('y', ['fight', 'fight', 'fight'], 'sengoku')];
-    expect(flip(u).players[pi].points - u.players[pi].points).toBe(3 - 4);
-  });
-
-  it('kachikomi is taken from the market for free, takes 3× the taker\'s 👊 count from the chosen school and drains 1× to the taker', () => {
+  it('kachikomi is taken from the market for free; the target\'s 👊 blocks, the rest is taken from them and half of it drained to the taker', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -365,10 +351,18 @@ describe('engine', () => {
     expect(back.market).toEqual(['kachikomi']);
     // 自分は殴れない
     expect(step(k, { type: 'kachikomi', target: pi })).toBe(k);
+    // 👊3 で 👊1 のクラスに殴りこむ：相手 −2、自分 +1
+    k.players[target].students = [mk('g', ['fight'])];
+    k.players[target].roles = [];
     const done = step(k, { type: 'kachikomi', target });
-    expect(done.players[target].points - t.players[target].points).toBe(-9);
-    expect(done.players[pi].points - t.players[pi].points).toBe(3);
+    expect(done.players[target].points - k.players[target].points).toBe(-2);
+    expect(done.players[pi].points - k.players[pi].points).toBe(1);
     expect(done.market).toEqual([]);
+    // 相手の👊が同じか多ければ防ぎきられる
+    k.players[target].students = [mk('g', ['fight', 'fight', 'fight'])];
+    const blocked = step(k, { type: 'kachikomi', target });
+    expect(blocked.players[target].points).toBe(k.players[target].points);
+    expect(blocked.players[pi].points).toBe(k.players[pi].points);
     // 👊がいなければ取れない
     const u = structuredClone(t);
     u.players[pi].students = [mk('a', ['study'])];
@@ -1431,7 +1425,7 @@ describe('engine', () => {
       expect(r.rows, id).toBe(1);
       r.d.forEach((d, i) => i !== drawer && expect(d, id).toBe(0));
     }
-    for (const id of ['poptest', 'marathon', 'bunkasai', 'raid_present']) expect(run(id).rows, id).toBe(3);
+    for (const id of ['poptest', 'marathon', 'bunkasai']) expect(run(id).rows, id).toBe(3);
   });
 });
 
