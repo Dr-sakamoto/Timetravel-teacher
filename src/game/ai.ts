@@ -1,5 +1,5 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
-import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, kachikomiHit, type GoodsCard } from './data/events';
+import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, kachikomiDrain, kachikomiHit, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
 import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, kaguyaGift, kaguyaWants, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
@@ -11,7 +11,7 @@ const ATTR_WEIGHT = Object.fromEntries(
     ALL_EVENT_CARDS.reduce((x, c) => x + (c.kind === 'normal' && c.attr === a ? c.count : c.kind === 'contest' && c.attr === a ? c.count / 11 : 0), 0),
   ]),
 ) as Record<Attr, number>;
-// 👊はカチコミ（場から取る・3枚。攻める分と、殴りこまれたときに防ぐ分）
+// 👊はカチコミ（場から取る・3枚・×3）の分
 ATTR_WEIGHT.fight += 9;
 
 /** クラスの強さの目安（CPUの判断用） */
@@ -156,10 +156,10 @@ export function buildValue(s: GameState, pi: number): number {
 }
 
 /** 一番点の高い相手 */
-/** カチコミの値打ち：相手の減点（相手の数で割る）＋自分のドレイン */
+/** カチコミの値打ち：相手の減点（相手の数で割る）＋自分のドレイン。相手の点より多くは削れない */
 function kachikomiValue(s: GameState, pi: number, target: number): number {
-  const { damage, drain } = kachikomiHit(attrScore(s.players[pi], 'fight').total, attrScore(s.players[target], 'fight').total);
-  return damage / (s.players.length - 1) + drain;
+  const damage = Math.min(kachikomiHit(attrScore(s.players[pi], 'fight').total).damage, s.players[target].points);
+  return damage / (s.players.length - 1) + kachikomiDrain(damage);
 }
 
 /** カチコミの相手：一番削れるクラス（同じならポイントの多いクラス） */

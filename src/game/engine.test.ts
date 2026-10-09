@@ -328,7 +328,7 @@ describe('engine', () => {
     expect(CARDS.find((c) => c.id === 'einstein')!.attrs).toEqual(['study', 'study', 'study', 'study', 'art']);
   });
 
-  it('kachikomi is taken from the market for free; the target\'s 👊 blocks, the rest is taken from them and half of it drained to the taker', () => {
+  it('kachikomi is taken from the market for free, takes 3× the taker\'s 👊 count from the chosen school and drains 2/3 of it to the taker', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -351,18 +351,20 @@ describe('engine', () => {
     expect(back.market).toEqual(['kachikomi']);
     // 自分は殴れない
     expect(step(k, { type: 'kachikomi', target: pi })).toBe(k);
-    // 👊3 で 👊1 のクラスに殴りこむ：相手 −2、自分 +1
-    k.players[target].students = [mk('g', ['fight'])];
-    k.players[target].roles = [];
-    const done = step(k, { type: 'kachikomi', target });
-    expect(done.players[target].points - k.players[target].points).toBe(-2);
-    expect(done.players[pi].points - k.players[pi].points).toBe(1);
-    expect(done.market).toEqual([]);
-    // 相手の👊が同じか多ければ防ぎきられる
+    // 👊3 で殴りこむ：相手 −9、自分 +6（相手の👊では防げない）
     k.players[target].students = [mk('g', ['fight', 'fight', 'fight'])];
-    const blocked = step(k, { type: 'kachikomi', target });
-    expect(blocked.players[target].points).toBe(k.players[target].points);
-    expect(blocked.players[pi].points).toBe(k.players[pi].points);
+    k.players[target].roles = [];
+    k.players[target].points = 20;
+    const done = step(k, { type: 'kachikomi', target });
+    expect(done.players[target].points - k.players[target].points).toBe(-9);
+    expect(done.players[pi].points - k.players[pi].points).toBe(6);
+    expect(done.market).toEqual([]);
+    // 相手の点より多くは削れない（0点で止まる）。吸い取るのは実際に削った分の3分の2
+    const poor = structuredClone(k);
+    poor.players[target].points = 4;
+    const robbed = step(poor, { type: 'kachikomi', target });
+    expect(robbed.players[target].points).toBe(0);
+    expect(robbed.players[pi].points - poor.players[pi].points).toBe(2);
     // 👊がいなければ取れない
     const u = structuredClone(t);
     u.players[pi].students = [mk('a', ['study'])];
@@ -381,8 +383,13 @@ describe('engine', () => {
     expect(flip(t).players[pi].points - t.players[pi].points).toBe(1);
     // 授業参観は👑で得点、👊で減点（人数では引かない）
     const u = structuredClone(t);
+    u.players[pi].points = 10;
     u.eventDeck.push('visit');
     expect(flip(u).players[pi].points - u.players[pi].points).toBe(0 - 2);
+    // 点は0未満にならない
+    const z = structuredClone(u);
+    z.players[pi].points = 1;
+    expect(flip(z).players[pi].points).toBe(0);
     // 持久走大会は🏃の数だけ（人数では引かない）
     const v = structuredClone(t);
     v.eventDeck.push('marathon');

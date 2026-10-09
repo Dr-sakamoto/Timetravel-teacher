@@ -26,6 +26,7 @@ import {
   eventScale,
   fixedRule,
   isGuerrilla,
+  kachikomiDrain,
   kachikomiHit,
   cardGlyph,
   fixedGlyph,
@@ -501,8 +502,8 @@ function payPatent(s: GameState, pi: number, r: EventResult): EventResult {
   const holder = s.patent;
   if (holder === undefined || holder === pi) return r;
   const c = eventCard(s, 'patent') as ContestCard;
-  const fee = c.effect.type === 'patent' ? c.effect.fee : 0;
-  s.players[pi].points -= fee;
+  // 払える分だけ払う（点は0未満にならない）
+  const fee = -addPoints(s.players[pi], c.effect.type === 'patent' ? -c.effect.fee : 0);
   s.players[holder].points += fee;
   const say = `特許料：${s.players[pi].name}のクラスから${s.players[holder].name}のクラスへ${fee}点。`;
   log(s, say, pi);
@@ -562,7 +563,7 @@ function settleOath(s: GameState) {
     extra.add(pi);
   }
   const rows: ResultRow[] = oath.players.map((pi, k) => {
-    const after = oath.base[k] + share + (extra.has(pi) ? 1 : 0);
+    const after = Math.max(0, oath.base[k] + share + (extra.has(pi) ? 1 : 0));
     const delta = after - ps[pi].points;
     ps[pi].points = after;
     return { player: pi, count: gains[k], delta, note: `稼ぎ${gains[k] >= 0 ? '+' : ''}${gains[k]} → 山分け` };
@@ -613,8 +614,7 @@ function awardRanks(s: GameState, values: number[], mult: number): ResultRow[] {
   const table = CONTEST_POINTS[s.players.length] ?? CONTEST_POINTS[5];
   const rk = ranks(values);
   return s.players.map((p, i) => {
-    const delta = Math.round((table[rk[i]] ?? 0) * mult);
-    p.points += delta;
+    const delta = addPoints(p, Math.round((table[rk[i]] ?? 0) * mult));
     return { player: i, count: values[i], rank: rk[i], delta };
   });
 }
@@ -644,8 +644,7 @@ function resolveSwing(s: GameState, c: SwingCard): EventResult {
     const plus = attrScore(p, c.plus);
     const minus = c.minus ? attrScore(p, c.minus) : { total: 0, holders: [] as Student[] };
     // 人数で数えるカード（持久走大会・合唱コンクール）は、持っている子1人につき +per
-    const delta = c.per ? plus.holders.length * c.per : plus.total - minus.total;
-    p.points += delta;
+    const delta = addPoints(p, c.per ? plus.holders.length * c.per : plus.total - minus.total);
     if (delta > 0) plus.holders.forEach((h) => h.mvp++);
     const note = c.minus ? `${ATTR_ICON[c.plus]}${plus.total}−${ATTR_ICON[c.minus]}${minus.total}` : undefined;
     return { player: i, count: c.minus ? undefined : c.per ? plus.holders.length : plus.total, delta, note: c.per ? `${plus.holders.length}人` : note, uids: [...plus.holders, ...minus.holders].map((h) => h.uid) };
@@ -734,7 +733,7 @@ function resolveEraScore(s: GameState, c: ContestCard, e: Extract<EraEffect, { t
         break;
       }
     }
-    p.points += delta;
+    delta = addPoints(p, delta);
     if (delta > 0) holders.filter(has).forEach((h) => h.mvp++);
     return { player: i, count, rank: place, delta, note, uids: holders.map((h) => h.uid) };
   });
@@ -778,9 +777,11 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
   const ps = s.players;
   const n = ps.length;
   const rows: ResultRow[] = ps.map((_, i) => ({ player: i, delta: 0 }));
-  const add = (i: number, d: number) => {
-    ps[i].points += d;
-    rows[i].delta += d;
+  /** 点を動かして結果に足す。実際に動いた点を返す（0未満にはならない） */
+  const add = (i: number, d: number): number => {
+    const moved = addPoints(ps[i], d);
+    rows[i].delta += moved;
+    return moved;
   };
   const scores = ps.map((p) => eraScore(p, c));
   const values = scores.map((x) => x.total);
@@ -824,8 +825,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         tell(`${ps[win].name}のクラスはもう満腹で、狩りをしなかった。`, win);
         break;
       }
-      add(win, e.amount);
-      add(lose, -e.amount);
+      add(win, -add(lose, -e.amount));
       scores[win].holders.forEach((h) => h.mvp++);
       rows[win].note = '奪った';
       rows[lose].note = '奪われた';
@@ -1006,8 +1006,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         rows[i].count = guard?.pts ?? 0;
         rows[i].uids = guard ? [guard.student.uid] : [];
         if (guard && guard.pts >= e.need) {
-          add(i, e.take);
-          add(chaser, -e.take);
+          add(i, -add(chaser, -e.take));
           guard.student.mvp++;
           moved.push(guard.student);
           rows[i].note = '一喝で追い返した';
@@ -1217,8 +1216,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         tell(`${ps[win].name}のクラスの天下はゆるがない。`, win);
         break;
       }
-      add(win, e.amount);
-      add(lord, -e.amount);
+      add(win, -add(lord, -e.amount));
       scores[win].holders.forEach((h) => h.mvp++);
       rows[win].note = '奇襲成功';
       rows[lord].note = '本陣を討たれた';
@@ -1313,10 +1311,10 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
     // 江戸：全クラスが出し合い、くじで1クラスが総取り
     case 'lottery': {
       const win = randInt(s, n);
-      ps.forEach((_, i) => add(i, -e.fee));
-      add(win, e.fee * n);
+      const pot = -ps.reduce((sum, _, i) => sum + add(i, -e.fee), 0);
+      add(win, pot);
       rows.forEach((r, i) => (r.note = i === win ? '当たり！' : 'はずれ'));
-      tell(`${ps[win].name}のクラスが当たり！（+${e.fee * n}）`, win);
+      tell(`${ps[win].name}のクラスが当たり！（+${pot}）`, win);
       break;
     }
     // 江戸：くじで決まったクラスから火が出て、席順にとなりへ燃え移る。Xが need 以上のクラスが消し止める（そこで止まる）
@@ -1547,6 +1545,13 @@ function resolveFixed(s: GameState, f: FixedEvent): EventResult {
 
 function setResult(s: GameState, pi: number | null, result: EventResult, ctx: ResultCtx) {
   s.phase = { kind: 'result', player: pi, result, ctx };
+}
+
+/** 点を動かす。点は0未満にならない（持っている点より多くは減らない）。実際に動いた点を返す */
+function addPoints(p: Player, d: number): number {
+  const before = p.points;
+  p.points = Math.max(0, before + d);
+  return p.points - before;
 }
 
 /** 転校で外せる生徒（係に就いていない子。定員の下限まで減っていたら外せない） */
@@ -2031,20 +2036,20 @@ export function step(prev: GameState, a: Action): GameState {
       takeFromMarket(s, ph.slot);
       const sc = attrScore(p, 'fight');
       const to = s.players[a.target];
-      const guard = attrScore(to, 'fight').total;
-      const { damage, drain } = kachikomiHit(sc.total, guard);
-      to.points -= damage;
+      // 相手の点より多くは削れない。吸い取るのは実際に削った分の3分の2
+      const damage = -addPoints(to, -kachikomiHit(sc.total).damage);
+      const drain = kachikomiDrain(damage);
       p.points += drain;
       if (damage > 0) sc.holders.forEach((h) => h.mvp++);
       const rows: ResultRow[] = [
         { player: ph.player, count: sc.total, delta: drain, note: 'カチコミ（ドレイン）', uids: sc.holders.map((h) => h.uid) },
-        { player: a.target, count: guard, delta: -damage, note: damage ? `被害（👊${guard}で防いだ）` : `👊${guard}で防ぎきった` },
+        { player: a.target, delta: -damage, note: '被害' },
       ];
       logRows(s, `カチコミ（${p.name}→${to.name}）`, rows);
       setResult(
         s,
         ph.player,
-        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: damage ? `${to.name}のクラスに殴りこんだ！` : `${to.name}のクラスに殴りこんだが、防がれた！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), say: shortRule(KACHIKOMI_CARDS[0]), rows },
+        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: `${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), say: shortRule(KACHIKOMI_CARDS[0]), rows },
         'turn',
       );
       return s;
