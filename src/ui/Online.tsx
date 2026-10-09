@@ -258,7 +258,11 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
   const room = useRef<HostRoom | null>(null);
   const [snap, setSnap] = useState<HostSnap | null>(null);
   const [watching, setWatching] = useState(true);
-  const onCursor = useCallback((c: Cursor) => room.current?.setCursor(0, c), []);
+  const [myCur, setMyCur] = useState<Cursor | null>(null);
+  const onCursor = useCallback((c: Cursor) => {
+    setMyCur(c);
+    room.current?.setCursor(0, c);
+  }, []);
 
   useEffect(() => {
     const save = resume ? loadHostSave() : null;
@@ -331,7 +335,9 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
             <span className="net-code">🏠{snap.code}</span>
             <TeamBadge state={snap.state} me={0} />
             {snap.lobby.pair && <PairBadge seats={seats} you={me} />}
-            {snap.joint && <ProposalBar state={snap.joint} seats={seats} mySeat={0} props={snap.props ?? []} onAgree={dispatch} />}
+            {snap.joint && (
+              <ProposalBar state={snap.joint} seats={seats} mySeat={0} props={snap.props ?? []} cursor={myCur} onConfirm={dispatch} onWithdraw={() => room.current?.withdraw(0)} />
+            )}
             {toggle}
             {snap.status !== 'open' && <span className="net-warn">{snap.error ?? '通信サーバーにつないでいます…'}</span>}
             {lost.map(({ s, i }) => (
@@ -448,7 +454,11 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
   const room = useRef<GuestRoom | null>(null);
   const [snap, setSnap] = useState<GuestSnap | null>(null);
   const [watching, setWatching] = useState(true);
-  const onCursor = useCallback((c: Cursor) => room.current?.cursor(c), []);
+  const [myCur, setMyCur] = useState<Cursor | null>(null);
+  const onCursor = useCallback((c: Cursor) => {
+    setMyCur(c);
+    room.current?.cursor(c);
+  }, []);
 
   useEffect(() => {
     // 読み込み直しても同じ部屋に戻れるよう、部屋番号をURLに残す
@@ -536,7 +546,17 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
             <span className="net-code">🏠{code}</span>
             <TeamBadge state={snap.state} me={snap.you} />
             {owner && <PairBadge seats={seats} you={snap.you} />}
-            {snap.jointSeat !== undefined && <ProposalBar state={snap.state} seats={seats} mySeat={snap.jointSeat} props={snap.props ?? []} onAgree={dispatch} />}
+            {snap.jointSeat !== undefined && (
+              <ProposalBar
+                state={snap.state}
+                seats={seats}
+                mySeat={snap.jointSeat}
+                props={snap.props ?? []}
+                cursor={myCur}
+                onConfirm={dispatch}
+                onWithdraw={() => room.current?.withdraw()}
+              />
+            )}
             {toggle}
             {snap.status !== 'joined' && <span className="net-warn">📵 通信が切れました。つなぎ直しています…</span>}
           </div>

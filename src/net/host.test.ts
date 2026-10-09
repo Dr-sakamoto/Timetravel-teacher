@@ -131,6 +131,16 @@ describe('チーム戦の部屋を作った人', () => {
     expect(room.proposals()).toEqual([expect.objectContaining({ seat: 0, pi: 0, action: mine })]);
     const last = sent.filter((x) => x.m.t === 'state').at(-1)!;
     expect(last.m.t === 'state' && last.m.joint && last.m.props?.length).toBe(1);
+    // 確定はトグル：取り消すと点線に戻り、相方が同じ案を出しても決まらない
+    room.withdraw(0);
+    expect(room.proposals()).toEqual([]);
+    deliver('h', { cid: 'g1', m: { t: 'action', seq: room.snap.seq, action: mine } });
+    expect(room.snap.state!.phase.kind === 'roles' && room.snap.state!.phase.ready[0]).toBe(false);
+    expect(room.proposals()).toEqual([expect.objectContaining({ seat: 1 })]);
+    // ゲストも取り消せる
+    deliver('h', { cid: 'g1', m: { t: 'withdraw', seq: room.snap.seq } });
+    expect(room.proposals()).toEqual([]);
+    room.apply(mine, room.snap.seq);
     // 相方が同じ案を出すと決まる
     deliver('h', { cid: 'g1', m: { t: 'action', seq: room.snap.seq, action: mine } });
     const ph = room.snap.state!.phase;

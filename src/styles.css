@@ -4284,36 +4284,15 @@ body:has(.title-screen) {
   color: #ffe58a;
   border: 1px solid #ffd43b;
 }
-/* 合体したクラス：もとの部屋に戻るとき、どちらのクラスへ帰る子か */
-.home-tag {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.68rem;
-  font-weight: bold;
-  line-height: 1.35;
-  padding: 0 0.5em;
-  border-radius: 999px;
-  background: var(--cc);
-  color: #111;
-  pointer-events: none;
-  z-index: 2;
+/* 合体したクラス：もとの部屋に戻るとき、どちらのクラスへ帰る子か（席の背景をまるごと、帰るクラスの色に塗る） */
+.home-bg {
+  /* となりの席とのすき間（--gx）まで塗って、同じクラスへ帰る子がひとかたまりの色の面に見えるようにする */
+  background: color-mix(in srgb, var(--cc) 72%, transparent);
+  box-shadow: 0 0 0 calc(var(--gx) / 2 + 1px) color-mix(in srgb, var(--cc) 72%, transparent);
+  border-radius: 0;
 }
-.home-frame {
-  position: absolute;
-  inset: 0 0 6px;
-  border: 3px solid var(--cc);
-  border-radius: 10px;
-  pointer-events: none;
-  z-index: 1;
-}
-.home-tag.fresh {
-  outline: 2px dashed #fff;
+.home-bg.fresh {
+  background-image: repeating-linear-gradient(45deg, transparent 0 8px, rgba(255, 255, 255, 0.18) 8px 16px);
 }
 .plate-homes {
   display: inline-flex;
@@ -4326,4 +4305,14 @@ body:has(.title-screen) {
   border: 2px solid var(--cc);
   color: var(--cc);
   white-space: nowrap;
+}
+/* 係の場にいる子も、係の場の敷物ごと帰るクラスの色に */
+.home-bg.role-zone::before {
+  background: color-mix(in srgb, var(--cc) 60%, #17352a);
+}
+/* 合体したクラス：画面の下の確定ボタン（確定中は実線の枠と同じく光らせる） */
+.net-banner > .confirm-toggle.on {
+  background: #2f9e44;
+  color: #fff;
+  box-shadow: 0 0 8px #69db7c;
 }

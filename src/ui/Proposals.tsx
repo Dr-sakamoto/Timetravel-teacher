@@ -1,4 +1,4 @@
-import { previewStudent } from '../game/engine';
+import { canBuild, canTake, previewStudent } from '../game/engine';
 import { EVENT_MAP, GIFT_MAP } from '../game/data/events';
 import { ROLES } from '../game/data/roles';
 import type { Action, GameState } from '../game/types';
@@ -136,29 +136,78 @@ export function CursorFrames({ marks }: { marks?: CursorMark[] }) {
 }
 
 /** 合体したクラス（チーム戦の3学期）：2人の案と、相方の案に合わせるボタン */
-export function ProposalBar({ state, seats, mySeat, props, onAgree }: { state: GameState; seats: Seat[]; mySeat: number; props: Proposal[]; onAgree: (a: Action) => void }) {
+/** 選んでいるところ（カーソル）から、確定したときの操作を作る。この場面ではカーソルから決められないなら null */
+export function cursorAction(s: GameState, pi: number, cur: Cursor | null | undefined): Action | null {
+  const ph = s.phase;
+  if (!cur || ph.kind === 'gameOver' || ph.player !== pi) return null;
+  switch (ph.kind) {
+    case 'draw':
+      if (cur.slot === -1) return canBuild(s, pi) ? { type: 'build' } : null;
+      return cur.slot !== null && cur.slot !== undefined && canTake(s, pi, cur.slot) ? { type: 'take', slot: cur.slot } : null;
+    case 'makeRoom':
+      return cur.uid ? { type: 'makeRoom', uid: cur.uid } : null;
+    case 'push':
+      return cur.uid ? { type: 'push', uid: cur.uid } : null;
+    case 'kachikomi':
+      return cur.target !== null && cur.target !== undefined ? { type: 'kachikomi', target: cur.target } : null;
+    case 'equip':
+      return cur.uid ? { type: 'equip', uid: cur.uid } : null;
+    case 'cyborg':
+      return cur.uid ? { type: 'cyborg', uid: cur.uid } : null;
+    case 'exchange':
+      return cur.uid && cur.target !== null && cur.target !== undefined && cur.theirUid ? { type: 'exchange', uid: cur.uid, target: cur.target, theirUid: cur.theirUid } : null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * 合体したクラス（チーム戦の3学期）：2人の確定のようすと、確定ボタン。
+ * 確定ボタンは、自分の選択カーソルを確定（実線）⇔ 取り消し（点線）に切り替える。2人の確定が重なったら決まる
+ */
+export function ProposalBar({
+  state,
+  seats,
+  mySeat,
+  props,
+  cursor,
+  onConfirm,
+  onWithdraw,
+}: {
+  state: GameState;
+  seats: Seat[];
+  mySeat: number;
+  props: Proposal[];
+  /** 自分が今選んでいるところ */
+  cursor: Cursor | null;
+  onConfirm: (a: Action) => void;
+  onWithdraw: () => void;
+}) {
   const mateSeat = seats[teamPartner(mySeat)];
   if (!mateSeat) return null;
+  const pi = Math.floor(mySeat / 2);
   const mine = props.find((x) => x.seat === mySeat);
   const mate = props.find((x) => x.seat === teamPartner(mySeat));
   const alone = mateSeat.kind === 'cpu' || (mateSeat.kind === 'guest' && !mateSeat.online);
+  const next = cursorAction(state, pi, cursor);
   return (
     <>
-      <span className="net-code" title="3学期はチームの2クラスが合体。2人が同じ操作をしたら決まる">
-        🤝 合体クラス：{alone ? `${mateSeat.name}は${mateSeat.kind === 'cpu' ? 'CPU' : '通信切れ'}なので1人で決める` : `選んだところに2人の枠が出る。2人とも同じものを確定したら決まる`}
+      <span className="net-code" title="3学期はチームの2クラスが合体。2人の確定が重なったら決まる">
+        🤝 合体クラス：{alone ? `${mateSeat.name}は${mateSeat.kind === 'cpu' ? 'CPU' : '通信切れ'}なので1人で決める` : '選んで「確定」。2人の確定が重なったら決まる'}
       </span>
       {mate && (
         <span className="net-mate">
-          👉 {mate.name}の案：{describeAction(state, mate.action)}
-          <button className="btn small primary" onClick={() => onAgree(mate.action)}>
-            👍 この案で決める
-          </button>
+          👉 {mate.name}が確定：{describeAction(state, mate.action)}
         </span>
       )}
-      {mine && (
-        <span className="net-code">
-          ✋ あなたの案：{describeAction(state, mine.action)}（{mateSeat.name}を待っています）
-        </span>
+      {mine ? (
+        <button className="btn small confirm-toggle on" onClick={onWithdraw}>
+          ✅ 確定中：{describeAction(state, mine.action)}（タップで取り消し）
+        </button>
+      ) : (
+        <button className="btn small confirm-toggle" disabled={!next} onClick={() => next && onConfirm(next)}>
+          {next ? `☐ 確定する：${describeAction(state, next)}` : '☐ 確定（カードや生徒を選んでください）'}
+        </button>
       )}
     </>
   );

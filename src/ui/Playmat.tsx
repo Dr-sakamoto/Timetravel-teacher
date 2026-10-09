@@ -98,6 +98,13 @@ export function Playmat(props: Props) {
     if (!wasDrag()) fn();
   };
 
+  /** 合体したクラス：その子が帰るクラスの色で、席の背景をまるごと塗る（帰るクラスごとに並んでいるので、色のかたまりになる） */
+  const homeBg = (uid: string | undefined): { cls: string; style?: CSSProperties } => {
+    const home = uid ? props.homes?.[uid] : undefined;
+    if (!home) return { cls: '' };
+    return { cls: `home-bg ${home.fresh ? 'fresh' : ''}`, style: { '--cc': CURSOR_COLORS[home.room] } as CSSProperties };
+  };
+
   const card = (uid: string, inZone: boolean) => {
     const st = view.students.find((s) => s.uid === uid)!;
     const tcg = (
@@ -113,18 +120,10 @@ export function Playmat(props: Props) {
       />
     );
     const frames = props.frames?.[st.uid];
-    const home = props.homes?.[st.uid];
-    if (!frames && !home) return tcg;
+    if (!frames) return tcg;
     return (
       <>
         {tcg}
-        {home && <span className="home-frame" style={{ '--cc': CURSOR_COLORS[home.room] } as CSSProperties} />}
-        {home && (
-          <span className={`home-tag ${home.fresh ? 'fresh' : ''}`} style={{ '--cc': CURSOR_COLORS[home.room] } as CSSProperties} title={home.fresh ? '3学期に来た子：もとの部屋に戻るとき、このクラスへ' : 'もとのクラス'}>
-            {home.fresh ? '🆕' : ''}
-            {props.homeNames?.[home.room] ?? (home.room ? 'B' : 'A')}
-          </span>
-        )}
         <CursorFrames marks={frames} />
       </>
     );
@@ -187,11 +186,13 @@ export function Playmat(props: Props) {
           const lockNote = view.unlocked.length < props.slots ? '選べる' : slotUnlockLabel(view.unlocked.length).replace('年', '-');
           const droppable = !!arrange && (open || unlockable);
           const fit = !!heldSt && droppable && heldSt.attrs.includes(def.attr) && st?.uid !== heldSt.uid;
+          const bg = homeBg(st?.uid);
           return (
             <div
               key={r}
               data-drop={droppable ? `role:${r}` : undefined}
-              className={`role-zone ${open ? 'open' : unlockable ? 'unlockable' : 'locked'} ${arrange?.fresh.includes(r) ? 'fresh' : ''} ${fit ? 'fit' : ''} ${over === `role:${r}` ? 'over' : ''} ${i === ROLE_ORDER.length - 1 ? 'last' : ''}`}
+              style={bg.style}
+              className={`${bg.cls} role-zone ${open ? 'open' : unlockable ? 'unlockable' : 'locked'} ${arrange?.fresh.includes(r) ? 'fresh' : ''} ${fit ? 'fit' : ''} ${over === `role:${r}` ? 'over' : ''} ${i === ROLE_ORDER.length - 1 ? 'last' : ''}`}
               title={`${def.name}：ここに置いた子は${roleDesc(r)}${open ? '' : unlockable ? '（タップで解放）' : '（まだ解放していない）'}`}
               onClick={
                 droppable
@@ -216,7 +217,7 @@ export function Playmat(props: Props) {
           );
         })}
         {free.map((st) => (
-          <div key={st.uid} className="seat">
+          <div key={st.uid} className={`seat ${homeBg(st.uid).cls}`} style={homeBg(st.uid).style}>
             {card(st.uid, false)}
           </div>
         ))}

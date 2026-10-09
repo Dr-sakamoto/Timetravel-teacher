@@ -59,8 +59,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   /** 中央で選んでいる場のカード（合体したクラスで相方に枠を見せる） */
   const [sel, setSel] = useState<number | null>(null);
   useEffect(() => {
-    onCursor?.({ slot: sel, uid: pick.uid, target: pick.target });
-  }, [sel, pick.uid, pick.target, onCursor]);
+    onCursor?.({ slot: sel, uid: pick.uid, target: pick.target, theirUid: pick.theirUid });
+  }, [sel, pick.uid, pick.target, pick.theirUid, onCursor]);
   const logRef = useRef<HTMLDivElement>(null);
   const feltRef = useRef<HTMLDivElement>(null);
   // どのカードから何点入ったかの演出（CPUの「速い」設定では早送り）

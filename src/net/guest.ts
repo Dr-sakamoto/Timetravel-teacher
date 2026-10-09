@@ -176,6 +176,11 @@ export class GuestRoom {
     this.send({ t: 'pick', cls });
   }
 
+  /** 合体したクラス：自分の確定を取り消す */
+  withdraw() {
+    this.send({ t: 'withdraw', seq: this.snap.seq });
+  }
+
   /** 合体したクラス：今どこを選んでいるかを知らせる */
   cursor(cur: Cursor) {
     this.send({ t: 'cursor', seq: this.snap.seq, cur });

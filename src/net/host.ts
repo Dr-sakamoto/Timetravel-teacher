@@ -188,6 +188,9 @@ export class HostRoom {
       case 'cursor':
         if (this.snap.joint && m.seq === this.snap.seq) this.setCursor(i, m.cur);
         return;
+      case 'withdraw':
+        if (this.snap.joint && m.seq === this.snap.seq) this.withdraw(i);
+        return;
       case 'ping':
         // 「通信切れ」になっていた人が戻ってきた
         if (!this.snap.lobby.seats[i].online) this.checkAlive();
@@ -301,6 +304,13 @@ export class HostRoom {
     const cursors = [...(this.snap.cursors ?? []).filter((x) => x.seat !== seat), { seat, cur }];
     this.set({ cursors });
     if (this.snap.lobby.seats.some((s) => s.kind === 'guest')) this.sendTo('*', { t: 'cursors', seq: this.snap.seq, cursors });
+  }
+
+  /** 合体した卓で、席 seat の人の確定を取り消す（選択カーソルは点線に戻る） */
+  withdraw(seat: number) {
+    if (!this.snap.joint || !this.snap.props?.some((x) => x.seat === seat)) return;
+    this.set({ props: this.snap.props.filter((x) => x.seat !== seat) });
+    this.broadcast();
   }
 
   /** 合体した卓で、CPUが進める操作か（「次へ」はだれでも） */

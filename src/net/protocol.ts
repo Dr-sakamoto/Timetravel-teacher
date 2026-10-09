@@ -98,6 +98,8 @@ export interface Cursor {
   slot?: number | null;
   uid?: string | null;
   target?: number | null;
+  /** クラス替えで選んでいる相手の生徒 */
+  theirUid?: string | null;
 }
 
 /** 席ごとの選択カーソル */
@@ -137,6 +139,8 @@ export type ToHost =
   | { t: 'ping'; seq: number }
   /** 合体したクラス：今どこを選んでいるか（相方の画面に枠で出る） */
   | { t: 'cursor'; seq: number; cur: Cursor }
+  /** 合体したクラス：自分の確定を取り消す（点線に戻す） */
+  | { t: 'withdraw'; seq: number }
   | { t: 'sync' };
 
 /** 部屋を作った人 → 参加した人 */
