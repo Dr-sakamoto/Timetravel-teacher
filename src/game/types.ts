@@ -242,7 +242,5 @@ export type Action =
   | { type: 'cyborg'; uid: string | null }
   /** かぐや姫に頼まれた宝を差し出す（手番の中でいつでも。手番は終わらない） */
   | { type: 'present' }
-  /** 場から取ったグッズ（かぐや姫が頼んでいる宝）を、装備せずにそのままかぐや姫に差し出す（手番は終わらない） */
-  | { type: 'offer' }
   /** 桃園の誓い：義兄弟になるクラス（自分以外・1つ以上） */
   | { type: 'oath'; targets: number[] };

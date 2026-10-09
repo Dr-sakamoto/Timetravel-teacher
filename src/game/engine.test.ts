@@ -845,7 +845,7 @@ describe('engine', () => {
       expect(role.delta).toEqual([3, 0, 0]);
     });
 
-    it('kaguya: Kaguya stays until the term ends; any class may present any of the 5 treasures (once each) for +5 and keep its turn', () => {
+    it('kaguya: Kaguya stays until the term ends; any class may present any of the 5 treasures (once each) for +5 without using its turn, but not on the turn it equipped one', () => {
       // クラス0は5つの宝を全部装備している。来ただけでは差し出さない（差し出すかどうかは手番で選ぶ）
       const holders = KAGUYA_TREASURES.map((g, k) => ({ ...mk(`t${k}`, ['study', g.attr]), goods: { id: g.id, name: g.name, icon: g.icon, attr: g.attr } }));
       const r = run('kaguya', [holders, [mk('b', ['art'])], [mk('c', ['charm'])]]);
@@ -872,37 +872,29 @@ describe('engine', () => {
       const u = structuredClone(r.after);
       u.phase = { kind: 'draw', player: 1 };
       expect(step(u, { type: 'present' })).toBe(u);
-      // 場の宝を取って、装備せずにそのまま差し出せる（払って+5、宝は消え、手番は続く）
+      // 場の宝を取ったら装備する（そのまま差し出すことはできない）。装備した手番は終わるので、差し出せるのは次の手番から
       const want = KAGUYA_TREASURES[0];
       u.market[0] = want.id;
       u.players[1].points = 20;
-      const taken = step(u, { type: 'take', slot: 0 });
-      expect(taken.phase.kind).toBe('equip');
-      const offered = step(taken, { type: 'offer' });
-      expect(offered.players[1].points).toBe(20 - marketCost(want.id) + 5);
+      const eq = step(step(u, { type: 'take', slot: 0 }), { type: 'equip', uid: 'b' });
+      expect(eq.players[1].students.find((x) => x.uid === 'b')!.goods?.id).toBe(want.id);
+      expect(eq.kaguya!.find((x) => x.id === want.id)!.by).toBeNull();
+      expect(eq.phase.kind === 'result' && eq.phase.ctx).toBe('turn');
+      expect(step(eq, { type: 'present' })).toBe(eq);
+      // 次の手番では、手番を使わずに差し出せる
+      const next = structuredClone(eq);
+      next.phase = { kind: 'draw', player: 1 };
+      const offered = step(next, { type: 'present' });
+      expect(offered.players[1].points - next.players[1].points).toBe(5);
       expect(offered.kaguya!.find((x) => x.id === want.id)!.by).toBe(1);
-      expect(offered.market).not.toContain(want.id);
-      expect(offered.discard).not.toContain(want.id);
       expect(step(offered, { type: 'continue' }).phase).toEqual({ kind: 'draw', player: 1 });
-      // 差し出された宝は、もう受け取ってもらえない（装備はできる）
-      const w = structuredClone(offered);
-      w.phase = { kind: 'draw', player: 2 };
-      w.market[0] = want.id;
-      w.players[2].points = 20;
-      const again = step(w, { type: 'take', slot: 0 });
-      expect(step(again, { type: 'offer' })).toBe(again);
-      expect(step(again, { type: 'equip', uid: 'c' }).players[2].students[0].goods?.id).toBe(want.id);
-      // 装備できる子がいなくても、待っている宝なら取って差し出せる
+      // 装備できる子がいなければ、待っている宝でも取れない
       const full = structuredClone(r.after);
       full.phase = { kind: 'draw', player: 0 };
       full.market[0] = KAGUYA_TREASURES[1].id;
       full.players[0].points = 20;
       expect(equippable(full.players[0])).toHaveLength(0);
-      expect(canTake(full, 0, 0)).toBe(true);
-      // 待っている宝を装備しても、勝手には差し出さない（あとで差し出せる）
-      const eq = step(step(u, { type: 'take', slot: 0 }), { type: 'equip', uid: 'b' });
-      expect(eq.players[1].students.find((x) => x.uid === 'b')!.goods?.id).toBe(want.id);
-      expect(eq.kaguya!.find((x) => x.id === want.id)!.by).toBeNull();
+      expect(canTake(full, 0, 0)).toBe(false);
       // 学期の区切りで月へ帰る
       let v = r.after;
       for (let n = 0; n < 2000 && v.phase.kind !== 'roles'; n++) v = step(v, cpuAction(v)!);
