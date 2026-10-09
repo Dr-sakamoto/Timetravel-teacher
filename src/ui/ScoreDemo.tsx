@@ -78,13 +78,6 @@ function scenario(id: string, label: string): Scenario {
     case 'contest':
       // デモは👊の合戦だけ。全アイコン勝負（'all'）は演出がないので👊で代用
       return { label, normal: false, fx: { attr: c.attr === 'all' ? 'fight' : c.attr, era: c.era }, card: { title: c.name, icon: c.icon, art: c.id, attr: c.attr, tone: 'era', desc: c.desc, rule, rows } };
-    case 'raid':
-      return {
-        label,
-        normal: false,
-        fx: { attr: 'fight', era: c.era, threat: c.threat },
-        card: { title: c.name, icon: c.icon, attr: 'fight', tone: 'era', desc: `敵の強さ ${c.threat}`, rule, rows },
-      };
     default:
       throw new Error(id);
   }
@@ -94,7 +87,6 @@ const SCENARIOS: Scenario[] = [
   scenario('n_sports', '🏃 通常カード'),
   scenario('visit', '👀 共通イベント（👑−👊）'),
   scenario('chibi', '⛵ 時代イベント'),
-  scenario('raid_sengoku', '👊 襲来（−敵の強さ）'),
 ];
 
 function readHash(): { v: number; s: number } {
@@ -103,7 +95,7 @@ function readHash(): { v: number; s: number } {
 }
 
 /** 案ごとに、本編で使う場面 */
-const HOME_SCENARIO = [0, 2, 3, 1];
+const HOME_SCENARIO = [0, 2, 2, 1];
 
 export function ScoreDemo() {
   const [v, setV] = useState(() => readHash().v);
@@ -116,7 +108,7 @@ export function ScoreDemo() {
   const list = useMemo(() => contributions(PLAYER, fx.attr), [fx]);
   const minus = useMemo(() => (fx.minus ? minusList(STUDENTS, fx.minus === 'heads' ? null : contributions(PLAYER, fx.minus)) : []), [fx]);
   const total = list.reduce((a, x) => a + x.pts, 0);
-  const delta = fx.threat !== undefined ? total - fx.threat : total - minus.reduce((a, x) => a + x.pts, 0);
+  const delta = total - minus.reduce((a, x) => a + x.pts, 0);
   const base = { start: 700, list, minusList: minus, card: fx, delta, total, all: STUDENTS.map((x) => x.uid) };
   const clock = useFxClock(`${v}-${s}-${run}`, variant.length(base), () => measure(root.current!, '.demo-mat', '.demo-ecard .ecard'), NO_RECTS);
   const frame = variant.run({ ...base, t: clock.t, rects: clock.rects });

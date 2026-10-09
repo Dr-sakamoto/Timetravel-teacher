@@ -1,7 +1,7 @@
 import { ERAS } from '../game/data/eras';
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { canBuild, canTake, currentEra, kaguyaGift, kaguyaWin, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
-import { EVENT_MAP, GIFT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
+import { EVENT_MAP, GIFT_MAP, MARKET_SIZE, cardGlyph, kachikomiHit, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import { ATTR_ICON, type Action, type EventResult, type GameState, type Player, type Student } from '../game/types';
@@ -18,7 +18,7 @@ interface Props {
   canContinue?: boolean;
   /** 転校・カチコミ・クラス替え・グッズで選んだもの */
   pick: Pick;
-  /** 得点演出の明細（襲来）。点数表の上に出す */
+  /** 得点演出の明細。点数表の上に出す */
   side?: ReactNode;
 }
 
@@ -100,7 +100,8 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
   return (
     <div className={`center ph-${ph.kind} ${guerrilla ? 'in-guerrilla' : ''}`}>
       {/* 山札（左）・場のカード（中央）・捨て札（右）を1列に */}
-      <div className="board">
+      {/* 場に並ぶ枚数（ピラミッドがあれば1枚多い）。カードの大きさを決めるのに使う */}
+      <div className="board" style={{ '--mk': MARKET_SIZE + (state.pyramid ? 1 : 0) } as CSSProperties}>
         <div className="piles">
           <button className="pile event-pile" disabled title="イベントの山札">
             <span className="pile-back">🃏</span>
@@ -518,8 +519,8 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         <div className="say">
           <div className="effect">{effectOf(state, ph.player, id)}</div>
           <div className="say-sub">
-            <button className="btn ghost" onClick={() => dispatch({ type: 'pass', slot: sel })} title="このカードを捨てて、手番を終える">
-              見送る
+            <button className="btn ghost" onClick={() => dispatch({ type: 'pass' })} title="何も取らずに手番を終える（カードは場に残る）">
+              パス
             </button>
             <button className="btn primary" disabled={!ok} onClick={() => dispatch({ type: 'take', slot: sel })}>
               {label}
@@ -544,12 +545,14 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     }
     case 'kachikomi': {
       const fight = attrScore(state.players[ph.player], 'fight').total;
-      const power = fight * KACHIKOMI_CARDS[0].mult;
-      const drain = fight * KACHIKOMI_CARDS[0].drain;
       const target = pick.target !== null ? state.players[pick.target] : null;
+      const guard = target ? attrScore(target, 'fight').total : 0;
+      const hit = kachikomiHit(fight, guard);
       return (
         <div className="say">
-          殴りこむ相手の名札をタップ（相手 −{power}、自分 +{drain}）
+          {target
+            ? `${target.name}の👊${guard}で防がれる：相手 −${hit.damage}、自分 +${hit.drain}`
+            : `殴りこむ相手の名札をタップ（自分の👊${fight} − 相手の👊 だけ削り、その半分を吸い取る）`}
           <div className="say-sub">
             <span className="pick-chip">{target ? target.name : '？'}</span>
           </div>
@@ -609,33 +612,36 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
             <EventCardView result={r} />
           </div>
           <div className="reveal-side">
-            {/* 何が起きたかを一言で（取った人だけのカードは結果、全員のイベントは効果） */}
-            {r.tone === 'personal' && r.desc ? (
-              <div className="reveal-say">
-                {ph.player !== null && (
-                  <>
-                    <Who state={state} />：
-                  </>
-                )}
-                {r.desc}
-              </div>
-            ) : (
-              <div className="reveal-say">{r.say ?? r.rule ?? r.desc}</div>
-            )}
-            <ResultTable state={state} result={r} />
-            {r.students && r.students.length > 0 && (
-              <div className="deal">
-                {/* 何人いても卓からはみ出さないように、見せるのは4人まで */}
-                {r.students.slice(0, DEAL_MAX).map((s) => (
-                  <div key={s.uid} className={`deal-card ${out.has(s.uid) ? 'out' : joined.has(s.uid) ? 'in' : ''}`}>
-                    <TcgCard student={s} size="mini" />
-                    {/* 札は転入・転校した子だけ（イベントで光っただけの子には付けない） */}
-                    {(out.has(s.uid) || joined.has(s.uid)) && <span className="deal-mark">{out.has(s.uid) ? '転校' : '転入'}</span>}
-                  </div>
-                ))}
-                {r.students.length > DEAL_MAX && <span className="deal-more">ほか{r.students.length - DEAL_MAX}人</span>}
-              </div>
-            )}
+            {/* 一言・明細・生徒は狭い画面では中でスクロールし、下の「次へ」は必ず見えるようにする */}
+            <div className="reveal-body">
+              {/* 何が起きたかを一言で（取った人だけのカードは結果、全員のイベントは効果） */}
+              {r.tone === 'personal' && r.desc ? (
+                <div className="reveal-say">
+                  {ph.player !== null && (
+                    <>
+                      <Who state={state} />：
+                    </>
+                  )}
+                  {r.desc}
+                </div>
+              ) : (
+                <div className="reveal-say">{r.say ?? r.rule ?? r.desc}</div>
+              )}
+              <ResultTable state={state} result={r} />
+              {r.students && r.students.length > 0 && (
+                <div className="deal">
+                  {/* 何人いても卓からはみ出さないように、見せるのは4人まで */}
+                  {r.students.slice(0, DEAL_MAX).map((s) => (
+                    <div key={s.uid} className={`deal-card ${out.has(s.uid) ? 'out' : joined.has(s.uid) ? 'in' : ''}`}>
+                      <TcgCard student={s} size="mini" />
+                      {/* 札は転入・転校した子だけ（イベントで光っただけの子には付けない） */}
+                      {(out.has(s.uid) || joined.has(s.uid)) && <span className="deal-mark">{out.has(s.uid) ? '転校' : '転入'}</span>}
+                    </div>
+                  ))}
+                  {r.students.length > DEAL_MAX && <span className="deal-more">ほか{r.students.length - DEAL_MAX}人</span>}
+                </div>
+              )}
+            </div>
             <div className="reveal-foot">
               {ph.ctx === 'turn' && ph.player === null && <NextTurn state={state} inline />}
               {canContinue ? (

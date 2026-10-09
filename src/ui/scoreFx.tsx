@@ -9,7 +9,7 @@ import { ATTR_ICON, type Attr, type EraId, type Student } from '../game/types';
  *   通常カード → popFly（A：点の入ったカード全部から同時に「+点」が名札へ飛ぶ）
  *   共通イベント → absorb（D：アイコンが1個ずつめくったカードに吸い込まれ、引かれる分は赤で出ていく）
  *   時代イベント → stamp（B：カードにスタンプが押されて残る）
- *   襲来         → receipt（C：明細が1行ずつ出て、敵の強さとの差が分かる）
+ *   receipt（C：明細が1行ずつ出る）は演出の見本ページだけで使う
  */
 
 export interface Pt {
@@ -22,8 +22,6 @@ export interface FxCard {
   attr: Attr;
   /** 時代イベント：この時代の生徒は×2 */
   era?: EraId;
-  /** 襲来：敵の強さ */
-  threat?: number;
   /** 共通イベント：引かれるアイコン（または人数） */
   minus?: Attr | 'heads';
   /** 「持つ子1人につき+N」：アイコンの数や×2に関係なく、1人ずつ同じ点 */
@@ -94,7 +92,6 @@ function fly(a: Pt, b: Pt, p: number, arc = 70): Pt {
   return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e - Math.sin(Math.PI * e) * arc };
 }
 const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
-const isRaid = (card: FxCard) => card.threat !== undefined;
 const minusIcon = (m: Attr | 'heads') => (m === 'heads' ? '人' : ATTR_ICON[m]);
 const iconRects = (rects: FxRects, u: string, a: Attr) => (rects.icons[u] ?? []).filter((x) => x.a === a).map((x) => x.r);
 
@@ -136,23 +133,13 @@ function counter(c: FxCtx, body: ReactNode, cls = '', key?: number): ReactNode {
 }
 
 const FINALE_FLY = 550;
-const finaleLength = (card: FxCard) => (isRaid(card) ? 900 : 250) + FINALE_FLY;
+const FINALE_LENGTH = 250 + FINALE_FLY;
 
-/** 最後に合計点が名札へ飛ぶ（襲来は敵の強さとの差を出してから） */
+/** 最後に合計点が名札へ飛ぶ */
 function finale(c: FxCtx, from: Pt, t0: number, f: Frame) {
-  const { t, delta, total, card, rects } = c;
+  const { t, delta, rects } = c;
   if (t < t0) return;
-  const raid = isRaid(card);
-  // 襲来の式は、点が名札へ飛び終わったら消す（あとは結果の明細に残る）
-  if (raid && t < t0 + 900 + FINALE_FLY) {
-    const q = back((t - t0) / 300);
-    f.overlay.push(
-      <div key="raid-eq" className="fx-raid-eq" style={{ left: (rects.ecard?.right ?? 0) + 16, top: from.y, transform: `translate(0,-50%) scale(${q})` }}>
-        👊{total} − 敵 {card.threat} ＝ <b className={delta < 0 ? 'down' : 'up'}>{delta < 0 ? delta : `撃退！${sign(delta)}`}</b>
-      </div>,
-    );
-  }
-  const p = (t - t0 - (raid ? 900 : 250)) / FINALE_FLY;
+  const p = (t - t0 - 250) / FINALE_FLY;
   if (p < 0) return;
   if (p < 1 && delta !== 0) {
     const at = fly(from, mid(rects.plate), p, 90);
@@ -175,7 +162,6 @@ export interface PopSrc {
   to: Pt;
   label: string;
   why?: ReactNode;
-  shield?: boolean;
 }
 const POP_IN = 260;
 const POP_HOLD = 560;
@@ -197,7 +183,7 @@ export function popBatch(t: number, start: number, srcs: PopSrc[], overlay: Reac
     const at = p < 0 ? s.from : fly(s.from, s.to, p);
     const sc = p < 0 ? back((t - start) / POP_IN) : 1 - 0.45 * ease(p);
     overlay.push(
-      <div key={s.key} className={`fx-bubble ${s.shield ? 'shield' : ''}`} style={{ left: at.x, top: at.y, transform: `translate(-50%,-100%) scale(${sc})` }}>
+      <div key={s.key} className="fx-bubble" style={{ left: at.x, top: at.y, transform: `translate(-50%,-100%) scale(${sc})` }}>
         <b>{s.label}</b>
         {p < 0 && s.why && <small>{s.why}</small>}
       </div>,
@@ -210,32 +196,23 @@ export const popFly: Variant = {
   id: 'A',
   name: 'A. ポップ＆フライ（一括）',
   desc: '通常カード用。点の入ったカード全部の上に同時に「+点数」が出て、そろって名札へ飛ぶ。テンポ重視。',
-  length: (c) => popLength(c.start, c.list.length) + (isRaid(c.card) ? finaleLength(c.card) : 0),
+  length: (c) => popLength(c.start, c.list.length),
   run(c) {
     const { t, list, card, rects, start } = c;
-    const raid = isRaid(card);
     const f = newFrame();
     dimOthers(c, f);
     if (t >= start) list.forEach((x) => f.lit.add(x.student.uid));
-    const to = raid ? mid(rects.ecard) : mid(rects.plate);
+    const to = mid(rects.plate);
     const srcs = list.map((x) => ({
       key: x.student.uid,
       from: top(rects.cards[x.student.uid]),
       to,
-      label: raid ? `${x.pts}` : `+${x.pts}`,
+      label: `+${x.pts}`,
       why: why(x, card),
-      shield: raid,
     }));
     const arrived = popBatch(t, start, srcs, f.overlay);
-    const got = sum(list.filter((x) => arrived.has(x.student.uid)));
-    const end = popLength(start, list.length);
-    if (raid) {
-      if (t >= start) f.overlay.push(counter(c, `👊 ${got} / ${card.threat}`, 'shield'));
-      finale(c, mid(rects.ecard), end, f);
-    } else {
-      f.gained = got;
-      f.done = t >= end;
-    }
+    f.gained = sum(list.filter((x) => arrived.has(x.student.uid)));
+    f.done = t >= popLength(start, list.length);
     return f;
   },
 };
@@ -248,10 +225,9 @@ export const stamp: Variant = {
   id: 'B',
   name: 'B. スタンプ',
   desc: '時代イベント用。点の入ったカードに「+点数」のスタンプがポンポン押されて残る。×2の理由もスタンプに書いてある。',
-  length: (c) => c.start + (c.list.length - 1) * stampStep(c.list.length) + 450 + finaleLength(c.card),
+  length: (c) => c.start + (c.list.length - 1) * stampStep(c.list.length) + 450 + FINALE_LENGTH,
   run(c) {
     const { t, list, card, rects, start } = c;
-    const raid = isRaid(card);
     const STEP = stampStep(list.length);
     const f = newFrame();
     dimOthers(c, f);
@@ -267,15 +243,15 @@ export const stamp: Variant = {
       f.overlay.push(
         <div
           key={u}
-          className={`fx-stamp ${raid ? 'shield' : ''}`}
+          className="fx-stamp"
           style={{ left: at.x, top: at.y, opacity: q, transform: `translate(-50%,-50%) rotate(${-14 + 6 * (i % 3)}deg) scale(${2.4 - 1.4 * ease(q)})` }}
         >
-          <b>{raid ? `${x.pts}` : `+${x.pts}`}</b>
+          <b>+{x.pts}</b>
           <small>{why(x, card)}</small>
         </div>,
       );
     });
-    if (t >= start) f.overlay.push(counter(c, raid ? `👊 ${got} / ${card.threat}` : `合計 ${got}`, raid ? 'shield' : ''));
+    if (t >= start) f.overlay.push(counter(c, `合計 ${got}`));
     finale(c, mid(rects.ecard), start + (list.length - 1) * STEP + 450, f);
     return f;
   },
@@ -288,11 +264,10 @@ const receiptStep = (n: number) => Math.min(600, 2000 / Math.max(1, n));
 export const receipt: Variant = {
   id: 'C',
   name: 'C. レシート（明細）',
-  desc: '襲来用。めくったカードの横に明細が1行ずつ印字され、その行のカードと線でつながる。最後に敵の強さを引いて名札へ。',
+  desc: 'めくったカードの横に明細が1行ずつ印字され、その行のカードと線でつながる。最後に合計を名札へ。',
   length: (c) => c.start + c.list.length * receiptStep(c.list.length) + 400 + 550,
   run(c) {
     const { t, list, card, rects, delta, start } = c;
-    const raid = isRaid(card);
     const STEP = receiptStep(list.length);
     const f = newFrame();
     const shown = list.filter((_, i) => t >= start + i * STEP);
@@ -323,22 +298,15 @@ export const receipt: Variant = {
               {x.student.icon} {x.student.name}
             </span>
             <span className="fx-row-why">{why(x, card)}</span>
-            <span className="fx-row-pts">{raid ? `${x.pts}` : `+${x.pts}`}</span>
+            <span className="fx-row-pts">+{x.pts}</span>
           </div>
         ))}
         {list.length === 0 && t >= start && <div className="fx-row empty">{ATTR_ICON[card.attr]}を持つ子がいない…</div>}
-        {raid && t >= end && (
-          <div className="fx-row enemy">
-            <span className="fx-row-who">敵の強さ</span>
-            <span className="fx-row-why" />
-            <span className="fx-row-pts">−{card.threat}</span>
-          </div>
-        )}
         {t >= end && (
           <div className={`fx-row total ${delta < 0 ? 'down' : ''}`} data-total>
-            <span className="fx-row-who">{raid && delta >= 0 ? '撃退！' : '合計'}</span>
+            <span className="fx-row-who">合計</span>
             <span className="fx-row-why" />
-            <span className="fx-row-pts">{raid ? (delta === 0 ? '±0' : sign(delta)) : `+${sum(shown)}`}</span>
+            <span className="fx-row-pts">+{sum(shown)}</span>
           </div>
         )}
       </div>
@@ -380,7 +348,7 @@ export const absorb: Variant = {
   id: 'D',
   name: 'D. アイコン吸い込み',
   desc: '共通イベント用。カードのアイコンが1個ずつめくったカードに吸い込まれる（×2の子は2個ずつ）。引かれるアイコンや人数は赤い「−」で吸い込まれる。',
-  length: (c) => absorbEnd(c) + finaleLength(c.card),
+  length: (c) => absorbEnd(c) + FINALE_LENGTH,
   run(c) {
     const { t, list, minusList: minus, card, rects, start } = c;
     const all = [...list, ...minus];
@@ -444,10 +412,9 @@ export const absorb: Variant = {
 
 export const VARIANTS: Variant[] = [popFly, stamp, receipt, absorb];
 
-/** めくったカードの種類ごとの演出：通常カード→A、襲来→C、時代イベント→B、共通イベント→D */
+/** めくったカードの種類ごとの演出：通常カード→A、時代イベント→B、共通イベント→D */
 export function variantFor(card: FxCard, normal: boolean): Variant {
-  // 襲来も吸い込み（明細のレシートは文字が多いので使わない）
-  return normal ? popFly : card.era && !isRaid(card) ? stamp : absorb;
+  return normal ? popFly : card.era ? stamp : absorb;
 }
 
 // ---------- 位置の計測と時計 ----------

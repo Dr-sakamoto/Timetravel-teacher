@@ -114,10 +114,8 @@ export interface EventResult {
   glyph?: string;
   /** 何が起きるかの一言（めくったカードの横に出す） */
   say?: string;
-  /** 時代イベント・襲来：この時代の生徒は×2（得点演出用） */
+  /** 時代イベント：この時代の生徒は×2（得点演出用） */
   era?: EraId;
-  /** 襲来：敵の強さ（得点演出用） */
-  threat?: number;
   /** 「持つ子1人につき+N」のイベント：アイコンの数ではなく人数で数える（得点演出用） */
   perHead?: number;
   /** 共通イベント：引かれるアイコン（または人数）（得点演出用） */
@@ -138,7 +136,7 @@ export type Phase =
   | { kind: 'memberDraw'; player: number; last: { player: number; student: Student } | null }
   /** 係決め：全クラスが一斉に決め、全員の準備OK（ready）がそろったら手番に進む */
   | { kind: 'roles'; player: null; ready: boolean[] }
-  /** 手番：場のカードを1枚取る（または1枚捨てて見送る） */
+  /** 手番：場のカードを1枚取る（またはパスする） */
   | { kind: 'draw'; player: number }
   /** 満席で人物カードを取る：代わりに転校させる生徒を選ぶ（slot は場のカードの位置） */
   | { kind: 'makeRoom'; player: number; slot: number }
@@ -228,8 +226,8 @@ export type Action =
   | { type: 'setRoles'; player: number; roles: RoleSeat[]; unlock?: RoleId[] }
   /** 場のカードを取る（人物・グッズはクラスポイントを払う） */
   | { type: 'take'; slot: number }
-  /** 場のカードを1枚捨てて見送る */
-  | { type: 'pass'; slot: number }
+  /** 何も取らずに手番を終える（場のカードはそのまま） */
+  | { type: 'pass' }
   /** ピラミッドに石を積む（クラスの🏃の数だけ。場のカードは減らない） */
   | { type: 'build' }
   /** 満席で人物を迎える時に、代わりに転校させる生徒（null でやめる） */

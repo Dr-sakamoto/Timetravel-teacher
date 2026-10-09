@@ -26,6 +26,7 @@ import {
   eventScale,
   fixedRule,
   isGuerrilla,
+  kachikomiHit,
   cardGlyph,
   fixedGlyph,
   fixedShort,
@@ -37,7 +38,6 @@ import {
   type FixedEvent,
   type GoodsCard,
   type NormalCard,
-  type RaidCard,
   type SwingCard,
 } from './data/events';
 import { ARCHETYPE_MAP, BOY_NAMES, GIRL_NAMES, MODERN_POOL, STARTER_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
@@ -74,7 +74,7 @@ export function eventScaleNow(s: GameState): number {
   return eventScale(termNo(s.year, termOfMonth(MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)])));
 }
 
-/** 今の学期の倍率をかけたカード（時代イベント・襲来だけ数字が変わる） */
+/** 今の学期の倍率をかけたカード（時代イベントだけ数字が変わる） */
 export function eventCard(s: GameState, id: string): EventCard {
   return scaleCard(EVENT_MAP[id], eventScaleNow(s));
 }
@@ -445,7 +445,7 @@ function beginTurn(s: GameState, pi: number) {
   for (const egg of eggs) hatch(s, egg);
   const desc = eggs.map((x) => x.name).join('・');
   log(s, `${p.name}のクラスで卵が孵った！ ${desc}`, pi);
-  setResult(s, pi, { title: '卵が孵った！', icon: '🥚', tone: 'personal', desc: `${desc}が生まれた！`, rows: [{ player: pi, delta: 0, note: '孵化', uids: eggs.map((x) => x.uid) }], students: eggs }, 'hatch');
+  setResult(s, pi, { title: '卵が孵った！', icon: '🥚', tone: 'personal', desc: eggs.length > 1 ? `恐竜が${eggs.length}匹生まれた！` : '恐竜が生まれた！', rows: [{ player: pi, delta: 0, note: '孵化', uids: eggs.map((x) => x.uid) }], students: eggs }, 'hatch');
 }
 
 /** 恐竜の卵（オヴィラプトルの卵泥棒で来る。アイコンはなく、席を1つ使う） */
@@ -532,7 +532,7 @@ function settleSunflower(s: GameState) {
     p.points += delta;
     st.mvp++;
     shown.push(st);
-    return { player, count: pts, delta, note: `${st.name}の絵が値上がり`, uids: [uid] };
+    return { player, count: pts, delta, note: '絵が値上がり', uids: [uid] };
   });
   sortRows(rows);
   logRows(s, `${c.name}の値打ち`, rows);
@@ -791,11 +791,14 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
   /** moved のうち、よそから転入してきた子（ほかはそのクラスにいたまま光るだけ） */
   const joined: string[] = [];
   const name = (x: Student) => x.name;
-  /** 起きたこと（ログに残し、めくったカードの横に一言で出す） */
+  /**
+   * 起きたこと：ログには text（だれが・どの子が）を残し、めくったカードの横には short（一言）を出す。
+   * 子の名前はカードに書いてあり、クラスごとの結果は明細に出るので、一言には名前を入れない（同じ一言は1回だけ）
+   */
   const said: string[] = [];
-  const tell = (text: string, pi?: number) => {
+  const tell = (text: string, pi?: number, short = text) => {
     log(s, text, pi);
-    said.push(text);
+    if (!said.includes(short)) said.push(short);
   };
 
   switch (e.type) {
@@ -869,7 +872,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       if (most > 0) {
         const i = scribes.findIndex((f) => f.length === most);
         moved.push(...scribes[i]);
-        tell(`${ps[i].name}のクラスの書記${most}人が、ヒエログリフを書き残した。`, i);
+        tell(`${ps[i].name}のクラスの書記${most}人が、ヒエログリフを書き残した。`, i, '書記がヒエログリフを書き残した！');
       }
       break;
     }
@@ -888,7 +891,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       if (most > 0) {
         const i = rich.findIndex((f) => f.length === most);
         moved.push(...rich[i]);
-        tell(`${ps[i].name}のクラスのお墓に、${rich[i].map((x) => x.goods!.name).join('・')}が納められた。`, i);
+        tell(`${ps[i].name}のクラスのお墓に、${rich[i].map((x) => x.goods!.name).join('・')}が納められた。`, i, 'お墓に副葬品が納められた。');
       }
       break;
     }
@@ -920,7 +923,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
           x.student.mvp++;
           moved.push(x.student);
           rows[i].note = '勝利';
-          tell(`${ps[i].name}のクラスの${name(x.student)}が闘技場を制した！`, i);
+          tell(`${ps[i].name}のクラスの${name(x.student)}が闘技場を制した！`, i, '闘技場を制した！');
         } else {
           add(i, -e.lose);
           rows[i].note = x ? '敗北' : '不戦敗';
@@ -939,7 +942,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
           rep.student.mvp++;
           moved.push(rep.student);
           rows[i].note = '対話成立';
-          tell(`${p.name}のクラスの${name(rep.student)}が、ソクラテスと語り合った！`, i);
+          tell(`${p.name}のクラスの${name(rep.student)}が、ソクラテスと語り合った！`, i, 'ソクラテスと語り合った！');
         } else {
           add(i, -e.lose);
           rows[i].note = rep ? '論破された' : '代表なし';
@@ -1008,7 +1011,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
           guard.student.mvp++;
           moved.push(guard.student);
           rows[i].note = '一喝で追い返した';
-          tell(`${p.name}のクラスの${name(guard.student)}が橋の上で一喝！${ps[chaser].name}のクラスの追っ手が逃げ出した。`, i);
+          tell(`${p.name}のクラスの${name(guard.student)}が橋の上で一喝！${ps[chaser].name}のクラスの追っ手が逃げ出した。`, i, '橋の上で一喝！追っ手が逃げ出した。');
         } else {
           add(i, -e.lose);
           rows[i].note = guard ? '突破された' : '守る子なし';
@@ -1040,7 +1043,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       joined.push(st.uid);
       rows[to].uids = [st.uid];
       rows[to].note = '孔明が転入';
-      tell(`${ps[to].name}のクラスに、軍師の${name(st)}がやってきた！`, to);
+      tell(`${ps[to].name}のクラスに、軍師の${name(st)}がやってきた！`, to, '軍師がやってきた！');
       break;
     }
     // 平安：一番のクラスへ、ほかの全クラスから贈り物（一番が複数なら、それぞれに贈る）
@@ -1076,7 +1079,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         rows[i].count = readers.length;
         rows[i].uids = [x.student.uid, ...readers.filter((y) => y !== x.student).map((y) => y.uid)];
         rows[i].note = `作者・読者${readers.length}人`;
-        tell(`${ps[i].name}のクラスの${name(x.student)}が物語を書いた！${ATTR_ICON[e.also]}の読者${readers.length}人（+${readers.length * e.per}）`, i);
+        tell(`${ps[i].name}のクラスの${name(x.student)}が物語を書いた！${ATTR_ICON[e.also]}の読者${readers.length}人（+${readers.length * e.per}）`, i, `物語を書いた！${ATTR_ICON[e.also]}の読者1人につき+${e.per}`);
       });
       break;
     }
@@ -1088,7 +1091,8 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         if (!has.length) return;
         rows[i].note = has.map((x) => x.goods!.name).join('・');
         rows[i].uids = has.map((x) => x.uid);
-        tell(`${p.name}のクラスの${has.map(name).join('・')}が宝を持っている！手番で差し出せば+${e.win}。`, i);
+        moved.push(...has);
+        tell(`${p.name}のクラスの${has.map(name).join('・')}が宝を持っている！手番で差し出せば+${e.win}。`, i, `宝を持っている！手番で差し出せば+${e.win}。`);
       });
       tell(`かぐや姫は5つの宝を待っている。宝を装備した子がいれば、次の手番から差し出せる（+${e.win}、手番は使わない）。`);
       break;
@@ -1129,7 +1133,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       joined.push(st.uid);
       rows[to].note = '弁慶が家来に';
       rows[to].uids = [...(rows[to].uids ?? []), st.uid];
-      tell(`${ps[to].name}のクラスが弁慶を倒した！${name(st)}が家来になって転入した。`, to);
+      tell(`${ps[to].name}のクラスが弁慶を倒した！${name(st)}が家来になって転入した。`, to, '弁慶を倒して家来にした！');
       break;
     }
     // 中世：各クラスの一番の描き手1人が描く。その子の点（係ボーナス込み）× per
@@ -1144,14 +1148,14 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         top.student.mvp++;
         rows[i].count = top.pts;
         rows[i].uids = [top.student.uid];
-        rows[i].note = `${top.student.name}`;
+        rows[i].note = '描いた';
       });
       const hi = Math.max(...rows.map((r) => r.delta));
       if (hi > 0) {
         const i = rows.findIndex((r) => r.delta === hi);
         const st = ps[i].students.find((x) => x.uid === rows[i].uids![0])!;
         moved.push(st);
-        tell(`一番の名画は${ps[i].name}のクラスの${name(st)}！（+${hi}）`, i);
+        tell(`一番の名画は${ps[i].name}のクラスの${name(st)}！（+${hi}）`, i, `一番の名画が生まれた！（+${hi}）`);
       }
       break;
     }
@@ -1173,7 +1177,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         }
         rows[i].uids = readers.map((x) => x.uid);
         rows[i].note = `${readers.length}人 ${ATTR_ICON[a]}＋1`;
-        tell(`${p.name}のクラスの${readers.length}人が本を読んで、${ATTR_ICON[a]}が1つ増えた。`, i);
+        tell(`${p.name}のクラスの${readers.length}人が本を読んで、${ATTR_ICON[a]}が1つ増えた。`, i, `本を読んで、${ATTR_ICON[a]}が1つ増えた！`);
       });
       break;
     }
@@ -1190,8 +1194,8 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         moved.push(st);
         rows[i].count = c.attr === 'all' ? undefined : iconsOf({ ...st, plague: false }, c.attr);
         rows[i].uids = [st.uid];
-        rows[i].note = `${st.name}が感染`;
-        tell(`${p.name}のクラスの${name(st)}がペストにかかった。`, i);
+        rows[i].note = '1人が感染';
+        tell(`${p.name}のクラスの${name(st)}がペストにかかった。`, i, 'ペストにかかった……（学期の区切りまで🏃を数えない）');
       });
       break;
     }
@@ -1255,7 +1259,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
           x.mvp++;
           moved.push(x);
           if (baseIcons(x) < MAX_ICONS) x.attrs = [...x.attrs, a];
-          tell(`${p.name}のクラスの${name(x)}が当選！${ATTR_ICON[a]}が1つ増えた。`, i);
+          tell(`${p.name}のクラスの${name(x)}が当選！${ATTR_ICON[a]}が1つ増えた。`, i, `当選！${ATTR_ICON[a]}が1つ増えた。`);
         }
       });
       break;
@@ -1281,7 +1285,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
           n++;
         }
         rows[i].note = `${n}人 ${ATTR_ICON[a]}＋1`;
-        if (n) tell(`${p.name}のクラスの機械の子${n}人の${ATTR_ICON[a]}が1つ増えた。`, i);
+        if (n) tell(`${p.name}のクラスの機械の子${n}人の${ATTR_ICON[a]}が1つ増えた。`, i, `機械の子の${ATTR_ICON[a]}が1つ増えた！`);
       });
       break;
     }
@@ -1302,7 +1306,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         joined.push(st.uid);
         rows[i].note = '転入';
         rows[i].uids = [st.uid];
-        tell(`${p.name}のクラスに、タイムマシンで${name(st)}がやってきた！`, i);
+        tell(`${p.name}のクラスに、タイムマシンで${name(st)}がやってきた！`, i, 'タイムマシンで転校生がやってきた！');
       });
       break;
     }
@@ -1378,7 +1382,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         x.student.mvp++;
         moved.push(x.student);
         rows[i].note = '受賞';
-        tell(`${ps[i].name}のクラスの${name(x.student)}が受賞！`, i);
+        tell(`${ps[i].name}のクラスの${name(x.student)}が受賞！`, i, '受賞！');
         rows[i].uids = [x.student.uid];
       });
       break;
@@ -1433,7 +1437,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         rows[i].count = top.pts;
         rows[i].uids = [top.student.uid];
         rows[i].note = `学期末に+${top.pts * e.per}`;
-        tell(`${p.name}のクラスの${name(top.student)}がひまわりの絵を飾った。`, i);
+        tell(`${p.name}のクラスの${name(top.student)}がひまわりの絵を飾った。`, i, 'ひまわりの絵を飾った。学期の区切りに値打ちが出る。');
       });
       if (paintings.length) s.sunflower = paintings;
       break;
@@ -1529,20 +1533,6 @@ export function cyborgable(p: Player): Student[] {
   return p.students.filter((x) => x.art !== 'cyborg');
 }
 
-/** 襲来（時代イベント・全クラス）：👊の合計 − 敵の強さ */
-function resolveRaid(s: GameState, c: RaidCard): EventResult {
-  const rows = s.players.map((p, i): ResultRow => {
-    const sc = attrScore(p, 'fight');
-    const delta = sc.total - c.threat;
-    p.points += delta;
-    if (delta >= 0) sc.holders.forEach((h) => h.mvp++);
-    return { player: i, count: sc.total, delta, note: delta >= 0 ? '撃退' : sc.total ? '突破' : '無防備', uids: sc.holders.map((h) => h.uid) };
-  });
-  sortRows(rows);
-  logRows(s, c.name, rows);
-  return { title: c.name, icon: c.icon, art: c.id, attr: 'fight', tone: 'era', era: c.era, threat: c.threat, desc: `敵の強さ ${c.threat}`, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows };
-}
-
 function resolveFixed(s: GameState, f: FixedEvent): EventResult {
   const values = s.players.map((p) => (f.rule === 'test' ? testScore(p, TEST_YANKEE_PENALTY) : totalPower(p)));
   const rows = awardRanks(s, values, f.mult);
@@ -1631,7 +1621,7 @@ function nextDrop(s: GameState, drawer: number, left: number[], gone: Student[],
       title: '転校',
       icon: '📦',
       tone: 'personal',
-      desc: gone.length ? `${gone.map((x) => x.name).join('・')} が転校していった。` : 'どのクラスも転校させられる子がいなかった。',
+      desc: gone.length ? `${gone.length}人が転校していった。` : 'どのクラスも転校させられる子がいなかった。',
       rule: cardRule(EVENT_MAP.push), glyph: cardGlyph(EVENT_MAP.push), say: shortRule(EVENT_MAP.push),
       rows: [],
       students: gone,
@@ -1682,8 +1672,9 @@ function ostracismResult(s: GameState, drawer: number, votes: number[], gone: St
   rows[out].note = gone.length ? `${votes[out]}票 追放` : `${votes[out]}票（転校できる子なし）`;
   rows[out].uids = gone.map((x) => x.uid);
   const who = s.players[out].name;
-  const say = gone.length ? `${who}のクラスに陶片の票が集まり、${gone.map((x) => x.name).join('・')}がアテネを去った。` : `${who}のクラスに陶片の票が集まったが、去れる子がいなかった。`;
-  log(s, say, out);
+  // 去った子の名前はログにだけ残す（画面ではカードに書いてある）
+  const say = gone.length ? `${who}のクラスに陶片の票が集まり、${gone.length}人がアテネを去った。` : `${who}のクラスに陶片の票が集まったが、去れる子がいなかった。`;
+  log(s, gone.length ? `${who}のクラスに陶片の票が集まり、${gone.map((x) => x.name).join('・')}がアテネを去った。` : say, out);
   return { ...eraResult(s, c, rows, { students: gone, outUids: gone.map((x) => x.uid) }), say };
 }
 
@@ -1727,7 +1718,7 @@ function nextGift(s: GameState, card: string, left: number[], items: string[], g
     null,
     {
       title: c.name, icon: c.icon, art: c.id, tone: 'era', era: c.era, desc: c.desc, rule: cardRule(c), glyph: cardGlyph(c),
-      say: got.length ? students.map((x, i) => `${x.name}に${GIFT_MAP[got[i].item].name}`).join('、') : '品を受け取れるクラスがなかった。',
+      say: got.length ? `${[...new Set(got.map((g) => GIFT_MAP[g.item].name))].join('・')}をもらった！` : '品を受け取れるクラスがなかった。',
       rows, students,
     },
     'turn',
@@ -1815,7 +1806,7 @@ function refill(s: GameState) {
   endTurn(s);
 }
 
-/** ゲリラ（共通イベント・時代イベント・襲来・転校） */
+/** ゲリラ（共通イベント・時代イベント・転校） */
 function fireGuerrilla(s: GameState, pi: number, id: string) {
   const c = eventCard(s, id);
   log(s, `ゲリラ発生！ ${c.name}`);
@@ -1829,9 +1820,6 @@ function fireGuerrilla(s: GameState, pi: number, id: string) {
       else if (c.effect.type === 'newworld' || c.effect.type === 'teppo') startGift(s, c, pi);
       else if (c.effect.type === 'oath') startOath(s, c, c.effect.max);
       else setResult(s, null, resolveContest(s, c), 'turn');
-      return;
-    case 'raid':
-      setResult(s, null, resolveRaid(s, c), 'turn');
       return;
     case 'push':
       startDrop(s, pi);
@@ -1880,7 +1868,7 @@ function buyPerson(s: GameState, pi: number, slot: number, gone?: Student) {
   const st = fromPoolId(s, personId(id), joinedLabel(s));
   addStudent(s, p, st);
   log(s, `${p.name}のクラスに${st.name}が転入！（−${cost}点）`, pi);
-  const desc = `${st.name}がやってきた！（−${cost}点）${gone ? ` 入れ替わりに${gone.name}が転校していった。` : ''}`;
+  const desc = `転校生がやってきた！（−${cost}点）${gone ? ' 入れ替わりに1人が転校していった。' : ''}`;
   setResult(s, pi, { title: '転入', icon: '🚪', tone: 'personal', desc, rows: [{ player: pi, delta: -cost, note: 'スカウト' }], students: gone ? [st, gone] : [st], inUids: [st.uid], outUids: gone ? [gone.uid] : undefined }, 'turn');
 }
 
@@ -1996,10 +1984,8 @@ export function step(prev: GameState, a: Action): GameState {
       return s;
     }
     case 'pass': {
-      if (ph.kind !== 'draw' || !s.market[a.slot]) return prev;
-      const id = s.market.splice(a.slot, 1)[0];
-      s.discard.push(id);
-      log(s, `${s.players[ph.player].name}は${isPerson(id) ? previewStudent(id).name : EVENT_MAP[id].name}のカードを捨てて見送った。`, ph.player);
+      if (ph.kind !== 'draw') return prev;
+      log(s, `${s.players[ph.player].name}はパスした。`, ph.player);
       refill(s);
       return s;
     }
@@ -2044,21 +2030,21 @@ export function step(prev: GameState, a: Action): GameState {
       if (!kachikomiTargets(s, ph.player).includes(a.target)) return prev;
       takeFromMarket(s, ph.slot);
       const sc = attrScore(p, 'fight');
-      const damage = sc.total * KACHIKOMI_CARDS[0].mult;
-      const drain = sc.total * KACHIKOMI_CARDS[0].drain;
       const to = s.players[a.target];
+      const guard = attrScore(to, 'fight').total;
+      const { damage, drain } = kachikomiHit(sc.total, guard);
       to.points -= damage;
       p.points += drain;
-      sc.holders.forEach((h) => h.mvp++);
+      if (damage > 0) sc.holders.forEach((h) => h.mvp++);
       const rows: ResultRow[] = [
         { player: ph.player, count: sc.total, delta: drain, note: 'カチコミ（ドレイン）', uids: sc.holders.map((h) => h.uid) },
-        { player: a.target, delta: -damage, note: '被害' },
+        { player: a.target, count: guard, delta: -damage, note: damage ? `被害（👊${guard}で防いだ）` : `👊${guard}で防ぎきった` },
       ];
       logRows(s, `カチコミ（${p.name}→${to.name}）`, rows);
       setResult(
         s,
         ph.player,
-        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: `${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), say: shortRule(KACHIKOMI_CARDS[0]), rows },
+        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: damage ? `${to.name}のクラスに殴りこんだ！` : `${to.name}のクラスに殴りこんだが、防がれた！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), say: shortRule(KACHIKOMI_CARDS[0]), rows },
         'turn',
       );
       return s;
@@ -2081,7 +2067,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: `${mine.name}と${theirs.name}（${to.name}）を入れ替えた`, rows: [], students: [theirs, mine], inUids: [theirs.uid], outUids: [mine.uid] },
+        { title: 'クラス替え', icon: '🔁', tone: 'personal', desc: `${to.name}のクラスと生徒を入れ替えた！`, rows: [], students: [theirs, mine], inUids: [theirs.uid], outUids: [mine.uid] },
         'turn',
       );
       return s;
@@ -2114,7 +2100,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'サイボーグ化', icon: '🦾', art: 'cyborg', tone: 'personal', desc: `${was}がサイボーグになった！`, rule: cardRule(EVENT_MAP.cyborg), glyph: cardGlyph(EVENT_MAP.cyborg), say: shortRule(EVENT_MAP.cyborg), rows: [], students: [st] },
+        { title: 'サイボーグ化', icon: '🦾', art: 'cyborg', tone: 'personal', desc: 'サイボーグになった！', rule: cardRule(EVENT_MAP.cyborg), glyph: cardGlyph(EVENT_MAP.cyborg), say: shortRule(EVENT_MAP.cyborg), rows: [], students: [st] },
         'turn',
       );
       return s;
@@ -2142,7 +2128,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: 'かぐや姫に宝を差し出した', icon: '🌙', art: 'kaguya', tone: 'personal', desc: `${st.name}が宝を差し出した！（+${win}）`, rows: [{ player: ph.player, delta: win, note: '差し出した', uids: [st.uid] }], students: [st] },
+        { title: 'かぐや姫に宝を差し出した', icon: '🌙', art: 'kaguya', tone: 'personal', desc: `かぐや姫に宝を差し出した！（+${win}）`, rows: [{ player: ph.player, delta: win, note: '差し出した', uids: [st.uid] }], students: [st] },
         'kaguya',
       );
       return s;
@@ -2181,7 +2167,7 @@ export function step(prev: GameState, a: Action): GameState {
       setResult(
         s,
         ph.player,
-        { title: c.name, icon: c.icon, attr: c.attr, tone: 'personal', desc: `${st.name}が装備した！`, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows: [], students: [st] },
+        { title: c.name, icon: c.icon, attr: c.attr, tone: 'personal', desc: `${c.name}を装備した！`, rule: cardRule(c), glyph: cardGlyph(c), say: shortRule(c), rows: [], students: [st] },
         'turn',
       );
       return s;
@@ -2242,8 +2228,6 @@ export function deckBreakdown(s: GameState): DeckRow[] {
           return { ...base, group: '時代イベント' };
         case 'contest':
           return { ...base, name: c.attr === 'all' ? c.name : `${c.name}（${ATTR_ICON[c.attr]}）`, group: '時代イベント' };
-        case 'raid':
-          return { ...base, name: `${c.name}（強さ${c.threat}）`, group: '時代イベント' };
       }
     });
   };

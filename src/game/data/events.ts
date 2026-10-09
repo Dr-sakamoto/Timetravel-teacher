@@ -11,17 +11,22 @@ export interface NormalCard {
   count: number;
 }
 
-/** カチコミ：場から取った人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させ、👊の数 × drain だけ自分に吸い取る（ドレイン） */
+/**
+ * カチコミ：場から取った人が他のクラスを1つ選んで殴りこむ。相手のクラスの👊の数だけ防がれ、
+ * 自分の👊の数 − 相手の👊の数（0より小さければ0）だけ相手を減点させ、その半分（切り捨て）を自分に吸い取る（ドレイン）
+ */
 export interface KachikomiCard {
   id: string;
   kind: 'kachikomi';
   name: string;
   icon: string;
-  /** 減点の倍率 */
-  mult: number;
-  /** 自分に入る倍率（ドレイン） */
-  drain: number;
   count: number;
+}
+
+/** カチコミの被害とドレイン（atk：殴りこむクラスの👊、def：殴りこまれるクラスの👊） */
+export function kachikomiHit(atk: number, def: number): { damage: number; drain: number } {
+  const damage = Math.max(0, atk - def);
+  return { damage, drain: Math.floor(damage / 2) };
 }
 
 /** 共通イベント（全クラス）：プラスのアイコンの数だけ得点（マイナスのアイコンがあれば、その数だけ減点） */
@@ -149,17 +154,6 @@ export interface ContestCard {
   count: number;
 }
 
-/** 襲来（時代イベント・全クラス）：クラスの👊の数 − 敵の強さ。撃退すれば大きくプラス、守れなければ大きくマイナス */
-export interface RaidCard {
-  id: string;
-  kind: 'raid';
-  era: EraId;
-  name: string;
-  icon: string;
-  threat: number;
-  count: number;
-}
-
 /** グッズ：生徒1人に装備して、そのアイコンを1つ増やす（1人1つまで） */
 export interface GoodsCard {
   id: string;
@@ -194,7 +188,7 @@ export interface MoveCard {
   odds?: number;
 }
 
-export type EventCard = NormalCard | KachikomiCard | SwingCard | ContestCard | RaidCard | GoodsCard | CyborgCard | MoveCard;
+export type EventCard = NormalCard | KachikomiCard | SwingCard | ContestCard | GoodsCard | CyborgCard | MoveCard;
 
 /** 定期テスト・卒業式（全員参加）の順位点（人数別） */
 export const CONTEST_POINTS: Record<number, number[]> = {
@@ -226,7 +220,7 @@ export function eventCost(c: EventCard, freeGoods = false): number {
 
 /** ゲリラ：場に並べようとめくった瞬間に、その場で起こるカード（だれも避けられない） */
 export function isGuerrilla(c: EventCard): boolean {
-  return c.kind === 'swing' || c.kind === 'contest' || c.kind === 'raid' || c.kind === 'push';
+  return c.kind === 'swing' || c.kind === 'contest' || c.kind === 'push';
 }
 
 const N = (attr: Attr, name: string, icon: string, count: number): NormalCard => ({ id: `n_${attr}`, kind: 'normal', name, icon, attr, count });
@@ -237,7 +231,7 @@ export const NORMAL_CARDS: NormalCard[] = [
   N('charm', '学活の時間', '🙋', 4),
 ];
 
-export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, drain: 1, count: 3 }];
+export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', count: 3 }];
 
 // 共通イベントはいったん休止中（時代イベントが出やすいように、山札に入れない）。戻すときは count を 1 に
 const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | undefined, desc: string, per?: number): SwingCard => ({
@@ -310,26 +304,6 @@ export const GIFT_MAP: Record<string, GoodsCard> = { ...NEW_WORLD_MAP, [TEPPO_GO
 export const CYBORG_CARDS: CyborgCard[] = [{ id: 'cyborg', kind: 'cyborg', name: 'サイボーグ化', icon: '🦾', era: 'future', count: 1 }];
 /** サイボーグになった生徒のアイコン */
 export const CYBORG_ATTRS: Attr[] = ['study', 'sports'];
-
-/** 時代ごとの襲来：攻めてくる敵の名前・絵柄・強さ（歴史の時代は実在の出来事） */
-export const ERA_RAIDERS: Record<EraId, [string, string, number]> = {
-  present: ['他校のヤンキー', '🏍️', 4],
-  cretaceous: ['ヴェロキラプトルの群れ', '🦖', 9],
-  egypt: ['海の民', '⛵', 4],
-  greece: ['クセルクセスのペルシア軍', '🏹', 6],
-  china: ['黄巾の乱', '🟡', 7],
-  heian: ['平将門の乱', '🐎', 5],
-  europe: ['ヴァイキング', '🏴‍☠️', 6],
-  sengoku: ['本能寺の変', '🔥', 8],
-  edo: ['赤穂浪士の討ち入り', '🏮', 5],
-  modern: ['アル・カポネ一味', '🕴️', 5],
-  future: ['宇宙海賊', '👾', 6],
-};
-
-export const RAID_CARDS: RaidCard[] = (Object.keys(ERA_RAIDERS) as EraId[]).map((era) => {
-  const [name, icon, threat] = ERA_RAIDERS[era];
-  return { id: `raid_${era}`, kind: 'raid', era, name: `襲来！${name}`, icon, threat, count: 1 };
-});
 
 /** count：その時代の固有イベントが4種の時代は1枚ずつ、2種の時代は2枚ずつ（どの時代も合わせて4枚） */
 const C = (id: string, name: string, icon: string, attr: Attr | 'all', effect: EraEffect, desc: string, era: EraId, count = 2): ContestCard => ({
@@ -422,12 +396,11 @@ export const ALL_EVENT_CARDS: EventCard[] = [
   ...GOODS_CARDS,
   ...CYBORG_CARDS,
   ...ERA_CARDS,
-  ...RAID_CARDS,
 ];
 
 /**
  * 学期が進むほどクラスは育つ（人数もアイコンも増え、授業カード1枚の点も大きくなる）ので、
- * 時代イベントと襲来の数字（届かせる数・敵の強さ・動く点）も学期に合わせて大きくする。
+ * 時代イベントの数字（届かせる数・動く点）も学期に合わせて大きくする。
  * 通算2学期目までは×1、そこから1学期ごとに＋0.25、最大×2
  */
 export function eventScale(termNo: number): number {
@@ -439,11 +412,10 @@ const UNSCALED: Partial<Record<EraEffect['type'], string[]>> = { masterpiece: ['
 /** 1人の子のアイコンと比べる数（1人のアイコンはクラス全体ほど伸びないので、倍率は半分。カードのアイコンの上限まで） */
 const PER_STUDENT: Partial<Record<EraEffect['type'], string[]>> = { dialogue: ['need'], bridge: ['need'] };
 
-/** 学期の倍率 k をかけた時代イベント・襲来のカード（ほかのカードと、k が1のときはそのまま） */
+/** 学期の倍率 k をかけた時代イベントのカード（ほかのカードと、k が1のときはそのまま） */
 export function scaleCard<T extends EventCard>(c: T, k: number): T {
   if (k === 1) return c;
   const r = (v: number) => Math.round(v * k);
-  if (c.kind === 'raid') return { ...c, threat: r(c.threat) };
   if (c.kind !== 'contest') return c;
   const e = c.effect;
   const keep = UNSCALED[e.type] ?? [];
@@ -462,7 +434,7 @@ export function scaleCard<T extends EventCard>(c: T, k: number): T {
 
 /** そのカードが入る時代（どの時代にも入るなら undefined） */
 export function cardEra(c: EventCard): EraId | undefined {
-  return c.kind === 'contest' || c.kind === 'raid' || c.kind === 'goods' || c.kind === 'cyborg' ? c.era : undefined;
+  return c.kind === 'contest' || c.kind === 'goods' || c.kind === 'cyborg' ? c.era : undefined;
 }
 export const EVENT_MAP: Record<string, EventCard> = Object.fromEntries(ALL_EVENT_CARDS.map((e) => [e.id, e]));
 export const FIXED_MAP: Record<string, FixedEvent> = Object.fromEntries(FIXED_EVENTS.map((e) => [e.id, e]));
@@ -473,15 +445,13 @@ export function cardRule(c: EventCard): string {
     case 'normal':
       return `取った人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させ、👊の数×${c.drain}だけ自分に加点（ドレイン）`;
+      return '取った人：他のクラスを1つ選んで殴りこむ。自分のクラスの👊の数から相手のクラスの👊の数を引いた分（防がれて0になることも）だけ相手を減点させ、その半分（切り捨て）を自分に加点（ドレイン）';
     case 'swing':
       if (c.per) return `全クラス：${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       if (!c.minus) return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点`;
       return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点、${ATTR_ICON[c.minus]}の数だけ減点`;
     case 'contest':
       return `全クラス：${eraEffectRule(c)}`;
-    case 'raid':
-      return `全クラス：クラスの👊の数 − ${c.threat}`;
     case 'goods':
       return `生徒1人に装備：${ATTR_ICON[c.attr]}＋1（1人1つまで）`;
     case 'cyborg':
@@ -598,21 +568,19 @@ export function fixedRule(f: FixedEvent): string {
 
 /**
  * カードの効果を短い式で（文章を読まなくても分かるように）。絵文字は5つのアイコン（📚🏃🎨👑👊）だけ使う。
- * 例：授業「👑 → +」、時代イベント「👊1位 +12」、襲来「👊 − 8」
+ * 例：授業「👑 → +」、時代イベント「👊1位 +12」
  */
 export function cardGlyph(c: EventCard): string {
   switch (c.kind) {
     case 'normal':
       return `${ATTR_ICON[c.attr]} → +`;
     case 'kachikomi':
-      return `相手 −👊×${c.mult}　自分 +👊×${c.drain}`;
+      return '相手 −(👊 − 相手の👊)　自分 +その半分';
     case 'swing':
       if (c.per) return `${ATTR_ICON[c.plus]}の子1人 +${c.per}`;
       return c.minus ? `+${ATTR_ICON[c.plus]}　−${ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
     case 'contest':
       return contestGlyph(c);
-    case 'raid':
-      return `👊 − ${c.threat}`;
     case 'goods':
       return `装備 ${ATTR_ICON[c.attr]}＋1`;
     case 'cyborg':
@@ -721,14 +689,12 @@ export function shortRule(c: EventCard): string {
     case 'normal':
       return `${ATTR_ICON[c.attr]}の数だけ得点`;
     case 'kachikomi':
-      return `相手に👊×${c.mult}のダメージ、👊×${c.drain}を吸い取る`;
+      return '👊の差だけ相手にダメージ（相手の👊で防がれる）、その半分を吸い取る';
     case 'swing':
       if (c.per) return `${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       return c.minus ? `${ATTR_ICON[c.plus]}で得点、${ATTR_ICON[c.minus]}で減点` : `${ATTR_ICON[c.plus]}の数だけ得点`;
     case 'contest':
       return eraEffectRule(c);
-    case 'raid':
-      return `👊の数から敵の強さ${c.threat}を引いた分だけ得点`;
     case 'goods':
       return '';
     case 'cyborg':
