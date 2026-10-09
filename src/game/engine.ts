@@ -1983,10 +1983,8 @@ export function step(prev: GameState, a: Action): GameState {
       return s;
     }
     case 'pass': {
-      if (ph.kind !== 'draw' || !s.market[a.slot]) return prev;
-      const id = s.market.splice(a.slot, 1)[0];
-      s.discard.push(id);
-      log(s, `${s.players[ph.player].name}は${isPerson(id) ? previewStudent(id).name : EVENT_MAP[id].name}のカードを捨てて見送った。`, ph.player);
+      if (ph.kind !== 'draw') return prev;
+      log(s, `${s.players[ph.player].name}はパスした。`, ph.player);
       refill(s);
       return s;
     }
