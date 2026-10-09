@@ -281,6 +281,23 @@ function drawYearEras(s: GameState) {
   }
 }
 
+/**
+ * チーム戦：2つの部屋の1年の時代を、1・2学期は全部ちがう時代に、3学期（合体する学期）は同じ時代にそろえる。
+ * 部屋Aの時代はそのまま、部屋Bの1・2学期を部屋Aと被らない時代に引き直す
+ */
+function assignTeamEras(a: GameState, b: GameState) {
+  const shared = a.yearEras[2];
+  const picked: number[] = [];
+  for (let guard = 0; picked.length < 2 && guard < 100; guard++) {
+    if (b.eraDeck.length === 0) b.eraDeck = shuffle(b, [...ALL_ERAS]);
+    const e = b.eraDeck.pop()!;
+    if (!a.yearEras.includes(e) && !picked.includes(e)) picked.push(e);
+  }
+  b.yearEras = [...picked, shared];
+  // 部屋Bも3学期にその時代を使ったので、あとの年に引かないようにする
+  b.eraDeck = b.eraDeck.filter((e) => e !== shared);
+}
+
 /** 今の学期の時代 */
 export function currentEra(s: GameState): number {
   const t = termOfMonth(MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)]);
@@ -610,6 +627,18 @@ function newYear(s: GameState) {
   drawYearEras(s);
   s.monthIdx = 0;
   startTerm(s);
+}
+
+/** チーム戦の新しい学年：2つの部屋の時代をそろえてから（assignTeamEras）、1学期を始める */
+function newTeamYear(a: GameState, b: GameState) {
+  for (const x of [a, b]) {
+    x.year++;
+    drawYearEras(x);
+    x.monthIdx = 0;
+  }
+  assignTeamEras(a, b);
+  startTerm(a);
+  startTerm(b);
 }
 
 // ---------- イベント解決 ----------
@@ -1640,10 +1669,8 @@ export function splitTeams(rooms: GameState[], joint: GameState): GameState[] | 
     return back(pa, sa, Math.floor(d / 2));
   });
   b.uidCounter = a.uidCounter;
-  for (const x of [a, b]) {
-    log(x, '3学期が終わり、合体していたクラスはもとの部屋に戻った。');
-    newYear(x);
-  }
+  for (const x of [a, b]) log(x, '3学期が終わり、合体していたクラスはもとの部屋に戻った。');
+  newTeamYear(a, b);
   return syncTeams([a, b]);
 }
 
@@ -1658,9 +1685,11 @@ export function syncTeams(rooms: GameState[]): GameState[] {
   });
 }
 
-/** チーム戦を始める：2つの部屋（同じ人数）を別々の乱数で作る。部屋ごとに1年の時代の並びが変わる */
+/** チーム戦を始める：2つの部屋（同じ人数）を別々の乱数で作る。1・2学期は部屋ごとにちがう時代を旅し、3学期は同じ時代で合流する */
 export function newTeamGame(rooms: SetupPlayer[][], years: number, seed = Date.now()): GameState[] {
   const states = rooms.map((setup, r) => ({ ...newGame(setup, years, seed + r * 7919), team: { room: r, mates: [] } }));
+  assignTeamEras(states[0], states[1]);
+  states[1].eventDeck = buildDeck(states[1]);
   return syncTeams(states);
 }
 

@@ -1531,7 +1531,14 @@ describe('チーム戦（2つの部屋）', () => {
     let rooms = newTeamGame([setup(0), setup(1)], 2, 42);
     expect(rooms.map((r) => r.team?.room)).toEqual([0, 1]);
     expect(rooms[0].team!.mates.map((m) => m.name)).toEqual(['B0', 'B1', 'B2', 'B3']);
+    /** 1・2学期は4つともちがう時代、3学期は同じ時代 */
+    const expectEras = (rs: GameState[]) => {
+      const [a, b] = rs.map((r) => r.yearEras);
+      expect(new Set([a[0], a[1], b[0], b[1], a[2]]).size).toBe(5);
+      expect(b[2]).toBe(a[2]);
+    };
     for (let year = 1; year <= 2; year++) {
+      expectEras(rooms);
       // 片方だけ2学期を終えても合体しない
       rooms = [runRoom(rooms[0]), rooms[1]];
       expect(rooms[0].phase).toMatchObject({ kind: 'teamWait', event: 'merge' });
@@ -1550,6 +1557,7 @@ describe('チーム戦（2つの部屋）', () => {
       const uids = joint.players.flatMap((p) => p.students.map((x) => x.uid));
       expect(new Set(uids).size).toBe(uids.length);
       expect(joint.phase.kind).toBe('roles');
+      expect(currentEra(joint)).toBe(rooms[1].yearEras[2]);
       const done = runJoint(joint);
       if (year === 2) {
         // 最後の学年は、合体したまま学年末テスト・卒業式を受けて終わる

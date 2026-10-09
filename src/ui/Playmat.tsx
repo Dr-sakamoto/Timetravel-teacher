@@ -6,6 +6,7 @@ import { className } from '../game/engine';
 import type { Player, RoleId, RoleSeat } from '../game/types';
 import { TcgCard } from './TcgCard';
 import { useCardDrag } from './useCardDrag';
+import { CursorFrames, type CursorMark } from './Proposals';
 
 /** 係決めでカードを置ける場所：係の場（'role:<係>'）・座席（'seats'）・座席のカード（'card:<uid>'） */
 export type DropTo = { kind: 'role'; role: RoleId } | { kind: 'seats' } | { kind: 'card'; uid: string };
@@ -55,6 +56,8 @@ interface Props {
   sworn?: boolean;
   /** 名札に出す時代の印（近代の電球の特許・ゴッホのひまわりなど） */
   marks?: EraMark[];
+  /** 合体したクラス（チーム戦の3学期）：生徒に出す選択カーソルの枠 */
+  frames?: Record<string, CursorMark[]>;
 }
 
 /** 名札に出す印 */
@@ -93,7 +96,7 @@ export function Playmat(props: Props) {
 
   const card = (uid: string, inZone: boolean) => {
     const st = view.students.find((s) => s.uid === uid)!;
-    return (
+    const tcg = (
       <TcgCard
         student={st}
         owner={view}
@@ -104,6 +107,15 @@ export function Playmat(props: Props) {
         onPointerDown={arrange ? grab(st.uid) : undefined}
         drop={arrange && !inZone ? `card:${st.uid}` : undefined}
       />
+    );
+    const frames = props.frames?.[st.uid];
+    return frames ? (
+      <>
+        {tcg}
+        <CursorFrames marks={frames} />
+      </>
+    ) : (
+      tcg
     );
   };
 
@@ -221,10 +233,12 @@ interface SeatProps {
   sworn?: boolean;
   /** 名札に出す時代の印（近代の電球の特許・ゴッホのひまわりなど） */
   marks?: EraMark[];
+  /** 合体したクラス：相手のクラスを選んでいる選択カーソルの枠 */
+  frames?: CursorMark[];
 }
 
 /** 相手の席：小さく畳んだ教室（名札と12席の埋まり具合）。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
-export function OpponentSeat({ player, year, acting, picking, upNext, offline, delta, rank, litIcons, targetable, targeted, onClick, sworn, marks }: SeatProps) {
+export function OpponentSeat({ player, year, acting, picking, upNext, offline, delta, rank, litIcons, targetable, targeted, onClick, sworn, marks, frames }: SeatProps) {
   return (
     <button
       data-pid={player.id}
@@ -268,6 +282,7 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
         )}
       </span>
       <DeltaBadge delta={delta} rank={rank} points={player.points} />
+      <CursorFrames marks={frames} />
     </button>
   );
 }

@@ -114,6 +114,14 @@ describe('チーム戦の部屋を作った人', () => {
     const joint = room.snap.joint!;
     expect(joint).toBeDefined();
     expect(joint.phase.kind).toBe('roles');
+    // 選択カーソル：相方が選んでいるところは、軽い知らせで全員に配られる
+    deliver('h', { cid: 'g1', m: { t: 'cursor', seq: room.snap.seq, cur: { slot: 2 } } });
+    expect(room.snap.cursors).toEqual([{ seat: 1, cur: { slot: 2 } }]);
+    const cur = sent.at(-1)!;
+    expect(cur.m).toEqual({ t: 'cursors', seq: room.snap.seq, cursors: [{ seat: 1, cur: { slot: 2 } }] });
+    // 古い版からのカーソルは捨てる
+    deliver('h', { cid: 'g1', m: { t: 'cursor', seq: room.snap.seq - 1, cur: { slot: 0 } } });
+    expect(room.snap.cursors).toEqual([{ seat: 1, cur: { slot: 2 } }]);
     // 係決め：ホストの案だけでは決まらず、相方に案が届く
     const roles = cpuAction({ ...joint, players: joint.players.map((p) => ({ ...p, isCpu: true })) })!;
     expect(roles.type).toBe('setRoles');

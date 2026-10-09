@@ -93,6 +93,19 @@ export interface Proposal {
   action: Action;
 }
 
+/** 合体したクラスで、今どこを選んでいるか（slot=場のカード（ピラミッドは -1）・uid=生徒・target=相手のクラス） */
+export interface Cursor {
+  slot?: number | null;
+  uid?: string | null;
+  target?: number | null;
+}
+
+/** 席ごとの選択カーソル */
+export interface SeatCursor {
+  seat: number;
+  cur: Cursor;
+}
+
 /** 2つの案が同じ操作か（係決めは並び順を問わない） */
 export function sameAction(a: Action, b: Action): boolean {
   const norm = (x: Action) =>
@@ -122,6 +135,8 @@ export type ToHost =
   | { t: 'pick'; cls: number }
   | { t: 'action'; seq: number; action: Action }
   | { t: 'ping'; seq: number }
+  /** 合体したクラス：今どこを選んでいるか（相方の画面に枠で出る） */
+  | { t: 'cursor'; seq: number; cur: Cursor }
   | { t: 'sync' };
 
 /** 部屋を作った人 → 参加した人 */
@@ -131,8 +146,10 @@ export type ToGuest =
    * pair=ペア担任（seats はロビーの全席。you は受け取った側が pairOwners で自分のクラスに直す）。
    * joint=チーム戦の3学期の合体した卓（seats はロビーの全席。クラスは席番号の半分）。props はそれぞれのクラスで出ている案
    */
-  | { t: 'state'; seq: number; state: GameState; you: number; seats: Seat[]; pair?: boolean; joint?: boolean; props?: Proposal[] }
+  | { t: 'state'; seq: number; state: GameState; you: number; seats: Seat[]; pair?: boolean; joint?: boolean; props?: Proposal[]; cursors?: SeatCursor[] }
   | { t: 'pong'; seq: number }
+  /** 合体した卓：みんなの選択カーソル（seq の版のもの） */
+  | { t: 'cursors'; seq: number; cursors: SeatCursor[] }
   | { t: 'reject'; reason: string }
   | { t: 'closed' };
 
