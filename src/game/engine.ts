@@ -1,4 +1,4 @@
-import { MAX_CLASS, MIN_CLASS, STARTING_MEMBERS, attrScore, baseIcons, contributions, counted, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock, type AttrScore } from './calc';
+import { MIN_CLASS, classCap, STARTING_MEMBERS, attrScore, baseIcons, contributions, counted, iconsOf, ranks, roleOf, roleSlots, termNo, testScore, totalPower, validRoles, validUnlock, type AttrScore } from './calc';
 import { CARDS, CARD_MAP, EGG_DINOS, KONGMING, toIcons } from './data/cards';
 import { ERAS } from './data/eras';
 import { BENKEI } from './data/cards';
@@ -42,7 +42,7 @@ import {
   type SwingCard,
 } from './data/events';
 import { ARCHETYPE_MAP, BOY_NAMES, GIRL_NAMES, MODERN_POOL, STARTER_POOL, SURNAMES, archetypeOf, isModernCard, type Archetype } from './data/modern';
-import { ROLES } from './data/roles';
+import { MAX_PER_ROLE, ROLES } from './data/roles';
 import { SAVE_VERSION } from './saveVersion';
 import {
   type Action,
@@ -468,12 +468,6 @@ function hatch(s: GameState, egg: Student) {
 
 function monthEnd(s: GameState) {
   const fixed = FIXED_BY_MONTH[MONTHS[s.monthIdx]];
-  // チーム戦：学年末テストは2つの部屋で合同（もう一方の部屋が着くのを待つ）
-  if (s.team && fixed === 'test3') {
-    s.phase = { kind: 'teamWait', player: null, event: 'test3' };
-    log(s, '学年末テストはチーム合同。もう一方の部屋を待っている…');
-    return;
-  }
   if (fixed) s.phase = { kind: 'result', player: null, result: resolveFixed(s, FIXED_MAP[fixed]), ctx: 'monthEnd' };
   else advanceMonth(s);
 }
@@ -495,7 +489,12 @@ function advanceMonth(s: GameState) {
     return;
   }
   const m = MONTHS[s.monthIdx];
-  if (m === 9 || m === 1) {
+  if (m === 1 && s.team) {
+    // チーム戦：3学期はチームの2クラスが合体する（もう一方の部屋が2学期を終えるのを待つ）
+    curePlague(s);
+    s.phase = { kind: 'teamWait', player: null, event: 'merge' };
+    log(s, '2学期が終わった。3学期はチームの2クラスが合体！ もう一方の部屋を待っている…');
+  } else if (m === 9 || m === 1) {
     curePlague(s);
     startTerm(s);
   } else startTurns(s);
@@ -601,9 +600,6 @@ function yearEnd(s: GameState) {
       ctx: 'yearEnd',
       result: { title: `進級！ ${s.year + 1}年生へ`, icon: '🌸', tone: 'fixed', desc: '新しい1年。時代も入れ替わる。', rows: [] },
     };
-  } else if (s.team) {
-    // チーム戦：卒業式も2つの部屋で合同
-    s.phase = { kind: 'teamWait', player: null, event: 'graduation' };
   } else {
     s.phase = { kind: 'result', player: null, result: resolveFixed(s, FIXED_MAP.graduation), ctx: 'final' };
   }
@@ -853,7 +849,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         break;
       }
       const win = tops[0];
-      if (ps[win].students.length >= MAX_CLASS) {
+      if (ps[win].students.length >= classCap(ps[win])) {
         rows[win].note = '満席';
         break;
       }
@@ -1039,7 +1035,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       }
       const to = ps
         .map((_, i) => i)
-        .filter((i) => ps[i].students.length < MAX_CLASS)
+        .filter((i) => ps[i].students.length < classCap(ps[i]))
         .sort((x, y) => gaps[y] - gaps[x] || ps[x].points - ps[y].points || x - y)[0];
       if (to === undefined) {
         tell('どのクラスも満席で、孔明を迎えられなかった。');
@@ -1130,7 +1126,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         break;
       }
       wins.sort((x, y) => values[y] - values[x] || ps[x].points - ps[y].points);
-      const to = wins.find((i) => ps[i].students.length < MAX_CLASS);
+      const to = wins.find((i) => ps[i].students.length < classCap(ps[i]));
       if (to === undefined) {
         tell('弁慶を倒したが、どのクラスも満席で家来にできなかった。');
         break;
@@ -1301,7 +1297,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
       const lo = Math.min(...ps.map((p) => p.points));
       ps.forEach((p, i) => {
         if (p.points !== lo) return;
-        if (p.students.length >= MAX_CLASS) {
+        if (p.students.length >= classCap(p)) {
           rows[i].note = '満席';
           return;
         }
@@ -1459,7 +1455,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
 function resolveInvasion(s: GameState, c: ContestCard): EventResult {
   const aliens: Student[] = [];
   const rows = s.players.map((p, i): ResultRow => {
-    if (p.students.length >= MAX_CLASS) return { player: i, delta: 0, note: '満席' };
+    if (p.students.length >= classCap(p)) return { player: i, delta: 0, note: '満席' };
     const st: Student = {
       uid: `u${s.uidCounter++}`,
       name: '火星人',
@@ -1540,13 +1536,13 @@ export function cyborgable(p: Player): Student[] {
   return p.students.filter((x) => x.art !== 'cyborg');
 }
 
-/** 学年末テスト・卒業式で比べる値（テストは📚−👊の子、卒業式はアイコンの総数）。クラスの子ごとの足し算なので、チームは2クラスの和 */
-export function fixedValue(p: Player, f: FixedEvent): number {
+/** 学年末テスト・卒業式で比べる値（テストは📚−👊の子、卒業式はアイコンの総数） */
+function fixedValue(p: Player, f: FixedEvent): number {
   return f.rule === 'test' ? testScore(p, TEST_YANKEE_PENALTY) : totalPower(p);
 }
 
-/** values があれば、それで順位をつける（チーム戦の合同：席ごとのチームの値） */
-function resolveFixed(s: GameState, f: FixedEvent, values = s.players.map((p) => fixedValue(p, f))): EventResult {
+function resolveFixed(s: GameState, f: FixedEvent): EventResult {
+  const values = s.players.map((p) => fixedValue(p, f));
   const rows = awardRanks(s, values, f.mult);
   for (const r of rows) {
     const st = s.players[r.player].students;
@@ -1558,28 +1554,97 @@ function resolveFixed(s: GameState, f: FixedEvent, values = s.players.map((p) =>
 }
 
 /**
- * チーム戦の合同イベント（学年末テスト・卒業式）：2つの部屋がどちらも teamWait で同じイベントを待っていたら、
- * 席ごとにチーム（同じ席番号のクラスどうし）の値を足して順位をつけ、両方のクラスに順位点を入れる。
- * まだそろっていなければ null
+ * チーム戦の3学期：2つの部屋がどちらも2学期を終えて待っていたら、同じ席番号のクラスどうしを合体させた1つの卓を作る。
+ * 部屋Aの山札・時代をもとにし、生徒は2クラスぶん（席も2倍）、ポイントは2クラスの合計。まだそろっていなければ null
  */
-export function resolveTeamEvent(rooms: GameState[]): GameState[] | null {
-  const waits = rooms.map((r) => (r.phase.kind === 'teamWait' ? r.phase.event : null));
-  if (waits.some((w) => w === null) || waits.some((w) => w !== waits[0])) return null;
-  const event = waits[0]!;
-  const f = FIXED_MAP[event];
-  const n = Math.min(...rooms.map((r) => r.players.length));
-  const teamValues = Array.from({ length: n }, (_, i) => rooms.reduce((a, r) => a + fixedValue(r.players[i], f), 0));
-  const next = rooms.map((prev) => {
-    const s: GameState = structuredClone(prev);
-    const values = s.players.map((_, i) => teamValues[i] ?? 0);
-    const result = resolveFixed(s, f, values);
-    for (const r of result.rows) r.note = `チーム合計 ${values[r.player]}`;
-    result.title = `${f.name}（チーム合同）`;
-    result.desc = 'もう一方の部屋のチームメイトと合わせた値で順位をつける。順位点はチームの2クラスとも入る。';
-    s.phase = { kind: 'result', player: null, result, ctx: event === 'test3' ? 'monthEnd' : 'final' };
-    return s;
+export function mergeTeams(rooms: GameState[]): GameState | null {
+  if (!rooms.every((r) => r.phase.kind === 'teamWait' && r.phase.event === 'merge')) return null;
+  const [a, b] = rooms;
+  const s: GameState = structuredClone(a);
+  delete s.team;
+  // 部屋Bの生徒は、部屋Aの生徒と番号が被らないよう付け直す
+  let counter = Math.max(a.uidCounter, b.uidCounter);
+  const bUids: string[] = [];
+  s.players = s.players.map((pa, i) => {
+    const pb: Player = structuredClone(b.players[i]);
+    const renamed = new Map<string, string>();
+    for (const st of pb.students) {
+      const uid = `u${counter++}`;
+      renamed.set(st.uid, uid);
+      st.uid = uid;
+      bUids.push(uid);
+    }
+    const roles = [...pa.roles];
+    for (const x of pb.roles) if (roles.filter((y) => y.role === x.role).length < MAX_PER_ROLE) roles.push({ role: x.role, uid: renamed.get(x.uid)! });
+    return {
+      ...pa,
+      name: `${pa.name}・${pb.name}`,
+      isCpu: pa.isCpu && pb.isCpu,
+      students: [...pa.students, ...pb.students],
+      unlocked: [...pa.unlocked, ...pb.unlocked.filter((x) => !pa.unlocked.includes(x))],
+      roles,
+      points: pa.points + pb.points,
+      freeGoods: pa.freeGoods || pb.freeGoods || undefined,
+      cap: classCap(pa) + classCap(pb),
+    };
   });
-  return syncTeams(next);
+  s.uidCounter = counter;
+  // 人物は、どちらの部屋でもまだ来ていない子だけ
+  for (const era of Object.keys(s.pools) as EraId[]) s.pools[era] = a.pools[era].filter((id) => b.pools[era].includes(id));
+  s.joint = { bUids };
+  log(s, `3学期はチームの2クラスが合体！ ${s.players.map((p) => p.name).join('／')}`);
+  startTerm(s);
+  return s;
+}
+
+/**
+ * チーム戦：合体した3学期が終わって次の学年があるとき、もとの2つの部屋に戻す。
+ * 生徒はもとのクラスへ（3学期に来た子は空いている方へ）。3学期に増えた（減った）点は2クラスで半分ずつ。rooms は合体する前の2つの部屋
+ */
+export function splitTeams(rooms: GameState[], joint: GameState): GameState[] | null {
+  if (joint.phase.kind !== 'teamWait' || joint.phase.event !== 'split' || !joint.joint) return null;
+  const [a0, b0] = rooms;
+  const fromB = new Set(joint.joint.bUids);
+  // 部屋Aは合体した卓の山札・時代を引き継ぐ。部屋Bは自分の部屋のまま
+  const a: GameState = structuredClone(joint);
+  delete a.joint;
+  a.team = { room: 0, mates: [] };
+  const b: GameState = structuredClone(b0);
+  b.year = joint.year;
+  b.monthIdx = joint.monthIdx;
+  // 3学期に来た人物は、どちらの部屋でももう来ない
+  for (const era of Object.keys(joint.pools) as EraId[]) {
+    const gone = a0.pools[era].filter((id) => b0.pools[era].includes(id) && !joint.pools[era].includes(id));
+    a.pools[era] = a0.pools[era].filter((id) => !gone.includes(id));
+    b.pools[era] = b0.pools[era].filter((id) => !gone.includes(id));
+  }
+  a.players = joint.players.map((jp, i) => {
+    const pa = a0.players[i];
+    const pb = b0.players[i];
+    const fromA = new Set(pa.students.map((x) => x.uid));
+    const sa = jp.students.filter((x) => fromA.has(x.uid));
+    const sb = jp.students.filter((x) => fromB.has(x.uid));
+    for (const x of jp.students.filter((y) => !fromA.has(y.uid) && !fromB.has(y.uid))) (sa.length <= sb.length ? sa : sb).push(x);
+    // 定員をこえたら、もう一方へ
+    while (sa.length > classCap(pa) && sb.length < classCap(pb)) sb.push(sa.pop()!);
+    while (sb.length > classCap(pb) && sa.length < classCap(pa)) sa.push(sb.pop()!);
+    const d = jp.points - pa.points - pb.points;
+    const back = (p: Player, students: Student[], gain: number): Player => ({
+      ...p,
+      students: structuredClone(students),
+      roles: jp.roles.filter((x) => p.unlocked.includes(x.role) && students.some((y) => y.uid === x.uid)),
+      points: Math.max(0, p.points + gain),
+      freeGoods: jp.freeGoods,
+    });
+    b.players[i] = back(pb, sb, d - Math.floor(d / 2));
+    return back(pa, sa, Math.floor(d / 2));
+  });
+  b.uidCounter = a.uidCounter;
+  for (const x of [a, b]) {
+    log(x, '3学期が終わり、合体していたクラスはもとの部屋に戻った。');
+    newYear(x);
+  }
+  return syncTeams([a, b]);
 }
 
 /** チーム戦：それぞれの部屋に、もう一方の部屋のチームメイトの名前とポイントを書き写す */
@@ -1895,7 +1960,7 @@ export function canTake(s: GameState, pi: number, slot: number): boolean {
   const p = s.players[pi];
   const cost = marketCost(id, p);
   if (cost > 0 && p.points < cost) return false;
-  if (isPerson(id)) return p.students.length < MAX_CLASS || droppable(p).length > 0;
+  if (isPerson(id)) return p.students.length < classCap(p) || droppable(p).length > 0;
   const c = EVENT_MAP[id];
   switch (c.kind) {
     case 'normal':
@@ -1938,7 +2003,7 @@ function buyPerson(s: GameState, pi: number, slot: number, gone?: Student) {
 function takeCard(s: GameState, pi: number, slot: number) {
   const id = s.market[slot];
   if (isPerson(id)) {
-    if (s.players[pi].students.length >= MAX_CLASS) s.phase = { kind: 'makeRoom', player: pi, slot };
+    if (s.players[pi].students.length >= classCap(s.players[pi])) s.phase = { kind: 'makeRoom', player: pi, slot };
     else buyPerson(s, pi, slot);
     return;
   }
@@ -2006,7 +2071,9 @@ export function step(prev: GameState, a: Action): GameState {
           advanceMonth(s);
           break;
         case 'yearEnd':
-          newYear(s);
+          // チーム戦の合体した3学期が終わったら、もとの2つの部屋に戻る（splitTeams）
+          if (s.joint) s.phase = { kind: 'teamWait', player: null, event: 'split' };
+          else newYear(s);
           break;
         case 'final':
           s.phase = { kind: 'gameOver' };

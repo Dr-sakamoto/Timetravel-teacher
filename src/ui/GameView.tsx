@@ -25,6 +25,8 @@ interface Props {
   banner?: ReactNode;
   /** 観戦（チーム戦でもう一方の部屋を見る）：何も操作できず、手番の人の教室を手前に出す */
   spectate?: boolean;
+  /** 合体したクラス：相方が選んでいる場のカード（位置 → 相方の名前） */
+  marks?: Record<number, string>;
 }
 
 /** 名札に出す時代の印：近代の電球の特許💡と、飾っているひまわりの絵🖼️ */
@@ -39,7 +41,7 @@ function eraMarks(state: GameState, pi: number): EraMark[] {
   return out;
 }
 
-export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner, spectate = false }: Props) {
+export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner, spectate = false, marks }: Props) {
   const online = mySeat !== undefined || spectate;
   const ph = state.phase;
   const actor = actingPlayer(state);
@@ -221,7 +223,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
         </div>
         {/* 相手の教室は卓に出さない（名札をタップしたときだけ開く） */}
         <div className="stage">
-          <Center state={state} dispatch={dispatch} cpuBusy={(cpuTurn && ph.kind !== 'roles') || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} />
+          <Center state={state} dispatch={dispatch} cpuBusy={(cpuTurn && ph.kind !== 'roles') || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} marks={marks} />
         </div>
         <div className="near-seat">
           {editingRoles ? (

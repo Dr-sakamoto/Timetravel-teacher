@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { MAX_CLASS, slotUnlockLabel } from '../game/calc';
+import { MAX_CLASS, classCap, slotUnlockLabel } from '../game/calc';
 import { ROLES, ROLE_ORDER, roleDesc } from '../game/data/roles';
 import { ERAS } from '../game/data/eras';
 import { className } from '../game/engine';
@@ -82,9 +82,10 @@ export function Playmat(props: Props) {
   };
   const inRole = new Set(ROLE_ORDER.map((r) => holderOf(r)?.uid).filter(Boolean));
   const free = view.students.filter((s) => !inRole.has(s.uid));
-  const desks = Math.max(0, MAX_CLASS - view.students.length);
+  const desks = Math.max(0, classCap(player) - view.students.length);
   // 係の場（4つ）＋係に就いていない子の席＋空いている席
   const cells = ROLE_ORDER.length + free.length + desks;
+  const rows = classCap(player) > MAX_CLASS ? 2 : 1;
   const over = drag?.over ?? null;
   const tap = (fn: () => void) => () => {
     if (!wasDrag()) fn();
@@ -114,11 +115,12 @@ export function Playmat(props: Props) {
       style={
         {
           '--pc': player.color,
-          '--cells': cells,
-          '--half': Math.ceil(cells / 2),
+          // 合体したクラス（チーム戦の3学期）は席が多いので、いつも2段に分ける
+          '--cells': Math.ceil(cells / rows),
+          '--half': Math.ceil(cells / 2 / rows),
           // 空いている机を省いたときのマスの数と、2段に収めたときの列数
-          '--filled': ROLE_ORDER.length + free.length,
-          '--fhalf': Math.ceil((ROLE_ORDER.length + free.length) / 2),
+          '--filled': Math.ceil((ROLE_ORDER.length + free.length) / rows),
+          '--fhalf': Math.ceil((ROLE_ORDER.length + free.length) / 2 / rows),
         } as CSSProperties
       }
       onClick={arrange ? tap(() => arrange.held && arrange.onPlace(null, { kind: 'seats' })) : undefined}
@@ -137,7 +139,7 @@ export function Playmat(props: Props) {
           ))}
         </span>
         <span className="plate-class">
-          {className(player.id, year)} 👥{view.students.length}/{MAX_CLASS}
+          {className(player.id, year)} 👥{view.students.length}/{classCap(player)}
         </span>
         <span className="plate-pts">{player.points}</span>
         <DeltaBadge delta={delta} rank={props.rank} points={player.points} />
@@ -248,7 +250,7 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
         <span className="opp-pts">{player.points}</span>
       </span>
       <span className="opp-seats">
-        {Array.from({ length: MAX_CLASS }, (_, i) => {
+        {Array.from({ length: classCap(player) }, (_, i) => {
           const st = player.students[i];
           return (
             <span

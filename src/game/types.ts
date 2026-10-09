@@ -84,6 +84,8 @@ export interface Player {
   points: number;
   /** 楽市楽座：次に取るグッズ1つがタダ */
   freeGoods?: boolean;
+  /** 教室の席の数（なければ MAX_CLASS。チーム戦の3学期に合体したクラスは2倍） */
+  cap?: number;
 }
 
 export interface ResultRow {
@@ -160,8 +162,11 @@ export type Phase =
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
-  /** チーム戦：学年末テスト・卒業式は2つの部屋のペアが合同で受けるので、もう一方の部屋がここに着くのを待つ */
-  | { kind: 'teamWait'; player: null; event: 'test3' | 'graduation' }
+  /**
+   * チーム戦：merge=2学期が終わり、もう一方の部屋が着いたらチームの2クラスが合体して3学期を一緒に過ごす。
+   * split=合体した3学期が終わり（次の学年がある）、もとの2つの部屋に戻る
+   */
+  | { kind: 'teamWait'; player: null; event: 'merge' | 'split' }
   | { kind: 'gameOver' };
 
 export interface LogEntry {
@@ -220,8 +225,15 @@ export interface GameState {
   patent?: number;
   /** ゴッホのひまわり：各クラスが飾った絵（描いた子と、描いたときの点。学期の区切りに値打ちが出て消える） */
   sunflower?: { player: number; uid: string; pts: number }[];
-  /** チーム戦（8〜10人）：2つの部屋で別々に進め、同じ席番号のクラスどうしがチーム。学年末テストと卒業式はチームで合同 */
+  /** チーム戦（8〜10人）：2つの部屋で別々に進め、同じ席番号のクラスどうしがチーム。3学期だけはチームの2クラスが合体する */
   team?: TeamInfo;
+  /** チーム戦の3学期：チームの2クラスが合体した卓（部屋Aをもとにする） */
+  joint?: JointInfo;
+}
+
+export interface JointInfo {
+  /** 部屋Bのクラスから来た生徒（もとの部屋に戻すときに使う） */
+  bUids: string[];
 }
 
 export interface TeamInfo {

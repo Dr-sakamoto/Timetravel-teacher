@@ -3,6 +3,11 @@ import { ATTRS, type Attr, type EraId, type Player, type RoleId, type RoleSeat, 
 
 /** 教室の席の数（クラスの定員） */
 export const MAX_CLASS = 9;
+
+/** そのクラスの席の数（チーム戦の3学期に合体したクラスは広い） */
+export function classCap(p: Player): number {
+  return p.cap ?? MAX_CLASS;
+}
 /** 転校・交換で手放してもこれより少なくはならない */
 export const MIN_CLASS = 4;
 export const STARTING_MEMBERS = 6;

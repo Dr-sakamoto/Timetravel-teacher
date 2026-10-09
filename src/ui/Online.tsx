@@ -5,6 +5,7 @@ import { GuestRoom, type GuestSnap } from '../net/guest';
 import { clearHostSave, HostRoom, loadHostSave, type HostSnap } from '../net/host';
 import { joinUrl, loadName, maxSeats, newRoomCode, normalizeCode, pairClasses, pairHasRoom, pairOffline, pairOwners, saveName, seatRoom, teamReady, PAIR_SIZE, type Lobby, type Seat } from '../net/protocol';
 import { GameView } from './GameView';
+import { mateMarks, ProposalBar } from './Proposals';
 
 type Mode = { kind: 'menu' } | { kind: 'host'; resume: boolean } | { kind: 'guest'; code: string };
 
@@ -175,6 +176,12 @@ function SeatList({
   );
 }
 
+/** チーム戦の3学期：合体したクラス i（部屋Aの席 2i と部屋Bの席 2i+1）の人がみんな通信切れか */
+function jointOffline(seats: Seat[], i: number): boolean {
+  const humans = [seats[i * 2], seats[i * 2 + 1]].filter((s) => s && s.kind !== 'cpu');
+  return humans.length > 0 && humans.every((s) => s.kind === 'guest' && !s.online);
+}
+
 /** ペア担任：同じクラスを受け持つ相方 */
 function PairBadge({ seats, you }: { seats: Seat[]; you: number }) {
   const owner = pairOwners(seats);
@@ -200,10 +207,10 @@ function WatchToggle({ own, other, watching, onToggle }: { own: GameState; other
 
 /** 観戦中の見出し */
 function WatchLabel({ own, other }: { own: GameState; other: GameState }) {
-  const ev = own.phase.kind === 'teamWait' && own.phase.event === 'graduation' ? '卒業式' : '学年末テスト';
+  const ev = own.phase.kind === 'teamWait' && own.phase.event === 'split' ? 'もとの部屋に戻るの' : '3学期の合体';
   return (
     <span className="net-warn">
-      👀 部屋{other.team?.room ? 'B' : 'A'}を観戦中（{ev}の合同待ち）
+      👀 部屋{other.team?.room ? 'B' : 'A'}を観戦中（{ev}待ち）
     </span>
   );
 }
@@ -308,8 +315,11 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
         onRules={onRules}
         me={me}
         driver
+        marks={snap.joint ? mateMarks(snap.props, 0) : undefined}
         offline={(i) => {
           if (snap.lobby.pair) return pairOffline(seats, pairOwners(seats), i);
+          // 合体した卓：クラス i は部屋Aの席 2i と部屋Bの席 2i+1 の2人
+          if (snap.joint) return jointOffline(seats, i);
           // チーム戦では、部屋Aの席 i はロビーの席 2i
           const s = seats[snap.rooms ? i * 2 : i];
           return s?.kind === 'guest' && !s.online;
@@ -319,6 +329,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
             <span className="net-code">🏠{snap.code}</span>
             <TeamBadge state={snap.state} me={0} />
             {snap.lobby.pair && <PairBadge seats={seats} you={me} />}
+            {snap.joint && <ProposalBar state={snap.joint} seats={seats} mySeat={0} props={snap.props ?? []} onAgree={dispatch} />}
             {toggle}
             {snap.status !== 'open' && <span className="net-warn">{snap.error ?? '通信サーバーにつないでいます…'}</span>}
             {lost.map(({ s, i }) => (
@@ -398,7 +409,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
         )}
         {team && (
           <p className="online-lead">
-            2つの部屋（A・B）に分かれて別々に進めます。部屋ごとに時代の並びが違います。同じ番号のチームの2クラスは、学年末テストと卒業式だけ合同で受け、合わせた値で順位を競います。最後はチームの2クラスの合計点で勝負。
+            1・2学期は2つの部屋（A・B）に分かれて別々に進めます（部屋ごとに時代の並びが違います）。3学期だけは、同じ番号のチームの2クラスが合体して1つの大きなクラス（18席）になり、全員が1つの卓で遊びます。合体したクラスは2人で操作し、2人が同じ操作をしたら決まります（相方の案は画面に出て「👍 この案で決める」で合わせられます）。学年末テスト・卒業式は合体したクラスどうしで勝負。次の学年があれば、もとの2つの部屋に戻ります。
           </p>
         )}
       </section>
@@ -508,12 +519,20 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
         onRules={onRules}
         me={snap.you}
         driver={false}
-        offline={(i) => (owner ? pairOffline(seats, owner, i) : seats[i]?.kind === 'guest' && !seats[i].online)}
+        marks={snap.jointSeat !== undefined ? mateMarks(snap.props, snap.jointSeat) : undefined}
+        offline={(i) =>
+          owner
+            ? pairOffline(seats, owner, i)
+            : snap.jointSeat !== undefined
+              ? jointOffline(seats, i)
+              : seats[i]?.kind === 'guest' && !seats[i].online
+        }
         banner={
           <div className="net-banner">
             <span className="net-code">🏠{code}</span>
             <TeamBadge state={snap.state} me={snap.you} />
             {owner && <PairBadge seats={seats} you={snap.you} />}
+            {snap.jointSeat !== undefined && <ProposalBar state={snap.state} seats={seats} mySeat={snap.jointSeat} props={snap.props ?? []} onAgree={dispatch} />}
             {toggle}
             {snap.status !== 'joined' && <span className="net-warn">📵 通信が切れました。つなぎ直しています…</span>}
           </div>

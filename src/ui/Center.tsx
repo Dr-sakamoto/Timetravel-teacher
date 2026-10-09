@@ -20,6 +20,8 @@ interface Props {
   pick: Pick;
   /** 得点演出の明細。点数表の上に出す */
   side?: ReactNode;
+  /** 合体したクラス：相方が選んでいる場のカード（位置 → 相方の名前。ピラミッドは -1） */
+  marks?: Record<number, string>;
 }
 
 /** 手前のマットで選んだ自分の生徒・相手のクラス・相手の生徒 */
@@ -30,7 +32,8 @@ export interface Pick {
 }
 
 /** 場のカード1枚の見た目 */
-function MarketCard({ id, selected, dim, onClick, buyer }: { id: string; selected: boolean; dim: boolean; onClick?: () => void; buyer?: Player | null }) {
+function MarketCard({ id, selected, dim, onClick, buyer, mark }: { id: string; selected: boolean; dim: boolean; onClick?: () => void; buyer?: Player | null; mark?: string }) {
+  const badge = mark && <span className="mcard-mate">👉{mark}</span>;
   const cost = marketCost(id, buyer ?? undefined);
   const costLabel = cost > 0 ? `${cost}点` : '無料';
   if (id.startsWith('person:')) {
@@ -38,6 +41,7 @@ function MarketCard({ id, selected, dim, onClick, buyer }: { id: string; selecte
       <button className={`mcard person ${selected ? 'selected' : ''} ${dim ? 'dim' : ''}`} onClick={onClick} disabled={!onClick}>
         <TcgCard student={previewStudent(id)} size="mini" />
         <span className={`mcard-cost ${cost > 0 ? '' : 'free'}`}>{costLabel}</span>
+        {badge}
       </button>
     );
   }
@@ -50,12 +54,13 @@ function MarketCard({ id, selected, dim, onClick, buyer }: { id: string; selecte
       <span className="mcard-name">{c.name}</span>
       {attr && <span className="mcard-attr">{attr}</span>}
       <span className={`mcard-cost ${cost > 0 ? '' : 'free'}`}>{costLabel}</span>
+      {badge}
     </button>
   );
 }
 
 /** 場の横に残るピラミッド（選ぶと🏃の数だけ石を積む）。積んだ石をクラスの色で積み上げて見せる */
-function PyramidCard({ state, selected, dim, onClick }: { state: GameState; selected: boolean; dim: boolean; onClick?: () => void }) {
+function PyramidCard({ state, selected, dim, onClick, mark }: { state: GameState; selected: boolean; dim: boolean; onClick?: () => void; mark?: string }) {
   const py = state.pyramid!;
   const c = pyramidCard(state)!;
   const sum = py.stones.reduce((a, x) => a + x, 0);
@@ -76,6 +81,7 @@ function PyramidCard({ state, selected, dim, onClick }: { state: GameState; sele
       <span className="mcard-name">
         石{Math.min(sum, py.need)}/{py.need}
       </span>
+      {mark && <span className="mcard-mate">👉{mark}</span>}
     </button>
   );
 }
@@ -84,7 +90,7 @@ function PyramidCard({ state, selected, dim, onClick }: { state: GameState; sele
 const PYRAMID_SEL = -1;
 
 /** 卓の中央：山札・場のカード・捨て札・めくったカードと手番の操作 */
-export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, side }: Props) {
+export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, side, marks }: Props) {
   const ph = state.phase;
   const era = ERAS[currentEra(state)];
   const actor = ph.kind !== 'gameOver' && ph.player !== null ? state.players[ph.player] : null;
@@ -135,6 +141,7 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
                 dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
                 onClick={canPick ? () => setSel(i) : undefined}
                 buyer={actor}
+                mark={marks?.[i]}
               />
             ))}
             {/* ゲリラ中：補充しようとした場所に、山札からめくれたゲリラを示す */}
@@ -151,6 +158,7 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
                 selected={selected === PYRAMID_SEL}
                 dim={!!canPick && ph.kind === 'draw' && !canBuild(state, ph.player)}
                 onClick={canPick ? () => setSel(PYRAMID_SEL) : undefined}
+                mark={marks?.[PYRAMID_SEL]}
               />
             )}
           </div>
@@ -601,8 +609,8 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     case 'teamWait':
       return (
         <div className="say">
-          🤝 {ph.event === 'test3' ? '学年末テスト' : '卒業式'}はチーム合同
-          <div className="say-sub">もう一方の部屋がここまで進むのを待っています…</div>
+          🤝 {ph.event === 'merge' ? '3学期はチームの2クラスが合体！' : '合体していたクラスは、もとの部屋に戻ります'}
+          <div className="say-sub">{ph.event === 'merge' ? 'もう一方の部屋が2学期を終えるのを待っています…' : '次の学年の準備中…'}</div>
         </div>
       );
     case 'result': {

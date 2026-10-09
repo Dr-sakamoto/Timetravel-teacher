@@ -78,6 +78,32 @@ export function seatRoom(seat: number): { room: number; idx: number } {
   return { room: seat % 2, idx: Math.floor(seat / 2) };
 }
 
+/** チーム戦で、同じチームのもう一方の部屋の席（3学期に合体したクラスを一緒に受け持つ相方） */
+export function teamPartner(seat: number): number {
+  return seat ^ 1;
+}
+
+/** 合体したクラスで、だれかが出した案（相方と同じ案になったら決まる） */
+export interface Proposal {
+  /** 案を出した人のロビーの席番号 */
+  seat: number;
+  /** 合体したクラスの番号 */
+  pi: number;
+  name: string;
+  action: Action;
+}
+
+/** 2つの案が同じ操作か（係決めは並び順を問わない） */
+export function sameAction(a: Action, b: Action): boolean {
+  const norm = (x: Action) =>
+    x.type === 'setRoles'
+      ? { ...x, roles: [...x.roles].sort((p, q) => (p.role + p.uid).localeCompare(q.role + q.uid)), unlock: [...(x.unlock ?? [])].sort() }
+      : x.type === 'oath'
+        ? { ...x, targets: [...x.targets].sort() }
+        : x;
+  return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+}
+
 /** チーム戦で、その部屋に入る席（部屋の中の席番号の順） */
 export function roomSeats(seats: Seat[], room: number): Seat[] {
   return seats.filter((_, k) => k % 2 === room);
@@ -101,8 +127,11 @@ export type ToHost =
 /** 部屋を作った人 → 参加した人 */
 export type ToGuest =
   | { t: 'lobby'; lobby: Lobby; you: number }
-  /** pair=ペア担任（seats はロビーの全席。you は受け取った側が pairOwners で自分のクラスに直す） */
-  | { t: 'state'; seq: number; state: GameState; you: number; seats: Seat[]; pair?: boolean }
+  /**
+   * pair=ペア担任（seats はロビーの全席。you は受け取った側が pairOwners で自分のクラスに直す）。
+   * joint=チーム戦の3学期の合体した卓（seats はロビーの全席。クラスは席番号の半分）。props はそれぞれのクラスで出ている案
+   */
+  | { t: 'state'; seq: number; state: GameState; you: number; seats: Seat[]; pair?: boolean; joint?: boolean; props?: Proposal[] }
   | { t: 'pong'; seq: number }
   | { t: 'reject'; reason: string }
   | { t: 'closed' };
