@@ -23,11 +23,13 @@ import {
   personCost,
   cardRule,
   eventCost,
+  eventScale,
   fixedRule,
   isGuerrilla,
   cardGlyph,
   fixedGlyph,
   fixedShort,
+  scaleCard,
   shortRule,
   type ContestCard,
   type EraEffect,
@@ -65,6 +67,16 @@ export function termOfMonth(m: number): number {
   if (m === 8) return 0;
   if (m >= 9) return 2;
   return 3;
+}
+
+/** 今の学期の、時代イベントの数字の倍率 */
+export function eventScaleNow(s: GameState): number {
+  return eventScale(termNo(s.year, termOfMonth(MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)])));
+}
+
+/** 今の学期の倍率をかけたカード（時代イベント・襲来だけ数字が変わる） */
+export function eventCard(s: GameState, id: string): EventCard {
+  return scaleCard(EVENT_MAP[id], eventScaleNow(s));
 }
 
 /** 今の学期に使える係の数 */
@@ -359,7 +371,8 @@ export function isPyramidCard(c: EventCard): c is ContestCard & { effect: Extrac
 /** 今学期の時代のピラミッドのカード（なければ undefined） */
 export function pyramidCard(s: GameState): (ContestCard & { effect: Extract<EraEffect, { type: 'pyramid' }> }) | undefined {
   const era = ERAS[currentEra(s)].id;
-  return ALL_EVENT_CARDS.filter(isPyramidCard).find((c) => c.era === era);
+  const c = ALL_EVENT_CARDS.filter(isPyramidCard).find((x) => x.era === era);
+  return c && scaleCard(c, eventScaleNow(s));
 }
 
 /** 学期の頭：前の学期のピラミッドは（完成していなくても）なくなり、ピラミッドのある時代なら新しく建て始める */
@@ -487,7 +500,7 @@ function advanceMonth(s: GameState) {
 function payPatent(s: GameState, pi: number, r: EventResult): EventResult {
   const holder = s.patent;
   if (holder === undefined || holder === pi) return r;
-  const c = EVENT_MAP.patent as ContestCard;
+  const c = eventCard(s, 'patent') as ContestCard;
   const fee = c.effect.type === 'patent' ? c.effect.fee : 0;
   s.players[pi].points -= fee;
   s.players[holder].points += fee;
@@ -1474,7 +1487,7 @@ function kaguyaReceive(s: GameState, pi: number, id: string, win: number) {
 }
 
 /** かぐや姫が待っている宝を装備した子がいれば差し出す（宝は消えて +win）。差し出した子を返す */
-function presentKaguya(s: GameState, pi: number, win = kaguyaWin()): Student | null {
+function presentKaguya(s: GameState, pi: number, win = kaguyaWin(s)): Student | null {
   const p = s.players[pi];
   const st = kaguyaGift(s, pi);
   if (!st) return null;
@@ -1489,8 +1502,8 @@ function presentKaguya(s: GameState, pi: number, win = kaguyaWin()): Student | n
 }
 
 /** かぐや姫に宝を差し出したときの点（カードの効果から） */
-function kaguyaWin(): number {
-  const e = (EVENT_MAP.kaguya as ContestCard).effect;
+export function kaguyaWin(s: GameState): number {
+  const e = (eventCard(s, 'kaguya') as ContestCard).effect;
   return e.type === 'kaguya' ? e.win : 0;
 }
 
@@ -1700,7 +1713,7 @@ function nextGift(s: GameState, card: string, left: number[], items: string[], g
     }
     log(s, `${s.players[pi].name}のクラスには品を受け取れる子がいなかった。`, pi);
   }
-  const c = EVENT_MAP[card] as ContestCard;
+  const c = eventCard(s, card) as ContestCard;
   const students = got.map((g) => s.players[g.player].students.find((x) => x.uid === g.uid)!);
   const rows: ResultRow[] = s.players.map((_, i) => {
     const g = got.find((x) => x.player === i);
@@ -1804,7 +1817,7 @@ function refill(s: GameState) {
 
 /** ゲリラ（共通イベント・時代イベント・襲来・転校） */
 function fireGuerrilla(s: GameState, pi: number, id: string) {
-  const c = EVENT_MAP[id];
+  const c = eventCard(s, id);
   log(s, `ゲリラ発生！ ${c.name}`);
   switch (c.kind) {
     // ゲリラは誰の手番でもない学校全体のできごと（めくった人のものとして見せない）
@@ -2126,7 +2139,7 @@ export function step(prev: GameState, a: Action): GameState {
       if (ph.kind !== 'draw') return prev;
       const st = presentKaguya(s, ph.player);
       if (!st) return prev;
-      const win = kaguyaWin();
+      const win = kaguyaWin(s);
       setResult(
         s,
         ph.player,
@@ -2143,7 +2156,7 @@ export function step(prev: GameState, a: Action): GameState {
       // 宝は消える（捨て札にも戻らない）
       p.points -= marketCost(takeFromMarket(s, ph.slot, false), p);
       delete p.freeGoods;
-      const win = kaguyaWin();
+      const win = kaguyaWin(s);
       kaguyaReceive(s, ph.player, c.id, win);
       log(s, `${p.name}のクラスが、かぐや姫に${c.name}を差し出した！（+${win}）${free ? '（楽市楽座でタダ）' : ''}`, ph.player);
       setResult(
@@ -2230,7 +2243,7 @@ export function deckBreakdown(s: GameState): DeckRow[] {
   };
   const define = (id: string) => {
     if (isPerson(id)) return row('person', () => ({ group: '人物', icon: era.icon, name: `${era.name}の生徒（転入）` }));
-    const c = EVENT_MAP[id];
+    const c = eventCard(s, id);
     return row(id, (): Omit<DeckRow, 'left' | 'open' | 'used'> => {
       const base = { icon: c.icon, name: c.name };
       switch (c.kind) {
