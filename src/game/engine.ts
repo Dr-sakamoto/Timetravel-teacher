@@ -1090,7 +1090,7 @@ function resolveEraSpecial(s: GameState, c: ContestCard, e: Exclude<EraEffect, {
         rows[i].uids = has.map((x) => x.uid);
         tell(`${p.name}のクラスの${has.map(name).join('・')}が宝を持っている！手番で差し出せば+${e.win}。`, i);
       });
-      tell(`かぐや姫は5つの宝を待っている。場の宝を取ってそのまま差し出してもよい（+${e.win}、手番は続く）。`);
+      tell(`かぐや姫は5つの宝を待っている。宝を装備した子がいれば、次の手番から差し出せる（+${e.win}、手番は使わない）。`);
       break;
     }
     // 平安：Xの合計が need 以上のクラスが弁慶を倒す。一番多いクラス（同点ならポイントが少ないクラス。満席なら次のクラス）に弁慶が家来として転入。届かないクラスは刀を取られて −lose
@@ -1852,8 +1852,7 @@ export function canTake(s: GameState, pi: number, slot: number): boolean {
     case 'normal':
       return true;
     case 'goods':
-      // かぐや姫が待っている宝なら、装備できる子がいなくてもそのまま差し出せる
-      return equippable(p).length > 0 || kaguyaWants(s, id);
+      return equippable(p).length > 0;
     case 'cyborg':
       return cyborgable(p).length > 0;
     case 'exchange':
@@ -2144,25 +2143,6 @@ export function step(prev: GameState, a: Action): GameState {
         s,
         ph.player,
         { title: 'かぐや姫に宝を差し出した', icon: '🌙', art: 'kaguya', tone: 'personal', desc: `${st.name}が宝を差し出した！（+${win}）`, rows: [{ player: ph.player, delta: win, note: '差し出した', uids: [st.uid] }], students: [st] },
-        'kaguya',
-      );
-      return s;
-    }
-    case 'offer': {
-      if (ph.kind !== 'equip' || !kaguyaWants(s, ph.card)) return prev;
-      const p = s.players[ph.player];
-      const c = EVENT_MAP[ph.card] as GoodsCard;
-      const free = !!p.freeGoods;
-      // 宝は消える（捨て札にも戻らない）
-      p.points -= marketCost(takeFromMarket(s, ph.slot, false), p);
-      delete p.freeGoods;
-      const win = kaguyaWin(s);
-      kaguyaReceive(s, ph.player, c.id, win);
-      log(s, `${p.name}のクラスが、かぐや姫に${c.name}を差し出した！（+${win}）${free ? '（楽市楽座でタダ）' : ''}`, ph.player);
-      setResult(
-        s,
-        ph.player,
-        { title: 'かぐや姫に宝を差し出した', icon: '🌙', art: 'kaguya', tone: 'personal', desc: `${c.name}を差し出した！（+${win}）`, rows: [{ player: ph.player, delta: win, note: '差し出した' }] },
         'kaguya',
       );
       return s;
