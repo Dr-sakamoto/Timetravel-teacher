@@ -1,7 +1,7 @@
 import { ERAS } from '../game/data/eras';
 import { useState, type ReactNode } from 'react';
 import { canBuild, canTake, currentEra, kaguyaGift, kaguyaWants, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
-import { EVENT_MAP, GIFT_MAP, KACHIKOMI_CARDS, MARKET_SIZE, cardGlyph, shortRule } from '../game/data/events';
+import { EVENT_MAP, GIFT_MAP, MARKET_SIZE, cardGlyph, kachikomiHit, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
 import { DeckInfo } from './DeckInfo';
 import { ATTR_ICON, type Action, type EventResult, type GameState, type Player, type Student } from '../game/types';
@@ -18,7 +18,7 @@ interface Props {
   canContinue?: boolean;
   /** 転校・カチコミ・クラス替え・グッズで選んだもの */
   pick: Pick;
-  /** 得点演出の明細（襲来）。点数表の上に出す */
+  /** 得点演出の明細。点数表の上に出す */
   side?: ReactNode;
 }
 
@@ -550,12 +550,14 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     }
     case 'kachikomi': {
       const fight = attrScore(state.players[ph.player], 'fight').total;
-      const power = fight * KACHIKOMI_CARDS[0].mult;
-      const drain = fight * KACHIKOMI_CARDS[0].drain;
       const target = pick.target !== null ? state.players[pick.target] : null;
+      const guard = target ? attrScore(target, 'fight').total : 0;
+      const hit = kachikomiHit(fight, guard);
       return (
         <div className="say">
-          殴りこむ相手の名札をタップ（相手 −{power}、自分 +{drain}）
+          {target
+            ? `${target.name}の👊${guard}で防がれる：相手 −${hit.damage}、自分 +${hit.drain}`
+            : `殴りこむ相手の名札をタップ（自分の👊${fight} − 相手の👊 だけ削り、その半分を吸い取る）`}
           <div className="say-sub">
             <span className="pick-chip">{target ? target.name : '？'}</span>
           </div>

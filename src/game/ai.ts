@@ -1,5 +1,5 @@
 import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
-import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, type GoodsCard } from './data/events';
+import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, kachikomiHit, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
 import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, kaguyaGift, kaguyaWants, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
 import { ATTRS, ATTR_ICON, type Action, type Attr, type GameState, type Player, type RoleId, type RoleSeat, type Student } from './types';
@@ -11,7 +11,7 @@ const ATTR_WEIGHT = Object.fromEntries(
     ALL_EVENT_CARDS.reduce((x, c) => x + (c.kind === 'normal' && c.attr === a ? c.count : c.kind === 'contest' && c.attr === a ? c.count / 11 : 0), 0),
   ]),
 ) as Record<Attr, number>;
-// 👊はカチコミ（場から取る・3枚・×3）と襲来の分
+// 👊はカチコミ（場から取る・3枚。攻める分と、殴りこまれたときに防ぐ分）
 ATTR_WEIGHT.fight += 9;
 
 /** クラスの強さの目安（CPUの判断用） */
@@ -130,8 +130,8 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
     case 'cyborg':
       return Math.max(...cyborgable(p).map((st) => gain(s, p, swap(st.uid, cyborged(st))))) - cost;
     case 'kachikomi':
-      // 相手1クラスの減点は相手の数で割って自分の加点と比べる。ドレインの分はそのまま自分の加点
-      return attrScore(p, 'fight').total * (c.mult / (s.players.length - 1) + c.drain);
+      // 一番効く相手に殴りこむとして、相手1クラスの減点は相手の数で割って自分の加点と比べる。ドレインの分はそのまま自分の加点
+      return Math.max(...kachikomiTargets(s, pi).map((t) => kachikomiValue(s, pi, t)));
     case 'exchange':
       return Math.max(...exchangePairs(s, pi).map((x) => gain(s, p, swap(x.uid, s.players[x.target].students.find((y) => y.uid === x.theirUid)!))));
     default:
@@ -156,6 +156,17 @@ export function buildValue(s: GameState, pi: number): number {
 }
 
 /** 一番点の高い相手 */
+/** カチコミの値打ち：相手の減点（相手の数で割る）＋自分のドレイン */
+function kachikomiValue(s: GameState, pi: number, target: number): number {
+  const { damage, drain } = kachikomiHit(attrScore(s.players[pi], 'fight').total, attrScore(s.players[target], 'fight').total);
+  return damage / (s.players.length - 1) + drain;
+}
+
+/** カチコミの相手：一番削れるクラス（同じならポイントの多いクラス） */
+function kachikomiPick(s: GameState, pi: number): number {
+  return [...kachikomiTargets(s, pi)].sort((x, y) => kachikomiValue(s, pi, y) - kachikomiValue(s, pi, x) || s.players[y].points - s.players[x].points)[0];
+}
+
 function leader(s: GameState, candidates: number[]): number {
   return [...candidates].sort((x, y) => s.players[y].points - s.players[x].points)[0];
 }
@@ -198,7 +209,7 @@ export function cpuAction(s: GameState): Action | null {
       return { type: 'push', uid: st.uid };
     }
     case 'kachikomi':
-      return { type: 'kachikomi', target: leader(s, kachikomiTargets(s, ph.player)) };
+      return { type: 'kachikomi', target: kachikomiPick(s, ph.player) };
     case 'vote':
       // 陶片追放：一番点の高い相手に入れる
       return { type: 'vote', target: leader(s, voteTargets(s, ph.player)) };

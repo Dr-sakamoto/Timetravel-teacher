@@ -18,7 +18,7 @@ export interface GameFx {
   /** 点が入り終わった人（名札の「+点」を出してよい） */
   settled: (pid: number) => boolean;
   overlay: ReactNode[];
-  /** めくったカードの横に出すもの（襲来の明細） */
+  /** めくったカードの横に出すもの（明細） */
   side?: ReactNode;
 }
 
@@ -47,7 +47,7 @@ function planOf(s: GameState, me: number): Plan | null {
   const row = r.rows.find((x) => x.player === pid);
   if (!row) return null;
   const p = s.players[pid];
-  const card = { attr: a, era: r.era, threat: r.threat, minus: r.minus, perHead: r.perHead };
+  const card = { attr: a, era: r.era, minus: r.minus, perHead: r.perHead };
   // 時代イベントの代表戦などは、点に関わった子（row.uids）だけを見せる。「1人につき」なら1人ずつ同じ点
   const list = contributions(p, a)
     .filter((x) => r.tone !== 'era' || !row.uids || row.uids.includes(x.student.uid))

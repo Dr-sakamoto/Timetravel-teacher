@@ -2856,8 +2856,7 @@ body:has(.title-screen) {
 }
 .fx-bubble,
 .fx-stamp,
-.fx-total,
-.fx-raid-eq {
+.fx-total {
   white-space: nowrap;
   font-weight: 900;
   text-align: center;
@@ -2880,11 +2879,6 @@ body:has(.title-screen) {
   gap: 0.25em;
   justify-content: center;
   font-size: 0.7rem;
-}
-.fx-bubble.shield,
-.fx-stamp.shield {
-  background: #9ec7ff;
-  color: #0c2a52;
 }
 .fx-mul {
   border-radius: 4px;
@@ -2912,9 +2906,6 @@ body:has(.title-screen) {
 .fx-stamp small {
   color: #333;
 }
-.fx-stamp.shield {
-  border-color: #1c5bb8;
-}
 .fx-total {
   font-size: 2.6rem;
   color: var(--up);
@@ -2924,19 +2915,6 @@ body:has(.title-screen) {
 .fx-total.down {
   color: var(--down);
   text-shadow: 0 0 18px rgba(255, 138, 138, 0.9);
-}
-.fx-raid-eq {
-  background: #1b1b1b;
-  border: 2px solid var(--chalk-dim);
-  border-radius: 10px;
-  padding: 0.2rem 0.7rem;
-  font-size: 1.05rem;
-}
-.fx-raid-eq .down {
-  color: var(--down);
-}
-.fx-raid-eq .up {
-  color: var(--up);
 }
 .fx-counter {
   transform: translate(-50%, -50%);
@@ -2952,10 +2930,6 @@ body:has(.title-screen) {
 .fx-counter.big {
   font-size: 1.6rem;
   animation: counter-tick 0.18s ease-out;
-}
-.fx-counter.shield {
-  border-color: #9ec7ff;
-  color: #9ec7ff;
 }
 .fx-counter small {
   font-size: 0.6em;
@@ -3025,9 +2999,6 @@ body:has(.title-screen) {
   text-align: right;
   font-weight: 900;
   font-size: 1rem;
-}
-.fx-row.enemy .fx-row-pts {
-  color: #c92a2a;
 }
 .fx-row.total {
   border-top: 2px solid #333;
