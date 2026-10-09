@@ -354,10 +354,17 @@ describe('engine', () => {
     // 👊3 で 👊1 のクラスに殴りこむ：相手 −2、自分 +1
     k.players[target].students = [mk('g', ['fight'])];
     k.players[target].roles = [];
+    k.players[target].points = 10;
     const done = step(k, { type: 'kachikomi', target });
     expect(done.players[target].points - k.players[target].points).toBe(-2);
     expect(done.players[pi].points - k.players[pi].points).toBe(1);
     expect(done.market).toEqual([]);
+    // 相手の点より多くは削れない（0点で止まる）。吸い取るのは実際に削った分の半分
+    const poor = structuredClone(k);
+    poor.players[target].points = 1;
+    const robbed = step(poor, { type: 'kachikomi', target });
+    expect(robbed.players[target].points).toBe(0);
+    expect(robbed.players[pi].points - poor.players[pi].points).toBe(0);
     // 相手の👊が同じか多ければ防ぎきられる
     k.players[target].students = [mk('g', ['fight', 'fight', 'fight'])];
     const blocked = step(k, { type: 'kachikomi', target });
@@ -381,8 +388,13 @@ describe('engine', () => {
     expect(flip(t).players[pi].points - t.players[pi].points).toBe(1);
     // 授業参観は👑で得点、👊で減点（人数では引かない）
     const u = structuredClone(t);
+    u.players[pi].points = 10;
     u.eventDeck.push('visit');
     expect(flip(u).players[pi].points - u.players[pi].points).toBe(0 - 2);
+    // 点は0未満にならない
+    const z = structuredClone(u);
+    z.players[pi].points = 1;
+    expect(flip(z).players[pi].points).toBe(0);
     // 持久走大会は🏃の数だけ（人数では引かない）
     const v = structuredClone(t);
     v.eventDeck.push('marathon');

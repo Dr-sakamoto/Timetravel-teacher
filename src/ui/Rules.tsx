@@ -98,7 +98,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
           </li>
           {SWING_CARDS.some((c) => c.count > 0) && (
             <li>
-              <b>共通イベント</b>（ゲリラ・全クラス・各1枚）：クラスの状況で<b>プラスにもマイナスにもなる</b>。
+              <b>共通イベント</b>（ゲリラ・全クラス・各1枚）：クラスの状況で<b>プラスにもマイナスにもなる</b>（ただし点は0点より下がらない。どのイベントやカチコミでも、持っている点より多くは減らない）。
               <ul>
                 {SWING_CARDS.map((c) => (
                   <li key={c.id}>
