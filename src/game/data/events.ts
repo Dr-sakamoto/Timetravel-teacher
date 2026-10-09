@@ -12,21 +12,28 @@ export interface NormalCard {
 }
 
 /**
- * カチコミ：場から取った人が他のクラスを1つ選んで殴りこむ。相手のクラスの👊の数だけ防がれ、
- * 自分の👊の数 − 相手の👊の数（0より小さければ0）だけ相手を減点させ、その半分（切り捨て）を自分に吸い取る（ドレイン）
+ * カチコミ：場から取った人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させ、
+ * 削った点の3分の2（切り捨て）を自分に吸い取る（ドレイン）
  */
 export interface KachikomiCard {
   id: string;
   kind: 'kachikomi';
   name: string;
   icon: string;
+  /** 減点の倍率 */
+  mult: number;
   count: number;
 }
 
-/** カチコミの被害とドレイン（atk：殴りこむクラスの👊、def：殴りこまれるクラスの👊） */
-export function kachikomiHit(atk: number, def: number): { damage: number; drain: number } {
-  const damage = Math.max(0, atk - def);
-  return { damage, drain: Math.floor(damage / 2) };
+/** カチコミで吸い取る点：削った点の3分の2（切り捨て） */
+export function kachikomiDrain(damage: number): number {
+  return Math.floor((damage * 2) / 3);
+}
+
+/** カチコミの被害とドレイン（atk：殴りこむクラスの👊） */
+export function kachikomiHit(atk: number): { damage: number; drain: number } {
+  const damage = atk * KACHIKOMI_CARDS[0].mult;
+  return { damage, drain: kachikomiDrain(damage) };
 }
 
 /** 共通イベント（全クラス）：プラスのアイコンの数だけ得点（マイナスのアイコンがあれば、その数だけ減点） */
@@ -231,7 +238,7 @@ export const NORMAL_CARDS: NormalCard[] = [
   N('charm', '学活の時間', '🙋', 4),
 ];
 
-export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', count: 3 }];
+export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, count: 3 }];
 
 // 共通イベントはいったん休止中（時代イベントが出やすいように、山札に入れない）。戻すときは count を 1 に
 const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | undefined, desc: string, per?: number): SwingCard => ({
@@ -445,7 +452,7 @@ export function cardRule(c: EventCard): string {
     case 'normal':
       return `取った人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return '取った人：他のクラスを1つ選んで殴りこむ。自分のクラスの👊の数から相手のクラスの👊の数を引いた分（防がれて0になることも）だけ相手を減点させ、その半分（切り捨て）を自分に加点（ドレイン）';
+      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させ、そのうち3分の2を自分に加点（ドレイン）`;
     case 'swing':
       if (c.per) return `全クラス：${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       if (!c.minus) return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点`;
@@ -575,7 +582,7 @@ export function cardGlyph(c: EventCard): string {
     case 'normal':
       return `${ATTR_ICON[c.attr]} → +`;
     case 'kachikomi':
-      return '相手 −(👊 − 相手の👊)　自分 +その半分';
+      return `相手 −👊×${c.mult}　自分 +そのうち2/3`;
     case 'swing':
       if (c.per) return `${ATTR_ICON[c.plus]}の子1人 +${c.per}`;
       return c.minus ? `+${ATTR_ICON[c.plus]}　−${ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
@@ -689,7 +696,7 @@ export function shortRule(c: EventCard): string {
     case 'normal':
       return `${ATTR_ICON[c.attr]}の数だけ得点`;
     case 'kachikomi':
-      return '👊の差だけ相手にダメージ（相手の👊で防がれる）、その半分を吸い取る';
+      return `相手に👊×${c.mult}のダメージ、そのうち3分の2を吸い取る`;
     case 'swing':
       if (c.per) return `${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       return c.minus ? `${ATTR_ICON[c.plus]}で得点、${ATTR_ICON[c.minus]}で減点` : `${ATTR_ICON[c.plus]}の数だけ得点`;

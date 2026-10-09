@@ -546,13 +546,10 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
     case 'kachikomi': {
       const fight = attrScore(state.players[ph.player], 'fight').total;
       const target = pick.target !== null ? state.players[pick.target] : null;
-      const guard = target ? attrScore(target, 'fight').total : 0;
-      const hit = kachikomiHit(fight, guard);
+      const hit = kachikomiHit(fight);
       return (
         <div className="say">
-          {target
-            ? `${target.name}の👊${guard}で防がれる：相手 −${hit.damage}、自分 +${hit.drain}`
-            : `殴りこむ相手の名札をタップ（自分の👊${fight} − 相手の👊 だけ削り、その半分を吸い取る）`}
+          殴りこむ相手の名札をタップ（相手 −{hit.damage}、自分 +{hit.drain}）
           <div className="say-sub">
             <span className="pick-chip">{target ? target.name : '？'}</span>
           </div>

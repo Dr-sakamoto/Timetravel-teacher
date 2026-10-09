@@ -26,6 +26,7 @@ import {
   eventScale,
   fixedRule,
   isGuerrilla,
+  kachikomiDrain,
   kachikomiHit,
   cardGlyph,
   fixedGlyph,
@@ -2035,21 +2036,20 @@ export function step(prev: GameState, a: Action): GameState {
       takeFromMarket(s, ph.slot);
       const sc = attrScore(p, 'fight');
       const to = s.players[a.target];
-      const guard = attrScore(to, 'fight').total;
-      // 相手の点より多くは削れない。吸い取るのは実際に削った分の半分
-      const damage = -addPoints(to, -kachikomiHit(sc.total, guard).damage);
-      const drain = Math.floor(damage / 2);
+      // 相手の点より多くは削れない。吸い取るのは実際に削った分の3分の2
+      const damage = -addPoints(to, -kachikomiHit(sc.total).damage);
+      const drain = kachikomiDrain(damage);
       p.points += drain;
       if (damage > 0) sc.holders.forEach((h) => h.mvp++);
       const rows: ResultRow[] = [
         { player: ph.player, count: sc.total, delta: drain, note: 'カチコミ（ドレイン）', uids: sc.holders.map((h) => h.uid) },
-        { player: a.target, count: guard, delta: -damage, note: damage ? `被害（👊${guard}で防いだ）` : `👊${guard}で防ぎきった` },
+        { player: a.target, delta: -damage, note: '被害' },
       ];
       logRows(s, `カチコミ（${p.name}→${to.name}）`, rows);
       setResult(
         s,
         ph.player,
-        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: damage ? `${to.name}のクラスに殴りこんだ！` : `${to.name}のクラスに殴りこんだが、防がれた！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), say: shortRule(KACHIKOMI_CARDS[0]), rows },
+        { title: 'カチコミ', icon: '👊', attr: 'fight', tone: 'personal', desc: `${to.name}のクラスに殴りこんだ！`, rule: EVENT_RULE.kachikomi, glyph: cardGlyph(KACHIKOMI_CARDS[0]), say: shortRule(KACHIKOMI_CARDS[0]), rows },
         'turn',
       );
       return s;

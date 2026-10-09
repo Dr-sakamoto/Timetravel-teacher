@@ -94,7 +94,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
               {kachikomi.icon}
               {kachikomi.name}
             </b>
-            （場から取る・無料・×{kachikomi.count}）：{cardRule(kachikomi)}。👊の子はテストでいつも足を引っぱるが、カチコミでは攻めにも守りにも頼りになる（例：👊3のクラスが👊1のクラスに殴りこむと、相手−2、自分+1）。
+            （場から取る・無料・×{kachikomi.count}）：{cardRule(kachikomi)}。👊の子はテストでいつも足を引っぱるが、カチコミでは頼りになる（例：👊3のクラスが殴りこむと、相手−9、自分+6）。
           </li>
           {SWING_CARDS.some((c) => c.count > 0) && (
             <li>
