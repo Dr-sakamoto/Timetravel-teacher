@@ -11,8 +11,8 @@ const ATTR_WEIGHT = Object.fromEntries(
     ALL_EVENT_CARDS.reduce((x, c) => x + (c.kind === 'normal' && c.attr === a ? c.count : c.kind === 'contest' && c.attr === a ? c.count / 11 : 0), 0),
   ]),
 ) as Record<Attr, number>;
-// 👊はカチコミ（場から取る・3枚・×3）の分
-ATTR_WEIGHT.fight += 9;
+// 👊はカチコミ（場から取る・3枚・×2）の分
+ATTR_WEIGHT.fight += 6;
 
 /** クラスの強さの目安（CPUの判断用） */
 export function classScore(p: Player): number {

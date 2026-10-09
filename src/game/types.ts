@@ -146,7 +146,7 @@ export type Phase =
   | { kind: 'push'; player: number; drawer: number; left: number[]; gone: Student[]; votes?: number[] }
   /** 陶片追放：全クラスが順番に、自分以外のクラスへ秘密で1票ずつ入れる（player は今投票している人、left はこの後に投票する人、ballots は入った票の行き先。画面には出さない） */
   | { kind: 'vote'; player: number; drawer: number; left: number[]; ballots: number[] }
-  /** カチコミ（場から取った）：他のクラスを1つ選んで、自分の👊の数×3だけ減点させる */
+  /** カチコミ（場から取った）：他のクラスを1つ選んで、自分の👊の数×2だけ減点させ、👊の数だけ吸い取る */
   | { kind: 'kachikomi'; player: number; slot: number }
   /** クラス替え：自分の生徒1人と、他のクラスの係に就いていない生徒1人を入れ替える（アイコンの数が同じ子どうしだけ） */
   | { kind: 'exchange'; player: number; slot: number }
