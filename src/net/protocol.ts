@@ -2,6 +2,8 @@ import { actingPlayer } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 
 export const MAX_SEATS = 5;
+/** チーム戦（2つの部屋×5クラス）の席の上限 */
+export const TEAM_MAX_SEATS = 10;
 /** これだけ音沙汰がなければ、つながっていないとみなす */
 export const TIMEOUT_MS = 15000;
 /** 生存確認の間隔（中継サーバーのメッセージ数を抑えるため、あまり短くしない） */
@@ -20,6 +22,27 @@ export interface Seat {
 export interface Lobby {
   seats: Seat[];
   years: number;
+  /** チーム戦：席を交互に部屋A・Bへ振り分け、席 2k と 2k+1 がチーム k になる */
+  team?: boolean;
+}
+
+export function maxSeats(lobby: Lobby): number {
+  return lobby.team ? TEAM_MAX_SEATS : MAX_SEATS;
+}
+
+/** チーム戦で、ロビーの席番号 → 部屋と、その部屋の中の席番号 */
+export function seatRoom(seat: number): { room: number; idx: number } {
+  return { room: seat % 2, idx: Math.floor(seat / 2) };
+}
+
+/** チーム戦で、その部屋に入る席（部屋の中の席番号の順） */
+export function roomSeats(seats: Seat[], room: number): Seat[] {
+  return seats.filter((_, k) => k % 2 === room);
+}
+
+/** チーム戦を始められる人数か（2つの部屋が同じ人数になる偶数。4〜10） */
+export function teamReady(n: number): boolean {
+  return n >= 4 && n <= TEAM_MAX_SEATS && n % 2 === 0;
 }
 
 /** 参加した人 → 部屋を作った人 */

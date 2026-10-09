@@ -5,6 +5,8 @@ import { BENKEI, CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, EVENT_MAP, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM, eventScale, scaleCard, type ContestCard } from './data/events';
 import { ARCHETYPES, MODERN_POOL, STARTER_POOL } from './data/modern';
+import { FIXED_MAP } from './data/events';
+import { fixedValue, newTeamGame, resolveTeamEvent } from './engine';
 import { MONTHS, canBuild, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Attr, GameState, Player, RoleSeat, Student } from './types';
 
@@ -1505,5 +1507,56 @@ describe('係の場にカードを置く', () => {
 
   it('係の子を空いている係の場へ動かすと、元の係は空く', () => {
     expect(sorted(moveToRole(base, 'a', 'pe'))).toEqual(sorted([{ role: 'pe', uid: 'a' }, { role: 'culture', uid: 'b' }]));
+  });
+});
+
+describe('チーム戦（2つの部屋）', () => {
+  /** 片方の部屋を、合同イベントで止まるかゲームが終わるまで CPU で進める */
+  const runRoom = (s: GameState): GameState => {
+    let guard = 0;
+    while (s.phase.kind !== 'teamWait' && s.phase.kind !== 'gameOver') {
+      const a = cpuAction(s) ?? { type: 'continue' as const };
+      const next = step(s, a);
+      if (next === s) throw new Error(`rejected ${JSON.stringify(a)} in ${s.phase.kind}`);
+      s = next;
+      if (++guard > 20000) throw new Error('did not stop');
+    }
+    return s;
+  };
+
+  it('2つの部屋を別々に進め、学年末テストと卒業式はチームの合計で順位をつける', () => {
+    const setup = (r: number) => Array.from({ length: 4 }, (_, i) => ({ name: `${r ? 'B' : 'A'}${i}`, isCpu: true }));
+    let rooms = newTeamGame([setup(0), setup(1)], 2, 42);
+    expect(rooms.map((r) => r.team?.room)).toEqual([0, 1]);
+    expect(rooms[0].team!.mates.map((m) => m.name)).toEqual(['B0', 'B1', 'B2', 'B3']);
+    const joints: string[] = [];
+    for (let guard = 0; rooms.some((r) => r.phase.kind !== 'gameOver'); guard++) {
+      if (guard > 20) throw new Error('team game did not finish');
+      // 片方だけ着いても進まない
+      rooms = [runRoom(rooms[0]), rooms[1]];
+      if (rooms[0].phase.kind === 'gameOver') break;
+      expect(resolveTeamEvent(rooms)).toBeNull();
+      rooms = [rooms[0], runRoom(rooms[1])];
+      const ph = rooms[0].phase;
+      expect(ph.kind).toBe('teamWait');
+      const event = ph.kind === 'teamWait' ? ph.event : '';
+      const values = rooms.map((r) => r.players.map((p) => fixedValue(p, FIXED_MAP[event])));
+      const before = rooms.map((r) => r.players.map((p) => p.points));
+      const resolved = resolveTeamEvent(rooms)!;
+      expect(resolved).not.toBeNull();
+      joints.push(event);
+      // 同じ席のチームには、両方の部屋で同じ順位点が入る（0点より下がらない調整がなければ）
+      const team = values[0].map((v, i) => v + values[1][i]);
+      resolved.forEach((r) => {
+        const res = r.phase.kind === 'result' ? r.phase.result : null;
+        expect(res?.rows.map((x) => x.count).sort()).toEqual([...team].sort());
+      });
+      const gain = resolved.map((r, k) => r.players.map((p, i) => p.points - before[k][i]));
+      expect(gain[0]).toEqual(gain[1]);
+      expect(resolved[0].team!.mates.map((m) => m.points)).toEqual(resolved[1].players.map((p) => p.points));
+      rooms = resolved.map((r) => step(r, { type: 'continue' }));
+    }
+    expect(joints).toEqual(['test3', 'test3', 'graduation']);
+    expect(rooms.every((r) => r.phase.kind === 'gameOver')).toBe(true);
   });
 });

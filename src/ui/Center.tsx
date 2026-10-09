@@ -598,6 +598,13 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         </div>
       );
     }
+    case 'teamWait':
+      return (
+        <div className="say">
+          🤝 {ph.event === 'test3' ? '学年末テスト' : '卒業式'}はチーム合同
+          <div className="say-sub">もう一方の部屋がここまで進むのを待っています…</div>
+        </div>
+      );
     case 'result': {
       const r = ph.result;
       const out = new Set(r.outUids ?? []);
