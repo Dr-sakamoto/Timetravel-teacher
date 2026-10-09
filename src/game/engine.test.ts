@@ -30,6 +30,7 @@ function playOut(players: number, years: number, seed: number): GameState {
 function flip(s: GameState): GameState {
   const t = structuredClone(s);
   t.discard.push(t.market.shift()!);
+  t.passes = 0;
   return step(t, { type: 'pass' });
 }
 /** 場の先頭にカードを置いて、それを取る */
@@ -326,6 +327,24 @@ describe('engine', () => {
       if (c.rarity === 'SSR') expect(c.attrs.length, c.name).toBeGreaterThanOrEqual(4);
     }
     expect(CARDS.find((c) => c.id === 'einstein')!.attrs).toEqual(['study', 'study', 'study', 'study', 'art']);
+  });
+
+  it('passing keeps the market, but once everyone passes in a row the oldest card goes and a new one is drawn', () => {
+    let s = newGame([{ name: 'A', isCpu: false }, { name: 'B', isCpu: false }, { name: 'C', isCpu: false }], 1, 8);
+    while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
+    s.eventDeck.push('n_art', 'n_study', 'n_sports');
+    const market = [...s.market];
+    let t = step(s, { type: 'pass' });
+    expect(t.market).toEqual(market);
+    t = step(t, { type: 'pass' });
+    expect(t.market).toEqual(market);
+    // だれかが取れば数え直し
+    const took = step(structuredClone(t), { type: 'take', slot: t.market.findIndex((id) => id.startsWith('n_')) });
+    expect(took.passes).toBe(0);
+    t = step(t, { type: 'pass' });
+    expect(t.market).toEqual([...market.slice(1), 'n_sports']);
+    expect(t.discard.at(-1)).toBe(market[0]);
+    expect(t.passes).toBe(0);
   });
 
   it('kachikomi is taken from the market for free, takes 3× the taker\'s 👊 count from the chosen school and drains 2/3 of it to the taker', () => {
