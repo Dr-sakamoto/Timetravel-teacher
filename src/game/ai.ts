@@ -1,4 +1,4 @@
-import { attrScore, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
+import { attrScore, classCap, countAttr, hasRoleBonus, iconsOf, totalPower } from './calc';
 import { ALL_EVENT_CARDS, CYBORG_ATTRS, EVENT_MAP, GIFT_MAP, SWING_CARDS, TEST_YANKEE_PENALTY, kachikomiDrain, kachikomiHit, type GoodsCard } from './data/events';
 import { MAX_PER_ROLE, ROLES, ROLE_ORDER } from './data/roles';
 import { MONTHS, canBuild, canTake, pyramidCard, pyramidReward, cyborgable, kaguyaGift, kaguyaWants, droppable, equippable, exchangePairs, kachikomiTargets, marketCost, oathTargets, previewStudent, slotsNow, voteTargets } from './engine';
@@ -11,8 +11,8 @@ const ATTR_WEIGHT = Object.fromEntries(
     ALL_EVENT_CARDS.reduce((x, c) => x + (c.kind === 'normal' && c.attr === a ? c.count : c.kind === 'contest' && c.attr === a ? c.count / 11 : 0), 0),
   ]),
 ) as Record<Attr, number>;
-// 👊はカチコミ（場から取る・3枚・×3）の分
-ATTR_WEIGHT.fight += 9;
+// 👊はカチコミ（場から取る・3枚・×2）の分
+ATTR_WEIGHT.fight += 6;
 
 /** クラスの強さの目安（CPUの判断用） */
 export function classScore(p: Player): number {
@@ -114,7 +114,7 @@ export function marketValue(s: GameState, pi: number, slot: number): number {
   const id = s.market[slot];
   const cost = marketCost(id, p);
   if (id.startsWith('person:')) {
-    const out = p.students.length >= 9 ? leastWorth(p) : undefined;
+    const out = p.students.length >= classCap(p) ? leastWorth(p) : undefined;
     const kept = p.students.filter((x) => x.uid !== out?.uid);
     return gain(s, p, withStudents(p, [...kept, previewStudent(id)])) - cost;
   }

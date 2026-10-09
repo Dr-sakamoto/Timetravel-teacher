@@ -4216,3 +4216,51 @@ body:has(.title-screen) {
     order: 2;
   }
 }
+/* ペア担任：ロビーのクラスごとの枠 */
+.pair-class {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 0.3rem 0.6rem;
+  margin-bottom: 0.4rem;
+}
+.pair-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+}
+.pair-head small {
+  flex: 1;
+  color: var(--chalk-dim);
+}
+.pair-move {
+  font: inherit;
+  font-size: 0.85rem;
+  background: #0f2a20;
+  color: var(--chalk);
+  border: 1px solid var(--chalk-dim);
+  border-radius: 6px;
+}
+/* チーム戦の3学期（合体したクラス）：相方が選んでいる場のカードの印と、相方の案 */
+.mcard-mate {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  max-width: 110%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.65rem;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  background: #ffd43b;
+  color: #222;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+.net-banner > .net-mate {
+  background: rgba(60, 40, 0, 0.85);
+  color: #ffe58a;
+  border: 1px solid #ffd43b;
+}

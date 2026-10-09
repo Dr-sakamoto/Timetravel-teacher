@@ -1,9 +1,9 @@
 import { Relay } from './relay';
 import { cpuAction, rolesAction } from '../game/ai';
-import { actingPlayer, calendarLabel, newGame, newTeamGame, resolveTeamEvent, step, syncTeams } from '../game/engine';
+import { actingPlayer, calendarLabel, mergeTeams, newGame, newTeamGame, splitTeams, step, syncTeams } from '../game/engine';
 import { SAVE_VERSION } from '../game/saveVersion';
 import type { Action, GameState } from '../game/types';
-import { canAct, maxSeats, roomSeats, seatRoom, teamReady, waitsFor, PING_MS, TIMEOUT_MS, type Lobby, type Seat, type ToGuest, type ToHost, type ToHostEnvelope } from './protocol';
+import { canAct, maxSeats, MAX_SEATS, pairClasses, pairDefaultClass, pairHasRoom, pairOwners, roomSeats, sameAction, seatRoom, teamPartner, teamReady, waitsFor, PING_MS, TIMEOUT_MS, type Lobby, type Proposal, type Seat, type ToGuest, type ToHost, type ToHostEnvelope } from './protocol';
 
 const SAVE_KEY = 'jikuu-saikyou-host-v1';
 
@@ -18,6 +18,10 @@ export interface HostSnap {
   /** チーム戦：2つの部屋の状態と、部屋ごとの版の番号 */
   rooms?: GameState[];
   seqs?: number[];
+  /** チーム戦の3学期：チームの2クラスが合体した卓（このあいだは state もこれ。rooms は合体する前のまま取っておく） */
+  joint?: GameState;
+  /** 合体したクラスで出ている案（相方と同じ案になったら決まる） */
+  props?: Proposal[];
 }
 
 interface HostSave {
@@ -27,6 +31,7 @@ interface HostSave {
   seq: number;
   rooms?: GameState[];
   seqs?: number[];
+  joint?: GameState;
   /** 前の版で、つながらなくなってCPUに任せていた席（読み込んだら本人に返す） */
   auto?: number[];
 }
@@ -67,7 +72,7 @@ export class HostRoom {
     resume?: HostSave,
   ) {
     this.snap = resume
-      ? { status: 'opening', code: resume.code, lobby: resume.lobby, state: resume.state, seq: resume.seq, rooms: resume.rooms, seqs: resume.seqs }
+      ? { status: 'opening', code: resume.code, lobby: resume.lobby, state: resume.state, seq: resume.seq, rooms: resume.rooms, seqs: resume.seqs, joint: resume.joint }
       : { status: 'opening', code, lobby: { seats: [{ name: hostName, kind: 'host', online: true }], years: 1 }, state: null, seq: 0 };
     // 前の版でCPUに任せていた席は本人に返す（CPUが勝手に手番を進めないように）
     if (resume?.auto?.length && this.snap.state) {
@@ -120,7 +125,7 @@ export class HostRoom {
       else
         localStorage.setItem(
           SAVE_KEY,
-          JSON.stringify({ code: this.snap.code, lobby: this.snap.lobby, state: s, seq: this.snap.seq, rooms: this.snap.rooms, seqs: this.snap.seqs } satisfies HostSave),
+          JSON.stringify({ code: this.snap.code, lobby: this.snap.lobby, state: s, seq: this.snap.seq, rooms: this.snap.rooms, seqs: this.snap.seqs, joint: this.snap.joint } satisfies HostSave),
         );
     } catch {
       /* 保存できない環境では何もしない */
@@ -148,8 +153,9 @@ export class HostRoom {
     if (i < 0) {
       if (this.snap.state) return this.sendTo(cid, { t: 'reject', reason: 'このルームのゲームはもう始まっています' });
       const max = maxSeats(this.snap.lobby);
-      if (seats.length >= max) return this.sendTo(cid, { t: 'reject', reason: `満員です（${max}人まで）` });
-      this.setSeats([...seats, { name: cleanName(name, seats.length), kind: 'guest', cid, online: true }]);
+      const cls = this.snap.lobby.pair ? pairDefaultClass(seats) : undefined;
+      if (seats.length >= max || cls === -1) return this.sendTo(cid, { t: 'reject', reason: `満員です（${max}人まで）` });
+      this.setSeats([...seats, { name: cleanName(name, seats.length), kind: 'guest', cid, online: true, cls }]);
       this.broadcast();
       return;
     }
@@ -174,6 +180,9 @@ export class HostRoom {
           this.broadcast();
         }
         return;
+      case 'pick':
+        this.pickClass(i, m.cls);
+        return;
       case 'ping':
         // 「通信切れ」になっていた人が戻ってきた
         if (!this.snap.lobby.seats[i].online) this.checkAlive();
@@ -192,6 +201,7 @@ export class HostRoom {
           this.sendOne(cid, i);
           return;
         }
+        if (this.snap.joint) return this.propose(i, m.action);
         this.commitRoom(v.room, step(v.state, m.action));
         return;
       }
@@ -225,32 +235,85 @@ export class HostRoom {
     this.broadcast();
   }
 
-  /** ロビーの席 → その人の部屋の状態と、部屋の中の席番号（チーム戦でなければ部屋は1つ） */
+  /** ロビーの席 → その人の部屋の状態と、部屋の中の席番号（チーム戦でなければ部屋は1つ。ペア担任ならその人のクラス） */
   private view(seat: number): { room: number; you: number; state: GameState; seq: number } {
-    const { rooms, seqs } = this.snap;
-    if (!rooms || !seqs) return { room: 0, you: seat, state: this.snap.state!, seq: this.snap.seq };
+    const { rooms, seqs, joint } = this.snap;
+    // 合体した卓：チーム（席番号の半分）のクラスを、部屋A・Bの2人で受け持つ
+    if (joint) return { room: -1, you: seatRoom(seat).idx, state: joint, seq: this.snap.seq };
+    if (!rooms || !seqs) {
+      const you = this.snap.lobby.pair ? pairOwners(this.snap.lobby.seats)[seat] ?? -1 : seat;
+      return { room: 0, you, state: this.snap.state!, seq: this.snap.seq };
+    }
     const { room, idx } = seatRoom(seat);
     return { room, you: idx, state: rooms[room], seq: seqs[room] };
   }
 
-  /** その部屋を進める。チーム戦なら、2つの部屋が合同イベントでそろったら一緒に進める */
+  /** その部屋を進める（room=-1 は合体した卓）。チーム戦なら、2つの部屋が2学期を終えてそろったら合体し、合体した3学期が終わったらもとに戻す */
   private commitRoom(room: number, next: GameState) {
-    const { rooms, seqs } = this.snap;
+    const { rooms, seqs, joint } = this.snap;
     if (!rooms || !seqs) return this.commit(next);
+    if (room < 0) {
+      if (!joint || next === joint) return;
+      const split = splitTeams(rooms, next);
+      // 版の番号はどの画面から見ても前に進むように、合体の前後で一番大きい番号の次にする
+      const seq = this.snap.seq + 1;
+      if (split) this.set({ rooms: split, seqs: [seq, seq], joint: undefined, props: undefined, state: split[0], seq });
+      else {
+        // 係決め（一斉）の案は、ほかのクラスが準備OKになっても、自分のクラスがまだなら残す
+        const ph = next.phase;
+        const props = ph.kind === 'roles' && joint.phase.kind === 'roles' ? this.snap.props?.filter((x) => !ph.ready[x.pi]) : undefined;
+        this.set({ joint: next, props, state: next, seq });
+      }
+      this.broadcast();
+      this.drive();
+      return;
+    }
     if (next === rooms[room]) return;
-    let nextRooms = rooms.map((r, k) => (k === room ? next : r));
+    const nextRooms = rooms.map((r, k) => (k === room ? next : r));
     // チームメイトの点は、進めた部屋にだけ書き写す（もう一方の部屋はその部屋が進んだときに）
     nextRooms[room] = syncTeams(nextRooms)[room];
     const nextSeqs = seqs.map((q, k) => (k === room ? q + 1 : q));
-    const joint = resolveTeamEvent(nextRooms);
-    if (joint) {
-      nextRooms = joint;
-      nextSeqs.forEach((_, k) => (nextSeqs[k] = seqs[k] + 1));
+    const merged = mergeTeams(nextRooms);
+    if (merged) {
+      const seq = Math.max(...nextSeqs) + 1;
+      this.set({ rooms: nextRooms, seqs: nextSeqs, joint: merged, props: undefined, state: merged, seq });
+      this.broadcast();
+      this.drive();
+      return;
     }
     this.set({ rooms: nextRooms, seqs: nextSeqs, state: nextRooms[0], seq: nextSeqs[0] });
-    if (joint) this.broadcast();
-    else this.broadcastRoom(room);
+    this.broadcastRoom(room);
     this.drive();
+  }
+
+  /** 合体した卓で、CPUが進める操作か（「次へ」はだれでも） */
+  private cpuMove(s: GameState, a: Action): boolean {
+    if (a.type === 'continue') return true;
+    if (a.type === 'setRoles') return !!s.players[a.player]?.isCpu;
+    const actor = actingPlayer(s);
+    return actor !== null && s.players[actor].isCpu;
+  }
+
+  /** 相方がこの操作を一緒に決められるか（CPU・通信切れなら、1人で決める） */
+  private partnerHere(seat: number): boolean {
+    const mate = this.snap.lobby.seats[teamPartner(seat)];
+    return !!mate && (mate.kind === 'host' || (mate.kind === 'guest' && mate.online));
+  }
+
+  /**
+   * 合体した卓で、席 seat の人が操作の案を出す。相方も同じ案を出していたら決まる（「次へ」と、相方がいないときはすぐ決まる）。
+   * 違う案なら、案を出し直す（相方の画面に出る）
+   */
+  private propose(seat: number, a: Action) {
+    const joint = this.snap.joint;
+    if (!joint) return;
+    const pi = seatRoom(seat).idx;
+    if (a.type === 'continue' || !this.partnerHere(seat)) return this.commitRoom(-1, step(joint, a));
+    const mate = (this.snap.props ?? []).find((x) => x.seat === teamPartner(seat));
+    if (mate && sameAction(mate.action, a)) return this.commitRoom(-1, step(joint, a));
+    const props = [...(this.snap.props ?? []).filter((x) => x.seat !== seat), { seat, pi, name: this.snap.lobby.seats[seat].name, action: a }];
+    this.set({ props });
+    this.broadcast();
   }
 
   /**
@@ -261,7 +324,8 @@ export class HostRoom {
     if (this.driveTimer) clearTimeout(this.driveTimer);
     this.driveTimer = null;
     const s = this.snap.rooms?.[1];
-    if (!s || this.closed) return;
+    // 合体した卓は、部屋を作った人の画面が進める
+    if (!s || this.closed || this.snap.joint) return;
     const ph = s.phase;
     const allCpu = s.players.every((p) => p.isCpu);
     let a: Action | null = null;
@@ -288,7 +352,13 @@ export class HostRoom {
 
   private sendState(to: string, you: number) {
     if (!this.snap.state) return;
-    if (!this.snap.rooms) return this.sendTo(to, { t: 'state', seq: this.snap.seq, state: this.snap.state, you, seats: this.snap.lobby.seats });
+    if (this.snap.joint) {
+      return this.sendTo(to, { t: 'state', seq: this.snap.seq, state: this.snap.joint, you: -1, seats: this.snap.lobby.seats, joint: true, props: this.snap.props ?? [] });
+    }
+    if (!this.snap.rooms) {
+      const pair = this.snap.lobby.pair || undefined;
+      return this.sendTo(to, { t: 'state', seq: this.snap.seq, state: this.snap.state, you: pair || you < 0 ? -1 : you, seats: this.snap.lobby.seats, pair });
+    }
     const v = this.view(you);
     this.sendTo(to, { t: 'state', seq: v.seq, state: v.state, you: v.you, seats: roomSeats(this.snap.lobby.seats, v.room) });
   }
@@ -308,7 +378,8 @@ export class HostRoom {
   /** 全員に1通で配る（席番号は受け取った側が端末IDから探す） */
   private broadcast() {
     if (!this.snap.lobby.seats.some((s) => s.kind === 'guest')) return;
-    if (this.snap.rooms) this.snap.rooms.forEach((_, r) => this.broadcastRoom(r));
+    if (this.snap.joint) this.sendState('*', -1);
+    else if (this.snap.rooms) this.snap.rooms.forEach((_, r) => this.broadcastRoom(r));
     else this.sendOne('*', -1);
   }
 
@@ -317,7 +388,10 @@ export class HostRoom {
   addCpu() {
     const seats = this.snap.lobby.seats;
     if (this.snap.state || seats.length >= maxSeats(this.snap.lobby)) return;
-    this.setSeats([...seats, { name: `CPU${seats.filter((s) => s.kind === 'cpu').length + 1}`, kind: 'cpu', online: true }]);
+    // ペア担任：CPUは1人で空いているクラスを受け持つ
+    const cls = this.snap.lobby.pair ? pairClasses(seats).findIndex((c) => c.length === 0) : undefined;
+    if (cls === -1) return;
+    this.setSeats([...seats, { name: `CPU${seats.filter((s) => s.kind === 'cpu').length + 1}`, kind: 'cpu', online: true, cls }]);
     this.broadcast();
   }
 
@@ -339,13 +413,32 @@ export class HostRoom {
     this.broadcast();
   }
 
-  /** チーム戦（8〜10人）にするか。普通の対戦に戻すとき、6人目からの席は外す */
-  setTeam(team: boolean) {
+  /** ペア担任：席 i の人を、クラス cls に移す（2人まで。CPUのクラスには入れない） */
+  pickClass(i: number, cls: number) {
+    const { seats, pair } = this.snap.lobby;
+    if (this.snap.state || !pair || !seats[i] || seats[i].kind === 'cpu' || seats[i].cls === cls) return;
+    if (!Number.isInteger(cls) || cls < 0 || cls >= MAX_SEATS || !pairHasRoom(seats, cls)) return;
+    this.setSeats(seats.map((s, j) => (j === i ? { ...s, cls } : s)));
+    this.broadcast();
+  }
+
+  /**
+   * 対戦のしかた：ふつう／チーム戦（8〜10人）／ペア担任（2人で1クラス）。
+   * 席の上限が減るときは、あふれた席を外す。ペア担任にするときは、来た順に2人ずつクラスへ入れる（CPUは1人で1クラス）
+   */
+  setStyle(style: 'normal' | 'team' | 'pair') {
     if (this.snap.state) return;
-    const lobby = { ...this.snap.lobby, team };
+    const lobby: Lobby = { ...this.snap.lobby, team: style === 'team' || undefined, pair: style === 'pair' || undefined };
     const max = maxSeats(lobby);
-    for (const s of lobby.seats.slice(max)) if (s.cid) this.sendTo(s.cid, { t: 'reject', reason: 'ルームの人数が変わったので外れました' });
-    this.set({ lobby: { ...lobby, seats: lobby.seats.slice(0, max) } });
+    const kept: Seat[] = [];
+    const out: Seat[] = [];
+    for (const { cls: _, ...seat } of lobby.seats) {
+      const cls = style === 'pair' ? (seat.kind === 'cpu' ? pairClasses(kept).findIndex((c) => c.length === 0) : pairDefaultClass(kept)) : undefined;
+      if (kept.length >= max || cls === -1) out.push(seat);
+      else kept.push(cls === undefined ? seat : { ...seat, cls });
+    }
+    for (const s of out) if (s.cid) this.sendTo(s.cid, { t: 'reject', reason: 'ルームの人数が変わったので外れました' });
+    this.set({ lobby: { ...lobby, seats: kept } });
     this.broadcast();
   }
 
@@ -360,6 +453,13 @@ export class HostRoom {
     const { seats, years } = this.snap.lobby;
     const players = seats.map((s, i) => ({ name: cleanName(s.name, i), isCpu: s.kind === 'cpu' }));
     this.setSeats(seats.map((s, i) => ({ ...s, name: players[i].name })));
+    if (this.snap.lobby.pair) {
+      // ペア担任：だれかいるクラスだけを、クラス番号の順に。名前は2人の名前を並べる
+      const classes = pairClasses(seats).filter((c) => c.length);
+      if (classes.length < 2) return;
+      this.commit(newGame(classes.map((c) => ({ name: c.map((i) => players[i].name).join('・'), isCpu: c.every((i) => players[i].isCpu) })), years));
+      return;
+    }
     if (this.snap.lobby.team) {
       if (!teamReady(players.length)) return;
       const rooms = newTeamGame([0, 1].map((r) => players.filter((_, k) => k % 2 === r)), years);
@@ -376,6 +476,12 @@ export class HostRoom {
     const s = this.snap.state;
     const simultaneous = a.type === 'setRoles' && s?.phase.kind === 'roles';
     if (!s || (seq !== this.snap.seq && !simultaneous)) return;
+    // 合体した卓：CPUの手はそのまま、部屋を作った人の手は相方と案を合わせる
+    if (this.snap.joint) {
+      if (this.cpuMove(s, a)) this.commitRoom(-1, step(s, a));
+      else if (canAct(s, seatRoom(0).idx, a)) this.propose(0, a);
+      return;
+    }
     this.commitRoom(0, step(s, a));
   }
 
@@ -385,7 +491,7 @@ export class HostRoom {
    */
   stepFor(i: number) {
     const seat = this.snap.lobby.seats[i];
-    if (!this.snap.state || seat?.kind !== 'guest' || seat.online) return;
+    if (!this.snap.state || seat?.kind !== 'guest' || seat.online || this.mateOnline(i)) return;
     const { room, you, state: s } = this.view(i);
     if (!waitsFor(s, you)) return;
     const a = s.phase.kind === 'roles' ? rolesAction(s, you) : cpuAction(s);
@@ -396,9 +502,28 @@ export class HostRoom {
     this.commitRoom(room, next);
   }
 
-  /** その席の人の操作を待って止まっているか（チーム戦では、その人の部屋で） */
+  /** ペア担任：同じクラスの相方が操作できるか（つながっている・ホスト） */
+  private mateOnline(i: number): boolean {
+    if (this.snap.joint) return this.partnerHere(i);
+    const { seats, pair } = this.snap.lobby;
+    if (!pair) return false;
+    const owner = pairOwners(seats);
+    return seats.some((s, j) => j !== i && owner[j] === owner[i] && s.kind !== 'cpu' && (s.kind === 'host' || s.online));
+  }
+
+  /** 合体した卓で、部屋を作った人と相方の案 */
+  proposals(): Proposal[] {
+    return this.snap.props ?? [];
+  }
+
+  /** 部屋を作った人が受け持つクラス（ペア担任では相方と同じクラス） */
+  myPlayer(): number {
+    return this.snap.state ? this.view(0).you : 0;
+  }
+
+  /** その席の人の操作を待って止まっているか（チーム戦では、その人の部屋で。ペア担任では相方もつながっていないとき） */
   waitsForSeat(i: number): boolean {
-    if (!this.snap.state) return false;
+    if (!this.snap.state || this.mateOnline(i)) return false;
     const v = this.view(i);
     return waitsFor(v.state, v.you);
   }

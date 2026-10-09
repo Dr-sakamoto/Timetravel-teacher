@@ -145,7 +145,7 @@ function Title({
           遊び方
         </button>
       </div>
-      <p className="title-foot">2〜5人（通信対戦のチーム戦は8〜10人） ・ 1台を回すホットシート式／スマホどうしの通信対戦 ・ CPUとも対戦可 ・ 偉人/恐竜カード{CARDS.length}種</p>
+      <p className="title-foot">2〜5人（通信対戦のペア担任・チーム戦は最大10人） ・ 1台を回すホットシート式／スマホどうしの通信対戦 ・ CPUとも対戦可 ・ 偉人/恐竜カード{CARDS.length}種</p>
     </div>
   );
 }

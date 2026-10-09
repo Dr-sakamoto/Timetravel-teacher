@@ -13,7 +13,7 @@ export interface NormalCard {
 
 /**
  * カチコミ：場から取った人が他のクラスを1つ選び、自分のクラスの👊の数 × mult だけそのクラスを減点させ、
- * 削った点の半分（👊の数 × 1.5。切り捨て）を自分に吸い取る（ドレイン）
+ * 削った点の半分（👊の数 × 1）を自分に吸い取る（ドレイン）
  */
 export interface KachikomiCard {
   id: string;
@@ -238,7 +238,7 @@ export const NORMAL_CARDS: NormalCard[] = [
   N('charm', '学活の時間', '🙋', 4),
 ];
 
-export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 3, count: 3 }];
+export const KACHIKOMI_CARDS: KachikomiCard[] = [{ id: 'kachikomi', kind: 'kachikomi', name: 'カチコミ', icon: '👊', mult: 2, count: 3 }];
 
 // 共通イベントはいったん休止中（時代イベントが出やすいように、山札に入れない）。戻すときは count を 1 に
 const W = (id: string, name: string, icon: string, plus: Attr, minus: Attr | undefined, desc: string, per?: number): SwingCard => ({
@@ -452,7 +452,7 @@ export function cardRule(c: EventCard): string {
     case 'normal':
       return `取った人：クラス全員の${ATTR_ICON[c.attr]}の数を加点`;
     case 'kachikomi':
-      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させ、その半分（👊の数×1.5）を自分に加点（ドレイン）`;
+      return `取った人：他のクラスを1つ選び、自分のクラスの👊の数×${c.mult}だけ減点させ、その半分（👊の数×1）を自分に加点（ドレイン）`;
     case 'swing':
       if (c.per) return `全クラス：${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       if (!c.minus) return `全クラス：${ATTR_ICON[c.plus]}の数だけ得点`;
@@ -582,7 +582,7 @@ export function cardGlyph(c: EventCard): string {
     case 'normal':
       return `${ATTR_ICON[c.attr]} → +`;
     case 'kachikomi':
-      return `相手 −👊×${c.mult}　自分 +👊×1.5`;
+      return `相手 −👊×${c.mult}　自分 +👊×1`;
     case 'swing':
       if (c.per) return `${ATTR_ICON[c.plus]}の子1人 +${c.per}`;
       return c.minus ? `+${ATTR_ICON[c.plus]}　−${ATTR_ICON[c.minus]}` : `${ATTR_ICON[c.plus]} → +`;
@@ -696,7 +696,7 @@ export function shortRule(c: EventCard): string {
     case 'normal':
       return `${ATTR_ICON[c.attr]}の数だけ得点`;
     case 'kachikomi':
-      return `相手に👊×${c.mult}のダメージ、その半分（👊×1.5）を吸い取る`;
+      return `相手に👊×${c.mult}のダメージ、その半分（👊×1）を吸い取る`;
     case 'swing':
       if (c.per) return `${ATTR_ICON[c.plus]}を持つ子1人につき+${c.per}`;
       return c.minus ? `${ATTR_ICON[c.plus]}で得点、${ATTR_ICON[c.minus]}で減点` : `${ATTR_ICON[c.plus]}の数だけ得点`;

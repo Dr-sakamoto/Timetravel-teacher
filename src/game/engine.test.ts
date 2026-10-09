@@ -5,8 +5,7 @@ import { BENKEI, CARDS, EGG_DINOS, KONGMING, parseAttrs, toIcons } from './data/
 import { ERAS, PRESENT_INDEX } from './data/eras';
 import { ERA_CARDS, EVENT_MAP, KAGUYA_TREASURES, MAX_ICONS, PERSON_CARDS_PER_TERM, eventScale, scaleCard, type ContestCard } from './data/events';
 import { ARCHETYPES, MODERN_POOL, STARTER_POOL } from './data/modern';
-import { FIXED_MAP } from './data/events';
-import { fixedValue, newTeamGame, resolveTeamEvent } from './engine';
+import { mergeTeams, newTeamGame, splitTeams } from './engine';
 import { MONTHS, canBuild, canTake, currentEra, kaguyaGift, deckBreakdown, droppable, equippable, exchangePairs, marketCost, newGame, step, termOfMonth } from './engine';
 import type { Attr, GameState, Player, RoleSeat, Student } from './types';
 
@@ -349,7 +348,7 @@ describe('engine', () => {
     expect(t.passes).toBe(0);
   });
 
-  it('kachikomi is taken from the market for free, takes 3× the taker\'s 👊 count from the chosen school and drains half of it (👊×1.5) to the taker', () => {
+  it('kachikomi is taken from the market for free, takes 2× the taker\'s 👊 count from the chosen school and drains half of it (👊×1) to the taker', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }, { name: 'C', isCpu: true }], 1, 8);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
@@ -372,13 +371,13 @@ describe('engine', () => {
     expect(back.market).toEqual(['kachikomi']);
     // 自分は殴れない
     expect(step(k, { type: 'kachikomi', target: pi })).toBe(k);
-    // 👊3 で殴りこむ：相手 −9、自分 +4（4.5 の切り捨て。相手の👊では防げない）
+    // 👊3 で殴りこむ：相手 −6、自分 +3（相手の👊では防げない）
     k.players[target].students = [mk('g', ['fight', 'fight', 'fight'])];
     k.players[target].roles = [];
     k.players[target].points = 20;
     const done = step(k, { type: 'kachikomi', target });
-    expect(done.players[target].points - k.players[target].points).toBe(-9);
-    expect(done.players[pi].points - k.players[pi].points).toBe(4);
+    expect(done.players[target].points - k.players[target].points).toBe(-6);
+    expect(done.players[pi].points - k.players[pi].points).toBe(3);
     expect(done.market).toEqual([]);
     // 相手の点より多くは削れない（0点で止まる）。吸い取るのは実際に削った分の半分
     const poor = structuredClone(k);
@@ -1524,39 +1523,60 @@ describe('チーム戦（2つの部屋）', () => {
     return s;
   };
 
-  it('2つの部屋を別々に進め、学年末テストと卒業式はチームの合計で順位をつける', () => {
+  /** 合体した卓を、次の区切り（もとの部屋に戻る・ゲームが終わる）まで CPU で進める */
+  const runJoint = (s: GameState): GameState => runRoom(s);
+
+  it('1・2学期は2つの部屋で別々に進め、3学期はチームの2クラスが合体して1つの卓で進む', () => {
     const setup = (r: number) => Array.from({ length: 4 }, (_, i) => ({ name: `${r ? 'B' : 'A'}${i}`, isCpu: true }));
     let rooms = newTeamGame([setup(0), setup(1)], 2, 42);
     expect(rooms.map((r) => r.team?.room)).toEqual([0, 1]);
     expect(rooms[0].team!.mates.map((m) => m.name)).toEqual(['B0', 'B1', 'B2', 'B3']);
-    const joints: string[] = [];
-    for (let guard = 0; rooms.some((r) => r.phase.kind !== 'gameOver'); guard++) {
-      if (guard > 20) throw new Error('team game did not finish');
-      // 片方だけ着いても進まない
+    for (let year = 1; year <= 2; year++) {
+      // 片方だけ2学期を終えても合体しない
       rooms = [runRoom(rooms[0]), rooms[1]];
-      if (rooms[0].phase.kind === 'gameOver') break;
-      expect(resolveTeamEvent(rooms)).toBeNull();
+      expect(rooms[0].phase).toMatchObject({ kind: 'teamWait', event: 'merge' });
+      expect(MONTHS[rooms[0].monthIdx]).toBe(1);
+      expect(mergeTeams(rooms)).toBeNull();
       rooms = [rooms[0], runRoom(rooms[1])];
-      const ph = rooms[0].phase;
-      expect(ph.kind).toBe('teamWait');
-      const event = ph.kind === 'teamWait' ? ph.event : '';
-      const values = rooms.map((r) => r.players.map((p) => fixedValue(p, FIXED_MAP[event])));
-      const before = rooms.map((r) => r.players.map((p) => p.points));
-      const resolved = resolveTeamEvent(rooms)!;
-      expect(resolved).not.toBeNull();
-      joints.push(event);
-      // 同じ席のチームには、両方の部屋で同じ順位点が入る（0点より下がらない調整がなければ）
-      const team = values[0].map((v, i) => v + values[1][i]);
-      resolved.forEach((r) => {
-        const res = r.phase.kind === 'result' ? r.phase.result : null;
-        expect(res?.rows.map((x) => x.count).sort()).toEqual([...team].sort());
+      const joint = mergeTeams(rooms)!;
+      expect(joint.joint).toBeDefined();
+      expect(joint.team).toBeUndefined();
+      expect(joint.players.map((p) => p.name)).toEqual(['A0・B0', 'A1・B1', 'A2・B2', 'A3・B3']);
+      joint.players.forEach((p, i) => {
+        expect(p.students).toHaveLength(rooms[0].players[i].students.length + rooms[1].players[i].students.length);
+        expect(p.points).toBe(rooms[0].players[i].points + rooms[1].players[i].points);
+        expect(p.cap).toBe(18);
       });
-      const gain = resolved.map((r, k) => r.players.map((p, i) => p.points - before[k][i]));
-      expect(gain[0]).toEqual(gain[1]);
-      expect(resolved[0].team!.mates.map((m) => m.points)).toEqual(resolved[1].players.map((p) => p.points));
-      rooms = resolved.map((r) => step(r, { type: 'continue' }));
+      const uids = joint.players.flatMap((p) => p.students.map((x) => x.uid));
+      expect(new Set(uids).size).toBe(uids.length);
+      expect(joint.phase.kind).toBe('roles');
+      const done = runJoint(joint);
+      if (year === 2) {
+        // 最後の学年は、合体したまま学年末テスト・卒業式を受けて終わる
+        expect(done.phase.kind).toBe('gameOver');
+        expect(done.log.some((l) => l.text.includes('卒業式'))).toBe(true);
+        break;
+      }
+      expect(done.phase).toMatchObject({ kind: 'teamWait', event: 'split' });
+      const split = splitTeams(rooms, done)!;
+      expect(split.map((r) => r.team?.room)).toEqual([0, 1]);
+      expect(split.map((r) => r.year)).toEqual([2, 2]);
+      split.forEach((r) => {
+        expect(r.phase.kind).toBe('roles');
+        expect(r.joint).toBeUndefined();
+        r.players.forEach((p) => expect(p.students.length).toBeLessThanOrEqual(9));
+      });
+      // もとのクラスの子はもとの部屋へ。点は3学期の増減を半分ずつ
+      done.players.forEach((jp, i) => {
+        const back = split[0].players[i].students.length + split[1].players[i].students.length;
+        expect(back).toBe(jp.students.length);
+        expect(split[0].players[i].name).toBe(`A${i}`);
+        expect(split[1].players[i].name).toBe(`B${i}`);
+        const d = jp.points - rooms[0].players[i].points - rooms[1].players[i].points;
+        expect(split[0].players[i].points).toBe(Math.max(0, rooms[0].players[i].points + Math.floor(d / 2)));
+      });
+      expect(split[0].team!.mates.map((m) => m.points)).toEqual(split[1].players.map((p) => p.points));
+      rooms = split;
     }
-    expect(joints).toEqual(['test3', 'test3', 'graduation']);
-    expect(rooms.every((r) => r.phase.kind === 'gameOver')).toBe(true);
   });
 });
