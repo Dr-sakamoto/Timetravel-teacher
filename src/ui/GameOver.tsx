@@ -6,6 +6,13 @@ export function GameOver({ state, onQuit }: { state: GameState; onQuit: () => vo
   const ranking = finalRanking(state);
   const winner = ranking[0];
   const medal = ['🥇', '🥈', '🥉', '4位', '5位'];
+  // チーム戦：同じ席番号の2クラス（この部屋のクラスと、もう一方の部屋のチームメイト）の合計点で勝負
+  const team = state.team;
+  const teams = team
+    ? state.players
+        .map((p, i) => ({ i, p, mate: team.mates[i], total: p.points + (team.mates[i]?.points ?? 0) }))
+        .sort((a, b) => b.total - a.total)
+    : [];
   return (
     <div className="gameover">
       <div className="confetti" aria-hidden>
@@ -16,8 +23,22 @@ export function GameOver({ state, onQuit }: { state: GameState; onQuit: () => vo
         ))}
       </div>
       <h1>🏆 時空最強クラス決定！</h1>
+      {team && (
+        <div className="winner" style={{ borderColor: teams[0].p.color }}>
+          <div className="winner-label">🤝 優勝チーム</div>
+          <div className="winner-name">
+            チーム{teams[0].i + 1}：{teams[0].p.name} ＆ {teams[0].mate?.name}
+          </div>
+          <div className="winner-pts">{teams[0].total}pt</div>
+          {teams.map((x, k) => (
+            <div key={x.i} className="final-sub">
+              {medal[k]} チーム{x.i + 1}（{x.p.name} {x.p.points}pt ＋ {x.mate?.name} {x.mate?.points ?? 0}pt）＝ {x.total}pt
+            </div>
+          ))}
+        </div>
+      )}
       <div className="winner" style={{ borderColor: winner.color }}>
-        <div className="winner-label">優勝</div>
+        <div className="winner-label">{team ? `部屋${team.room ? 'B' : 'A'}の1位` : '優勝'}</div>
         <div className="winner-name">
           {winner.name}の {className(winner.id, state.year)}
         </div>

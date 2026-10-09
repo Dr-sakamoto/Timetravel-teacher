@@ -160,6 +160,8 @@ export type Phase =
   /** グッズ：生徒1人に装備する */
   | { kind: 'equip'; player: number; card: string; slot: number }
   | { kind: 'result'; player: number | null; result: EventResult; ctx: ResultCtx }
+  /** チーム戦：学年末テスト・卒業式は2つの部屋のペアが合同で受けるので、もう一方の部屋がここに着くのを待つ */
+  | { kind: 'teamWait'; player: null; event: 'test3' | 'graduation' }
   | { kind: 'gameOver' };
 
 export interface LogEntry {
@@ -218,6 +220,15 @@ export interface GameState {
   patent?: number;
   /** ゴッホのひまわり：各クラスが飾った絵（描いた子と、描いたときの点。学期の区切りに値打ちが出て消える） */
   sunflower?: { player: number; uid: string; pts: number }[];
+  /** チーム戦（8〜10人）：2つの部屋で別々に進め、同じ席番号のクラスどうしがチーム。学年末テストと卒業式はチームで合同 */
+  team?: TeamInfo;
+}
+
+export interface TeamInfo {
+  /** この部屋の番号（0 か 1） */
+  room: number;
+  /** 席番号ごとの、もう一方の部屋にいるチームメイト（名前と、最後に見たときのポイント） */
+  mates: { name: string; points: number }[];
 }
 
 export type Action =

@@ -468,6 +468,12 @@ function hatch(s: GameState, egg: Student) {
 
 function monthEnd(s: GameState) {
   const fixed = FIXED_BY_MONTH[MONTHS[s.monthIdx]];
+  // チーム戦：学年末テストは2つの部屋で合同（もう一方の部屋が着くのを待つ）
+  if (s.team && fixed === 'test3') {
+    s.phase = { kind: 'teamWait', player: null, event: 'test3' };
+    log(s, '学年末テストはチーム合同。もう一方の部屋を待っている…');
+    return;
+  }
   if (fixed) s.phase = { kind: 'result', player: null, result: resolveFixed(s, FIXED_MAP[fixed]), ctx: 'monthEnd' };
   else advanceMonth(s);
 }
@@ -595,6 +601,9 @@ function yearEnd(s: GameState) {
       ctx: 'yearEnd',
       result: { title: `進級！ ${s.year + 1}年生へ`, icon: '🌸', tone: 'fixed', desc: '新しい1年。時代も入れ替わる。', rows: [] },
     };
+  } else if (s.team) {
+    // チーム戦：卒業式も2つの部屋で合同
+    s.phase = { kind: 'teamWait', player: null, event: 'graduation' };
   } else {
     s.phase = { kind: 'result', player: null, result: resolveFixed(s, FIXED_MAP.graduation), ctx: 'final' };
   }
@@ -1531,8 +1540,13 @@ export function cyborgable(p: Player): Student[] {
   return p.students.filter((x) => x.art !== 'cyborg');
 }
 
-function resolveFixed(s: GameState, f: FixedEvent): EventResult {
-  const values = s.players.map((p) => (f.rule === 'test' ? testScore(p, TEST_YANKEE_PENALTY) : totalPower(p)));
+/** 学年末テスト・卒業式で比べる値（テストは📚−👊の子、卒業式はアイコンの総数）。クラスの子ごとの足し算なので、チームは2クラスの和 */
+export function fixedValue(p: Player, f: FixedEvent): number {
+  return f.rule === 'test' ? testScore(p, TEST_YANKEE_PENALTY) : totalPower(p);
+}
+
+/** values があれば、それで順位をつける（チーム戦の合同：席ごとのチームの値） */
+function resolveFixed(s: GameState, f: FixedEvent, values = s.players.map((p) => fixedValue(p, f))): EventResult {
   const rows = awardRanks(s, values, f.mult);
   for (const r of rows) {
     const st = s.players[r.player].students;
@@ -1541,6 +1555,48 @@ function resolveFixed(s: GameState, f: FixedEvent): EventResult {
   sortRows(rows);
   logRows(s, f.name, rows);
   return { title: f.name, icon: f.icon, attr: f.rule === 'test' ? 'study' : 'all', tone: 'fixed', desc: '', rule: fixedRule(f), glyph: fixedGlyph(f), say: fixedShort(f), rows };
+}
+
+/**
+ * チーム戦の合同イベント（学年末テスト・卒業式）：2つの部屋がどちらも teamWait で同じイベントを待っていたら、
+ * 席ごとにチーム（同じ席番号のクラスどうし）の値を足して順位をつけ、両方のクラスに順位点を入れる。
+ * まだそろっていなければ null
+ */
+export function resolveTeamEvent(rooms: GameState[]): GameState[] | null {
+  const waits = rooms.map((r) => (r.phase.kind === 'teamWait' ? r.phase.event : null));
+  if (waits.some((w) => w === null) || waits.some((w) => w !== waits[0])) return null;
+  const event = waits[0]!;
+  const f = FIXED_MAP[event];
+  const n = Math.min(...rooms.map((r) => r.players.length));
+  const teamValues = Array.from({ length: n }, (_, i) => rooms.reduce((a, r) => a + fixedValue(r.players[i], f), 0));
+  const next = rooms.map((prev) => {
+    const s: GameState = structuredClone(prev);
+    const values = s.players.map((_, i) => teamValues[i] ?? 0);
+    const result = resolveFixed(s, f, values);
+    for (const r of result.rows) r.note = `チーム合計 ${values[r.player]}`;
+    result.title = `${f.name}（チーム合同）`;
+    result.desc = 'もう一方の部屋のチームメイトと合わせた値で順位をつける。順位点はチームの2クラスとも入る。';
+    s.phase = { kind: 'result', player: null, result, ctx: event === 'test3' ? 'monthEnd' : 'final' };
+    return s;
+  });
+  return syncTeams(next);
+}
+
+/** チーム戦：それぞれの部屋に、もう一方の部屋のチームメイトの名前とポイントを書き写す */
+export function syncTeams(rooms: GameState[]): GameState[] {
+  return rooms.map((s, r) => {
+    if (!s.team) return s;
+    const other = rooms[1 - r];
+    const mates = s.players.map((_, i) => ({ name: other.players[i]?.name ?? '', points: other.players[i]?.points ?? 0 }));
+    if (JSON.stringify(mates) === JSON.stringify(s.team.mates)) return s;
+    return { ...s, team: { ...s.team, mates } };
+  });
+}
+
+/** チーム戦を始める：2つの部屋（同じ人数）を別々の乱数で作る。部屋ごとに1年の時代の並びが変わる */
+export function newTeamGame(rooms: SetupPlayer[][], years: number, seed = Date.now()): GameState[] {
+  const states = rooms.map((setup, r) => ({ ...newGame(setup, years, seed + r * 7919), team: { room: r, mates: [] } }));
+  return syncTeams(states);
 }
 
 function setResult(s: GameState, pi: number | null, result: EventResult, ctx: ResultCtx) {

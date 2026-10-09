@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PLAYER_COLORS } from '../game/engine';
-import type { Action } from '../game/types';
+import type { Action, GameState } from '../game/types';
 import { GuestRoom, type GuestSnap } from '../net/guest';
 import { clearHostSave, HostRoom, loadHostSave, type HostSnap } from '../net/host';
-import { joinUrl, loadName, MAX_SEATS, newRoomCode, normalizeCode, saveName, waitsFor, type Seat } from '../net/protocol';
+import { joinUrl, loadName, maxSeats, newRoomCode, normalizeCode, saveName, seatRoom, teamReady, type Lobby } from '../net/protocol';
 import { GameView } from './GameView';
 
 type Mode = { kind: 'menu' } | { kind: 'host'; resume: boolean } | { kind: 'guest'; code: string };
@@ -32,7 +32,7 @@ export function Online({ initialCode, onExit, onRules }: { initialCode: string; 
   return (
     <div className="setup online">
       <h1>📱 通信対戦</h1>
-      <p className="online-lead">1人がルームを作ると5桁の部屋番号が出ます。ほかの人はその部屋番号を入れて入ります（2〜5人。足りない席はCPU）。</p>
+      <p className="online-lead">1人がルームを作ると5桁の部屋番号が出ます。ほかの人はその部屋番号を入れて入ります（2〜5人。足りない席はCPU。チーム戦なら8〜10人）。</p>
       <section>
         <h3>あなたの名前</h3>
         <div className="player-row">
@@ -76,13 +76,22 @@ export function Online({ initialCode, onExit, onRules }: { initialCode: string; 
   );
 }
 
-function SeatList({ seats, you, onRemove }: { seats: Seat[]; you: number; onRemove?: (i: number) => void }) {
+/** チーム戦の席の見出し（部屋A・Bとチーム番号） */
+function teamLabel(i: number): string {
+  const { room, idx } = seatRoom(i);
+  return `チーム${idx + 1}・部屋${room ? 'B' : 'A'}`;
+}
+
+function SeatList({ lobby, you, onRemove }: { lobby: Lobby; you: number; onRemove?: (i: number) => void }) {
+  const seats = lobby.seats;
+  const color = (i: number) => PLAYER_COLORS[lobby.team ? seatRoom(i).idx : i];
   return (
     <div className="seat-list">
       {seats.map((s, i) => (
         <div key={i} className="player-row">
-          <span className="dot big" style={{ background: PLAYER_COLORS[i] }} />
+          <span className="dot big" style={{ background: color(i) }} />
           <span className="seat-name">
+            {lobby.team && <small>{teamLabel(i)} </small>}
             {s.name}
             {i === you && <small>（あなた）</small>}
           </span>
@@ -96,13 +105,28 @@ function SeatList({ seats, you, onRemove }: { seats: Seat[]; you: number; onRemo
           )}
         </div>
       ))}
-      {Array.from({ length: MAX_SEATS - seats.length }, (_, i) => (
+      {Array.from({ length: maxSeats(lobby) - seats.length }, (_, i) => (
         <div key={`e${i}`} className="player-row empty">
           <span className="dot big" />
-          <span className="seat-name">（空き）</span>
+          <span className="seat-name">
+            {lobby.team && <small>{teamLabel(seats.length + i)} </small>}
+            （空き）
+          </span>
         </div>
       ))}
     </div>
+  );
+}
+
+/** チーム戦：自分のチームメイト（もう一方の部屋）とチームの合計点 */
+function TeamBadge({ state, me }: { state: GameState; me: number }) {
+  const mate = state.team?.mates[me];
+  if (!state.team || !mate) return null;
+  const mine = state.players[me]?.points ?? 0;
+  return (
+    <span className="net-code" title="チーム戦：学年末テストと卒業式は、もう一方の部屋のチームメイトと合同">
+      🤝 部屋{state.team.room ? 'B' : 'A'}・チームメイト {mate.name}（{mate.points}点）・合計 {mine + mate.points}点
+    </span>
   );
 }
 
@@ -159,7 +183,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
     const seats = snap.lobby.seats;
     const lost = seats.map((s, i) => ({ s, i })).filter(({ s }) => s.kind === 'guest' && !s.online);
     // 通信が切れた人の操作を待って止まっているときだけ、1手だけ代わりに進められる
-    const stuck = (i: number) => waitsFor(snap.state!, i);
+    const stuck = (i: number) => !!room.current?.waitsForSeat(i);
     return (
       <GameView
         state={snap.state}
@@ -168,10 +192,15 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
         onRules={onRules}
         me={0}
         driver
-        offline={(i) => seats[i]?.kind === 'guest' && !seats[i].online}
+        offline={(i) => {
+          // チーム戦では、部屋Aの席 i はロビーの席 2i
+          const s = seats[snap.rooms ? i * 2 : i];
+          return s?.kind === 'guest' && !s.online;
+        }}
         banner={
           <div className="net-banner">
             <span className="net-code">🏠{snap.code}</span>
+            <TeamBadge state={snap.state} me={0} />
             {snap.status !== 'open' && <span className="net-warn">{snap.error ?? '通信サーバーにつないでいます…'}</span>}
             {lost.map(({ s, i }) => (
               <span key={i} className="net-warn">
@@ -193,6 +222,9 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
   }
 
   const seats = snap.lobby.seats;
+  const max = maxSeats(snap.lobby);
+  const team = !!snap.lobby.team;
+  const canStart = (team ? teamReady(seats.length) : seats.length >= 2) && !seats.some((s) => s.kind === 'guest' && !s.online);
   return (
     <div className="setup online">
       <h1>🏠 ルームを作りました</h1>
@@ -208,14 +240,30 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
       )}
       <section>
         <h3>
-          プレイヤー（{seats.length}/{MAX_SEATS}）
+          プレイヤー（{seats.length}/{max}）
         </h3>
-        <SeatList seats={seats} you={0} onRemove={(i) => room.current?.removeSeat(i)} />
+        <SeatList lobby={snap.lobby} you={0} onRemove={(i) => room.current?.removeSeat(i)} />
         <div className="seg">
-          <button className="btn small ghost" disabled={seats.length >= MAX_SEATS} onClick={() => room.current?.addCpu()}>
+          <button className="btn small ghost" disabled={seats.length >= max} onClick={() => room.current?.addCpu()}>
             🤖 CPUを足す
           </button>
         </div>
+      </section>
+      <section>
+        <h3>対戦のしかた</h3>
+        <div className="seg">
+          <button className={`btn ${!team ? 'primary' : 'ghost'}`} onClick={() => room.current?.setTeam(false)}>
+            ふつう（2〜5人）
+          </button>
+          <button className={`btn ${team ? 'primary' : 'ghost'}`} onClick={() => room.current?.setTeam(true)}>
+            🤝 チーム戦（8〜10人）
+          </button>
+        </div>
+        {team && (
+          <p className="online-lead">
+            2つの部屋（A・B）に分かれて別々に進めます。部屋ごとに時代の並びが違います。同じ番号のチームの2クラスは、学年末テストと卒業式だけ合同で受け、合わせた値で順位を競います。最後はチームの2クラスの合計点で勝負。
+          </p>
+        )}
       </section>
       <section>
         <h3>期間</h3>
@@ -235,11 +283,12 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
         <button className="btn ghost" onClick={onExit}>
           ルームを閉じる
         </button>
-        <button className="btn primary big" disabled={seats.length < 2 || seats.some((s) => s.kind === 'guest' && !s.online)} onClick={() => room.current?.startGame()}>
+        <button className="btn primary big" disabled={!canStart} onClick={() => room.current?.startGame()}>
           ゲーム開始！
         </button>
       </div>
-      {seats.length < 2 && <p className="online-lead">2人以上（CPU可）で始められます</p>}
+      {!team && seats.length < 2 && <p className="online-lead">2人以上（CPU可）で始められます</p>}
+      {team && !teamReady(seats.length) && <p className="online-lead">チーム戦は、2つの部屋が同じ人数になるよう偶数（4〜10人。CPU可）で始められます</p>}
     </div>
   );
 }
@@ -299,6 +348,7 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
         banner={
           <div className="net-banner">
             <span className="net-code">🏠{code}</span>
+            <TeamBadge state={snap.state} me={snap.you} />
             {snap.status !== 'joined' && <span className="net-warn">📵 通信が切れました。つなぎ直しています…</span>}
           </div>
         }
@@ -314,7 +364,7 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
           <p className="online-lead">ルームを作った人がゲームを始めるのを待っています…（期間：{snap.lobby.years}年）</p>
           <section>
             <h3>プレイヤー</h3>
-            <SeatList seats={snap.lobby.seats} you={snap.you} />
+            <SeatList lobby={snap.lobby} you={snap.you} />
           </section>
         </>
       ) : (

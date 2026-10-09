@@ -261,6 +261,7 @@ export function cpuAction(s: GameState): Action | null {
     }
     case 'result':
       return { type: 'continue' };
+    case 'teamWait':
     case 'gameOver':
       return null;
   }
