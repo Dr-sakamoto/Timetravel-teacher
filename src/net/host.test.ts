@@ -114,6 +114,14 @@ describe('チーム戦の部屋を作った人', () => {
     const joint = room.snap.joint!;
     expect(joint).toBeDefined();
     expect(joint.phase.kind).toBe('roles');
+    // 選択カーソル：相方が選んでいるところは、軽い知らせで全員に配られる
+    deliver('h', { cid: 'g1', m: { t: 'cursor', seq: room.snap.seq, cur: { slot: 2 } } });
+    expect(room.snap.cursors).toEqual([{ seat: 1, cur: { slot: 2 } }]);
+    const cur = sent.at(-1)!;
+    expect(cur.m).toEqual({ t: 'cursors', seq: room.snap.seq, cursors: [{ seat: 1, cur: { slot: 2 } }] });
+    // 古い版からのカーソルは捨てる
+    deliver('h', { cid: 'g1', m: { t: 'cursor', seq: room.snap.seq - 1, cur: { slot: 0 } } });
+    expect(room.snap.cursors).toEqual([{ seat: 1, cur: { slot: 2 } }]);
     // 係決め：ホストの案だけでは決まらず、相方に案が届く
     const roles = cpuAction({ ...joint, players: joint.players.map((p) => ({ ...p, isCpu: true })) })!;
     expect(roles.type).toBe('setRoles');
@@ -123,6 +131,16 @@ describe('チーム戦の部屋を作った人', () => {
     expect(room.proposals()).toEqual([expect.objectContaining({ seat: 0, pi: 0, action: mine })]);
     const last = sent.filter((x) => x.m.t === 'state').at(-1)!;
     expect(last.m.t === 'state' && last.m.joint && last.m.props?.length).toBe(1);
+    // 確定はトグル：取り消すと点線に戻り、相方が同じ案を出しても決まらない
+    room.withdraw(0);
+    expect(room.proposals()).toEqual([]);
+    deliver('h', { cid: 'g1', m: { t: 'action', seq: room.snap.seq, action: mine } });
+    expect(room.snap.state!.phase.kind === 'roles' && room.snap.state!.phase.ready[0]).toBe(false);
+    expect(room.proposals()).toEqual([expect.objectContaining({ seat: 1 })]);
+    // ゲストも取り消せる
+    deliver('h', { cid: 'g1', m: { t: 'withdraw', seq: room.snap.seq } });
+    expect(room.proposals()).toEqual([]);
+    room.apply(mine, room.snap.seq);
     // 相方が同じ案を出すと決まる
     deliver('h', { cid: 'g1', m: { t: 'action', seq: room.snap.seq, action: mine } });
     const ph = room.snap.state!.phase;

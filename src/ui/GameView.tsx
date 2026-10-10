@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cpuAction } from '../game/ai';
-import { MONTHS, actingPlayer, cyborgable, inGuerrilla, nextTurnPlayer, droppable, equippable, exchangePairs, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth } from '../game/engine';
-import type { Action, GameState } from '../game/types';
+import { MONTHS, actingPlayer, jointHomes, cyborgable, inGuerrilla, nextTurnPlayer, droppable, equippable, exchangePairs, exchangeTargets, kachikomiTargets, slotsNow, termOfMonth } from '../game/engine';
+import type { Action, GameState, Player } from '../game/types';
 import type { Pick } from './Center';
 import { Center } from './Center';
 import { GameOver } from './GameOver';
@@ -9,6 +9,8 @@ import { OpponentSeat, Playmat, type EraMark } from './Playmat';
 import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
 import { useGameFx } from './useGameFx';
+import type { CursorMarks } from './Proposals';
+import type { Cursor } from '../net/protocol';
 
 interface Props {
   state: GameState;
@@ -25,8 +27,10 @@ interface Props {
   banner?: ReactNode;
   /** 観戦（チーム戦でもう一方の部屋を見る）：何も操作できず、手番の人の教室を手前に出す */
   spectate?: boolean;
-  /** 合体したクラス：相方が選んでいる場のカード（位置 → 相方の名前） */
-  marks?: Record<number, string>;
+  /** 合体したクラス（チーム戦の3学期）：2人の選択カーソルの枠 */
+  cursorMarks?: CursorMarks;
+  /** 合体したクラス：自分が今どこを選んでいるか（相方の画面に枠で出す） */
+  onCursor?: (c: Cursor) => void;
 }
 
 /** 名札に出す時代の印：近代の電球の特許💡と、飾っているひまわりの絵🖼️ */
@@ -41,7 +45,7 @@ function eraMarks(state: GameState, pi: number): EraMark[] {
   return out;
 }
 
-export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner, spectate = false, marks }: Props) {
+export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver = true, offline, banner, spectate = false, cursorMarks, onCursor }: Props) {
   const online = mySeat !== undefined || spectate;
   const ph = state.phase;
   const actor = actingPlayer(state);
@@ -52,6 +56,11 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const [peek, setPeek] = useState<number | null>(null);
   const [focus, setFocus] = useState(() => mySeat ?? state.players.find((p) => !p.isCpu)?.id ?? 0);
   const [pick, setPick] = useState<Pick>({ uid: null, target: null, theirUid: null });
+  /** 中央で選んでいる場のカード（合体したクラスで相方に枠を見せる） */
+  const [sel, setSel] = useState<number | null>(null);
+  useEffect(() => {
+    onCursor?.({ slot: sel, uid: pick.uid, target: pick.target, theirUid: pick.theirUid });
+  }, [sel, pick.uid, pick.target, pick.theirUid, onCursor]);
   const logRef = useRef<HTMLDivElement>(null);
   const feltRef = useRef<HTMLDivElement>(null);
   // どのカードから何点入ったかの演出（CPUの「速い」設定では早送り）
@@ -164,6 +173,12 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const matLit = (i: number) => fx?.lit(i) ?? lit;
   const fxDim = (i: number) => (fx?.dims(i) ? (u: string) => fx.dims(i)!.has(u) : undefined);
   const me = state.players[focus];
+  // 合体したクラス（チーム戦の3学期）：もとの部屋に戻るとき、どちらのクラスへ帰る子かを色で分け、帰るクラスごとに並べる
+  const homesOf = (pi: number) => (state.joint ? jointHomes(state, pi) : undefined);
+  const byHome = (p: Player, homes?: Record<string, { room: number }>): Player =>
+    homes ? { ...p, students: [...p.students].sort((x, y) => (homes[x.uid]?.room ?? 0) - (homes[y.uid]?.room ?? 0)) } : p;
+  const focusHomes = homesOf(focus);
+  const peekHomes = peek !== null ? homesOf(peek) : undefined;
   const editingRoles = ph.kind === 'roles' && !ph.ready[focus] && !me.isCpu && !spectate;
 
   return (
@@ -218,12 +233,13 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               onClick={() => pickOpponent(pi)}
               sworn={state.oath?.players.includes(pi)}
               marks={eraMarks(state, pi)}
+              frames={cursorMarks?.target[pi]}
             />
           ))}
         </div>
         {/* 相手の教室は卓に出さない（名札をタップしたときだけ開く） */}
         <div className="stage">
-          <Center state={state} dispatch={dispatch} cpuBusy={(cpuTurn && ph.kind !== 'roles') || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} marks={marks} />
+          <Center state={state} dispatch={dispatch} cpuBusy={(cpuTurn && ph.kind !== 'roles') || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} frames={cursorMarks?.slot} onSel={onCursor ? setSel : undefined} />
         </div>
         <div className="near-seat">
           {editingRoles ? (
@@ -236,7 +252,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
             />
           ) : (
             <Playmat
-              player={shown(focus)}
+              player={byHome(shown(focus), focusHomes)}
               year={state.year}
               slots={slots}
               variant="near"
@@ -256,6 +272,9 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
                   : undefined
               }
               selectedUid={choosing ? pick.uid : null}
+              frames={cursorMarks?.uid}
+              homes={focusHomes}
+              homeNames={state.joint?.names?.[focus]}
               dimUid={selectable.length ? (uid) => !selectable.some((x) => x.uid === uid) : fxDim(focus)}
             />
           )}
@@ -270,12 +289,14 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
             </button>
             {peekPicking && <div className="peek-hint">こちらのクラスに来てもらう生徒をタップ（アイコンの数が同じ子だけ。係の子は選べない）</div>}
             <Playmat
-              player={state.players[peek]}
+              player={byHome(state.players[peek], peekHomes)}
               year={state.year}
               slots={slots}
               variant="peek"
               sworn={state.oath?.players.includes(peek)}
               marks={eraMarks(state, peek)}
+              homes={peekHomes}
+              homeNames={state.joint?.names?.[peek]}
               delta={deltas.get(peek)}
               lit={lit}
               onSeatClick={

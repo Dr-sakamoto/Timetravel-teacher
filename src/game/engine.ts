@@ -281,6 +281,23 @@ function drawYearEras(s: GameState) {
   }
 }
 
+/**
+ * チーム戦：2つの部屋の1年の時代を、1・2学期は全部ちがう時代に、3学期（合体する学期）は同じ時代にそろえる。
+ * 部屋Aの時代はそのまま、部屋Bの1・2学期を部屋Aと被らない時代に引き直す
+ */
+function assignTeamEras(a: GameState, b: GameState) {
+  const shared = a.yearEras[2];
+  const picked: number[] = [];
+  for (let guard = 0; picked.length < 2 && guard < 100; guard++) {
+    if (b.eraDeck.length === 0) b.eraDeck = shuffle(b, [...ALL_ERAS]);
+    const e = b.eraDeck.pop()!;
+    if (!a.yearEras.includes(e) && !picked.includes(e)) picked.push(e);
+  }
+  b.yearEras = [...picked, shared];
+  // 部屋Bも3学期にその時代を使ったので、あとの年に引かないようにする
+  b.eraDeck = b.eraDeck.filter((e) => e !== shared);
+}
+
 /** 今の学期の時代 */
 export function currentEra(s: GameState): number {
   const t = termOfMonth(MONTHS[Math.min(s.monthIdx, MONTHS.length - 1)]);
@@ -610,6 +627,18 @@ function newYear(s: GameState) {
   drawYearEras(s);
   s.monthIdx = 0;
   startTerm(s);
+}
+
+/** チーム戦の新しい学年：2つの部屋の時代をそろえてから（assignTeamEras）、1学期を始める */
+function newTeamYear(a: GameState, b: GameState) {
+  for (const x of [a, b]) {
+    x.year++;
+    drawYearEras(x);
+    x.monthIdx = 0;
+  }
+  assignTeamEras(a, b);
+  startTerm(a);
+  startTerm(b);
 }
 
 // ---------- イベント解決 ----------
@@ -1591,10 +1620,37 @@ export function mergeTeams(rooms: GameState[]): GameState | null {
   s.uidCounter = counter;
   // 人物は、どちらの部屋でもまだ来ていない子だけ
   for (const era of Object.keys(s.pools) as EraId[]) s.pools[era] = a.pools[era].filter((id) => b.pools[era].includes(id));
-  s.joint = { bUids };
+  s.joint = { bUids, aUids: a.players.flatMap((p) => p.students.map((x) => x.uid)), names: a.players.map((pa, i) => [pa.name, b.players[i].name]) };
   log(s, `3学期はチームの2クラスが合体！ ${s.players.map((p) => p.name).join('／')}`);
   startTerm(s);
   return s;
+}
+
+/**
+ * 合体したクラスの生徒を、もとの2クラスに分ける：もとのクラスの子はもとのクラスへ、3学期に来た子は人数の少ないほうへ。
+ * 定員をこえたら、もう一方へ
+ */
+function splitStudents(students: Student[], fromA: Set<string>, fromB: Set<string>, capA: number, capB: number): [Student[], Student[]] {
+  const sa = students.filter((x) => fromA.has(x.uid));
+  const sb = students.filter((x) => fromB.has(x.uid));
+  for (const x of students.filter((y) => !fromA.has(y.uid) && !fromB.has(y.uid))) (sa.length <= sb.length ? sa : sb).push(x);
+  while (sa.length > capA && sb.length < capB) sb.push(sa.pop()!);
+  while (sb.length > capB && sa.length < capA) sa.push(sb.pop()!);
+  return [sa, sb];
+}
+
+/** 合体したクラスの生徒が、もとの部屋に戻るときにどちらのクラスへ帰るか（0=部屋A・1=部屋B）と、3学期に来た子か */
+export function jointHomes(s: GameState, pi: number): Record<string, { room: number; fresh: boolean }> {
+  const j = s.joint;
+  const p = s.players[pi];
+  if (!j || !p) return {};
+  const fromB = new Set(j.bUids);
+  const fromA = new Set(j.aUids ?? p.students.filter((x) => !fromB.has(x.uid)).map((x) => x.uid));
+  const half = Math.floor(classCap(p) / 2);
+  const [sa, sb] = splitStudents(p.students, fromA, fromB, half, classCap(p) - half);
+  const out: Record<string, { room: number; fresh: boolean }> = {};
+  for (const [room, list] of [sa, sb].entries()) for (const x of list) out[x.uid] = { room, fresh: !fromA.has(x.uid) && !fromB.has(x.uid) };
+  return out;
 }
 
 /**
@@ -1621,13 +1677,7 @@ export function splitTeams(rooms: GameState[], joint: GameState): GameState[] | 
   a.players = joint.players.map((jp, i) => {
     const pa = a0.players[i];
     const pb = b0.players[i];
-    const fromA = new Set(pa.students.map((x) => x.uid));
-    const sa = jp.students.filter((x) => fromA.has(x.uid));
-    const sb = jp.students.filter((x) => fromB.has(x.uid));
-    for (const x of jp.students.filter((y) => !fromA.has(y.uid) && !fromB.has(y.uid))) (sa.length <= sb.length ? sa : sb).push(x);
-    // 定員をこえたら、もう一方へ
-    while (sa.length > classCap(pa) && sb.length < classCap(pb)) sb.push(sa.pop()!);
-    while (sb.length > classCap(pb) && sa.length < classCap(pa)) sa.push(sb.pop()!);
+    const [sa, sb] = splitStudents(jp.students, new Set(pa.students.map((x) => x.uid)), fromB, classCap(pa), classCap(pb));
     const d = jp.points - pa.points - pb.points;
     const back = (p: Player, students: Student[], gain: number): Player => ({
       ...p,
@@ -1640,10 +1690,8 @@ export function splitTeams(rooms: GameState[], joint: GameState): GameState[] | 
     return back(pa, sa, Math.floor(d / 2));
   });
   b.uidCounter = a.uidCounter;
-  for (const x of [a, b]) {
-    log(x, '3学期が終わり、合体していたクラスはもとの部屋に戻った。');
-    newYear(x);
-  }
+  for (const x of [a, b]) log(x, '3学期が終わり、合体していたクラスはもとの部屋に戻った。');
+  newTeamYear(a, b);
   return syncTeams([a, b]);
 }
 
@@ -1658,9 +1706,11 @@ export function syncTeams(rooms: GameState[]): GameState[] {
   });
 }
 
-/** チーム戦を始める：2つの部屋（同じ人数）を別々の乱数で作る。部屋ごとに1年の時代の並びが変わる */
+/** チーム戦を始める：2つの部屋（同じ人数）を別々の乱数で作る。1・2学期は部屋ごとにちがう時代を旅し、3学期は同じ時代で合流する */
 export function newTeamGame(rooms: SetupPlayer[][], years: number, seed = Date.now()): GameState[] {
   const states = rooms.map((setup, r) => ({ ...newGame(setup, years, seed + r * 7919), team: { room: r, mates: [] } }));
+  assignTeamEras(states[0], states[1]);
+  states[1].eventDeck = buildDeck(states[1]);
   return syncTeams(states);
 }
 

@@ -3,7 +3,7 @@ import { cpuAction, rolesAction } from '../game/ai';
 import { actingPlayer, calendarLabel, mergeTeams, newGame, newTeamGame, splitTeams, step, syncTeams } from '../game/engine';
 import { SAVE_VERSION } from '../game/saveVersion';
 import type { Action, GameState } from '../game/types';
-import { canAct, maxSeats, MAX_SEATS, pairClasses, pairDefaultClass, pairHasRoom, pairOwners, roomSeats, sameAction, seatRoom, teamPartner, teamReady, waitsFor, PING_MS, TIMEOUT_MS, type Lobby, type Proposal, type Seat, type ToGuest, type ToHost, type ToHostEnvelope } from './protocol';
+import { canAct, maxSeats, MAX_SEATS, pairClasses, pairDefaultClass, pairHasRoom, pairOwners, roomSeats, sameAction, seatRoom, teamPartner, teamReady, waitsFor, PING_MS, TIMEOUT_MS, type Cursor, type Lobby, type Proposal, type Seat, type SeatCursor, type ToGuest, type ToHost, type ToHostEnvelope } from './protocol';
 
 const SAVE_KEY = 'jikuu-saikyou-host-v1';
 
@@ -22,6 +22,8 @@ export interface HostSnap {
   joint?: GameState;
   /** 合体したクラスで出ている案（相方と同じ案になったら決まる） */
   props?: Proposal[];
+  /** 合体した卓で、みんなが今どこを選んでいるか（確定前の枠） */
+  cursors?: SeatCursor[];
 }
 
 interface HostSave {
@@ -183,6 +185,12 @@ export class HostRoom {
       case 'pick':
         this.pickClass(i, m.cls);
         return;
+      case 'cursor':
+        if (this.snap.joint && m.seq === this.snap.seq) this.setCursor(i, m.cur);
+        return;
+      case 'withdraw':
+        if (this.snap.joint && m.seq === this.snap.seq) this.withdraw(i);
+        return;
       case 'ping':
         // 「通信切れ」になっていた人が戻ってきた
         if (!this.snap.lobby.seats[i].online) this.checkAlive();
@@ -257,12 +265,14 @@ export class HostRoom {
       const split = splitTeams(rooms, next);
       // 版の番号はどの画面から見ても前に進むように、合体の前後で一番大きい番号の次にする
       const seq = this.snap.seq + 1;
-      if (split) this.set({ rooms: split, seqs: [seq, seq], joint: undefined, props: undefined, state: split[0], seq });
+      if (split) this.set({ rooms: split, seqs: [seq, seq], joint: undefined, props: undefined, cursors: undefined, state: split[0], seq });
       else {
         // 係決め（一斉）の案は、ほかのクラスが準備OKになっても、自分のクラスがまだなら残す
         const ph = next.phase;
         const props = ph.kind === 'roles' && joint.phase.kind === 'roles' ? this.snap.props?.filter((x) => !ph.ready[x.pi]) : undefined;
-        this.set({ joint: next, props, state: next, seq });
+        // 同じ人が同じ場面で選んでいる途中なら、選択カーソルも残す
+        const same = ph.kind === joint.phase.kind && (ph.kind === 'gameOver' || joint.phase.kind === 'gameOver' || ph.player === joint.phase.player);
+        this.set({ joint: next, props, cursors: same ? this.snap.cursors : undefined, state: next, seq });
       }
       this.broadcast();
       this.drive();
@@ -276,7 +286,7 @@ export class HostRoom {
     const merged = mergeTeams(nextRooms);
     if (merged) {
       const seq = Math.max(...nextSeqs) + 1;
-      this.set({ rooms: nextRooms, seqs: nextSeqs, joint: merged, props: undefined, state: merged, seq });
+      this.set({ rooms: nextRooms, seqs: nextSeqs, joint: merged, props: undefined, cursors: undefined, state: merged, seq });
       this.broadcast();
       this.drive();
       return;
@@ -284,6 +294,23 @@ export class HostRoom {
     this.set({ rooms: nextRooms, seqs: nextSeqs, state: nextRooms[0], seq: nextSeqs[0] });
     this.broadcastRoom(room);
     this.drive();
+  }
+
+  /** 合体した卓で、席 seat の人の選択カーソルを変えて、みんなに配る（状態ごとではなく軽い知らせで） */
+  setCursor(seat: number, cur: Cursor) {
+    if (!this.snap.joint) return;
+    const prev = this.snap.cursors?.find((x) => x.seat === seat);
+    if (prev && JSON.stringify(prev.cur) === JSON.stringify(cur)) return;
+    const cursors = [...(this.snap.cursors ?? []).filter((x) => x.seat !== seat), { seat, cur }];
+    this.set({ cursors });
+    if (this.snap.lobby.seats.some((s) => s.kind === 'guest')) this.sendTo('*', { t: 'cursors', seq: this.snap.seq, cursors });
+  }
+
+  /** 合体した卓で、席 seat の人の確定を取り消す（選択カーソルは点線に戻る） */
+  withdraw(seat: number) {
+    if (!this.snap.joint || !this.snap.props?.some((x) => x.seat === seat)) return;
+    this.set({ props: this.snap.props.filter((x) => x.seat !== seat) });
+    this.broadcast();
   }
 
   /** 合体した卓で、CPUが進める操作か（「次へ」はだれでも） */
@@ -353,7 +380,7 @@ export class HostRoom {
   private sendState(to: string, you: number) {
     if (!this.snap.state) return;
     if (this.snap.joint) {
-      return this.sendTo(to, { t: 'state', seq: this.snap.seq, state: this.snap.joint, you: -1, seats: this.snap.lobby.seats, joint: true, props: this.snap.props ?? [] });
+      return this.sendTo(to, { t: 'state', seq: this.snap.seq, state: this.snap.joint, you: -1, seats: this.snap.lobby.seats, joint: true, props: this.snap.props ?? [], cursors: this.snap.cursors ?? [] });
     }
     if (!this.snap.rooms) {
       const pair = this.snap.lobby.pair || undefined;

@@ -3,9 +3,9 @@ import { PLAYER_COLORS } from '../game/engine';
 import type { Action, GameState } from '../game/types';
 import { GuestRoom, type GuestSnap } from '../net/guest';
 import { clearHostSave, HostRoom, loadHostSave, type HostSnap } from '../net/host';
-import { joinUrl, loadName, maxSeats, newRoomCode, normalizeCode, pairClasses, pairHasRoom, pairOffline, pairOwners, saveName, seatRoom, teamReady, PAIR_SIZE, type Lobby, type Seat } from '../net/protocol';
+import { joinUrl, loadName, maxSeats, newRoomCode, normalizeCode, pairClasses, pairHasRoom, pairOffline, pairOwners, saveName, seatRoom, teamReady, PAIR_SIZE, type Cursor, type Lobby, type Seat } from '../net/protocol';
 import { GameView } from './GameView';
-import { mateMarks, ProposalBar } from './Proposals';
+import { cursorMarks, ProposalBar } from './Proposals';
 
 type Mode = { kind: 'menu' } | { kind: 'host'; resume: boolean } | { kind: 'guest'; code: string };
 
@@ -258,6 +258,11 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
   const room = useRef<HostRoom | null>(null);
   const [snap, setSnap] = useState<HostSnap | null>(null);
   const [watching, setWatching] = useState(true);
+  const [myCur, setMyCur] = useState<Cursor | null>(null);
+  const onCursor = useCallback((c: Cursor) => {
+    setMyCur(c);
+    room.current?.setCursor(0, c);
+  }, []);
 
   useEffect(() => {
     const save = resume ? loadHostSave() : null;
@@ -315,7 +320,8 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
         onRules={onRules}
         me={me}
         driver
-        marks={snap.joint ? mateMarks(snap.props, 0) : undefined}
+        cursorMarks={snap.joint ? cursorMarks(seats, 0, snap.props, snap.cursors) : undefined}
+        onCursor={snap.joint ? onCursor : undefined}
         offline={(i) => {
           if (snap.lobby.pair) return pairOffline(seats, pairOwners(seats), i);
           // 合体した卓：クラス i は部屋Aの席 2i と部屋Bの席 2i+1 の2人
@@ -329,7 +335,9 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
             <span className="net-code">🏠{snap.code}</span>
             <TeamBadge state={snap.state} me={0} />
             {snap.lobby.pair && <PairBadge seats={seats} you={me} />}
-            {snap.joint && <ProposalBar state={snap.joint} seats={seats} mySeat={0} props={snap.props ?? []} onAgree={dispatch} />}
+            {snap.joint && (
+              <ProposalBar state={snap.joint} seats={seats} mySeat={0} props={snap.props ?? []} cursor={myCur} onConfirm={dispatch} onWithdraw={() => room.current?.withdraw(0)} />
+            )}
             {toggle}
             {snap.status !== 'open' && <span className="net-warn">{snap.error ?? '通信サーバーにつないでいます…'}</span>}
             {lost.map(({ s, i }) => (
@@ -409,7 +417,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
         )}
         {team && (
           <p className="online-lead">
-            1・2学期は2つの部屋（A・B）に分かれて別々に進めます（部屋ごとに時代の並びが違います）。3学期だけは、同じ番号のチームの2クラスが合体して1つの大きなクラス（18席）になり、全員が1つの卓で遊びます。合体したクラスは2人で操作し、2人が同じ操作をしたら決まります（相方の案は画面に出て「👍 この案で決める」で合わせられます）。学年末テスト・卒業式は合体したクラスどうしで勝負。次の学年があれば、もとの2つの部屋に戻ります。
+            1・2学期は2つの部屋（A・B）に分かれ、ちがう時代を旅します。3学期は同じ時代で合流します。3学期だけは、同じ番号のチームの2クラスが合体して1つの大きなクラス（18席）になり、全員が1つの卓で遊びます。合体したクラスは2人で操作します。それぞれが選んでいるところに色つきの枠が出て、2人の確定した枠が同じものに重なったら決まります。学年末テスト・卒業式は合体したクラスどうしで勝負。次の学年があれば、もとの2つの部屋に戻ります。
           </p>
         )}
       </section>
@@ -446,6 +454,11 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
   const room = useRef<GuestRoom | null>(null);
   const [snap, setSnap] = useState<GuestSnap | null>(null);
   const [watching, setWatching] = useState(true);
+  const [myCur, setMyCur] = useState<Cursor | null>(null);
+  const onCursor = useCallback((c: Cursor) => {
+    setMyCur(c);
+    room.current?.cursor(c);
+  }, []);
 
   useEffect(() => {
     // 読み込み直しても同じ部屋に戻れるよう、部屋番号をURLに残す
@@ -519,7 +532,8 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
         onRules={onRules}
         me={snap.you}
         driver={false}
-        marks={snap.jointSeat !== undefined ? mateMarks(snap.props, snap.jointSeat) : undefined}
+        cursorMarks={snap.jointSeat !== undefined ? cursorMarks(seats, snap.jointSeat, snap.props, snap.cursors) : undefined}
+        onCursor={snap.jointSeat !== undefined ? onCursor : undefined}
         offline={(i) =>
           owner
             ? pairOffline(seats, owner, i)
@@ -532,7 +546,17 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
             <span className="net-code">🏠{code}</span>
             <TeamBadge state={snap.state} me={snap.you} />
             {owner && <PairBadge seats={seats} you={snap.you} />}
-            {snap.jointSeat !== undefined && <ProposalBar state={snap.state} seats={seats} mySeat={snap.jointSeat} props={snap.props ?? []} onAgree={dispatch} />}
+            {snap.jointSeat !== undefined && (
+              <ProposalBar
+                state={snap.state}
+                seats={seats}
+                mySeat={snap.jointSeat}
+                props={snap.props ?? []}
+                cursor={myCur}
+                onConfirm={dispatch}
+                onWithdraw={() => room.current?.withdraw()}
+              />
+            )}
             {toggle}
             {snap.status !== 'joined' && <span className="net-warn">📵 通信が切れました。つなぎ直しています…</span>}
           </div>
