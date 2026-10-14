@@ -9,6 +9,7 @@ import { normalizeCode } from './net/protocol';
 import { Rules } from './ui/Rules';
 import { ScoreDemo } from './ui/ScoreDemo';
 import { OgpCard } from './ui/OgpCard';
+import { PrintSheet } from './ui/PrintSheet';
 import { finishedPlays, track, trackGameStart } from './analytics';
 import { useTracking } from './ui/useTracking';
 
@@ -47,6 +48,8 @@ export default function App() {
   if (location.hash.startsWith('#score-demo')) return <ScoreDemo />;
   // SNSのリンクのカードの構図（#ogp。撮影して public/ogp.png にする）
   if (location.hash.startsWith('#ogp')) return <OgpCard />;
+  // 紙の試作品の印刷用シート（#print）
+  if (location.hash.startsWith('#print')) return <PrintSheet />;
   return <Game />;
 }
 
@@ -175,7 +178,7 @@ function Title({
           遊び方
         </button>
       </div>
-      <p className="title-foot">2〜5人（通信対戦のペア担任・チーム戦は最大10人） ・ 1台を回すホットシート式／スマホどうしの通信対戦 ・ CPUとも対戦可 ・ 偉人/恐竜カード{CARDS.length}種</p>
+      <p className="title-foot">2〜5人（通信対戦のペア担任・チーム戦は最大10人） ・ 1台を回すホットシート式／スマホどうしの通信対戦 ・ CPUとも対戦可 ・ 偉人/恐竜カード{CARDS.length}種 ・ <a href="./about/">このゲームについて・配信の方へ</a></p>
     </div>
   );
 }

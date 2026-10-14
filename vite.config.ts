@@ -30,7 +30,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,ico}'],
         // SNSのリンクのカード用の画像は、アプリの中では使わないので端末に持たせない
-        globIgnores: ['ogp.png'],
+        // 紹介ページ（/about/）は、アプリの中では使わないので端末に持たせない
+        globIgnores: ['ogp.png', 'about/**'],
+        // 紹介ページを開いたときに、アプリの画面に差し替えない
+        navigateFallbackDenylist: [/\/about\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,

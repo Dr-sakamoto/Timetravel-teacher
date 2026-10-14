@@ -83,6 +83,9 @@ npm run build   # dist/ に静的ファイルを出力
 通信対戦の中継サーバーを別の Supabase プロジェクトにする時は、ビルド時に `VITE_RELAY_URL`（プロジェクトのURL）と `VITE_RELAY_KEY`（公開用の publishable キー）を指定します。Supabase の無料プロジェクトは、しばらく使われないと休止するので、`.github/workflows/keepalive.yml` が3日ごとにアクセスして起こしておきます。
 
 - **計測**：`src/analytics.ts` が [Vercel Web Analytics](https://vercel.com/docs/analytics) に、来訪 → ゲーム開始（`game_start`）→ 1学期を終えた（`term1_done`）→ 最後まで遊んだ（`game_finish`）→ 次のゲームを始めた（`replay`）と、シェア（`share_result`・`invite_share`）・招待リンクで開いた（`invite_open`）を送る。カスタムイベントは Vercel の有料プランでしか見られないので、同じできごとを仮想ページ `/f/<名前>` の表示としても送っている（無料プランでも「Pages」の一覧で数を見られる）。Vercel のプロジェクトの Analytics を有効にしておくこと。Vercel 以外（開発サーバー・GitHub Pages）では何も送らない
+- **紹介ページ・プレスキット**：`public/about/index.html`（`/about/`。実況者・メディア向けの紹介文・画像・配信の案内）と `public/about/privacy.html`（プライバシーポリシー）。アプリとは別の静的なページで、PWAの事前キャッシュには入れない
+- **紙の試作品の印刷用シート**：`#print`（`src/ui/PrintSheet.tsx`）。全カードをポーカーサイズで A4 に9枚ずつ並べる。作り方は [docs/prototype.md](docs/prototype.md)
+- **収益化の計画と必要なお金**：[docs/monetization.md](docs/monetization.md)
 - **SNSのリンクのカード**：`index.html` の OGP と `public/ogp.png`（1200×630）。画像は `#ogp`（`src/ui/OgpCard.tsx`）の画面を 1200×630 で撮ったもの。顔ぶれや文言を変えたら撮り直す。公開URLを変える時は `index.html` と `src/site.ts` を合わせて直す
 
 進行状況はブラウザの localStorage に自動保存され、タイトル画面の「続きから」で再開できます。
