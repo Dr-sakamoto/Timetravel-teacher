@@ -29,6 +29,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,ico}'],
+        // SNSのリンクのカード用の画像は、アプリの中では使わないので端末に持たせない
+        globIgnores: ['ogp.png'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,

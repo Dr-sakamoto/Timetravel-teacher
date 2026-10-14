@@ -225,6 +225,8 @@ export interface GameState {
   patent?: number;
   /** ゴッホのひまわり：各クラスが飾った絵（描いた子と、描いたときの点。学期の区切りに値打ちが出て消える） */
   sunflower?: { player: number; uid: string; pts: number }[];
+  /** 体験版：1年生の1学期だけ遊び、1学期の終わりに卒業式（years は 1） */
+  trial?: boolean;
   /** チーム戦（8〜10人）：2つの部屋で別々に進め、同じ席番号のクラスどうしがチーム。3学期だけはチームの2クラスが合体する */
   team?: TeamInfo;
   /** チーム戦の3学期：チームの2クラスが合体した卓（部屋Aをもとにする） */

@@ -189,9 +189,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
             {state.year}年生 {month}月
           </b>
           <span>{term === 0 ? '夏休み' : `${term}学期`}</span>
-          <small>
-            {state.year}/{state.years}年
-          </small>
+          <small>{state.trial ? '体験版（1学期だけ）' : `${state.year}/${state.years}年`}</small>
         </div>
         <EraBar state={state} />
         <div className="top-actions">

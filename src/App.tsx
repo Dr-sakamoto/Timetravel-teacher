@@ -8,6 +8,9 @@ import { Online } from './ui/Online';
 import { normalizeCode } from './net/protocol';
 import { Rules } from './ui/Rules';
 import { ScoreDemo } from './ui/ScoreDemo';
+import { OgpCard } from './ui/OgpCard';
+import { finishedPlays, track, trackGameStart } from './analytics';
+import { useTracking } from './ui/useTracking';
 
 const SAVE_KEY = 'timetravel-teacher-save-v10';
 
@@ -32,10 +35,18 @@ function writeSave(s: GameState | null) {
 }
 
 const DEFAULT_NAMES = ['赤井先生', '青山先生', '緑川先生', '黄瀬先生', '紫藤先生'];
+/** 「まず15分で遊んでみる」：あなた＋CPU2人で、1学期だけ */
+const TRIAL_PLAYERS = [
+  { name: 'あなた', isCpu: false },
+  { name: DEFAULT_NAMES[1], isCpu: true },
+  { name: DEFAULT_NAMES[2], isCpu: true },
+];
 
 export default function App() {
   // 得点演出の見本（#score-demo）
   if (location.hash.startsWith('#score-demo')) return <ScoreDemo />;
+  // SNSのリンクのカードの構図（#ogp。撮影して public/ogp.png にする）
+  if (location.hash.startsWith('#ogp')) return <OgpCard />;
   return <Game />;
 }
 
@@ -46,8 +57,20 @@ function Game() {
   const [roomCode] = useState(() => normalizeCode(new URLSearchParams(location.search).get('room') ?? ''));
   const [screen, setScreen] = useState<'title' | 'setup' | 'game' | 'online'>(() => (roomCode ? 'online' : 'title'));
   const [rules, setRules] = useState(false);
+  useEffect(() => {
+    if (roomCode) track('invite_open');
+  }, [roomCode]);
 
   const dispatch = useCallback((a: Action) => setState((s) => (s ? step(s, a) : s)), []);
+  useTracking(screen === 'game' ? state : null, 'local');
+
+  /** years が 0 なら体験版（1学期だけ） */
+  const start = (players: { name: string; isCpu: boolean }[], years: number) => {
+    const trial = years === 0;
+    setState(newGame(players, trial ? 1 : years, Date.now(), trial));
+    setScreen('game');
+    trackGameStart(trial ? 'trial' : 'local', { players: players.length, humans: players.filter((p) => !p.isCpu).length, years });
+  };
 
   useEffect(() => {
     if (state) writeSave(state);
@@ -65,6 +88,7 @@ function Game() {
         <Title
           saved={saved}
           onNew={() => setScreen('setup')}
+          onTrial={() => start(TRIAL_PLAYERS, 0)}
           onOnline={() => setScreen('online')}
           onContinue={() => {
             if (saved) {
@@ -78,10 +102,7 @@ function Game() {
       {screen === 'setup' && (
         <Setup
           onBack={() => setScreen('title')}
-          onStart={(players, years) => {
-            setState(newGame(players, years));
-            setScreen('game');
-          }}
+          onStart={start}
         />
       )}
       {screen === 'online' && <Online initialCode={roomCode} onExit={() => setScreen('title')} onRules={() => setRules(true)} />}
@@ -96,16 +117,25 @@ function Game() {
 function Title({
   saved,
   onNew,
+  onTrial,
   onOnline,
   onContinue,
   onRules,
 }: {
   saved: GameState | null;
   onNew: () => void;
+  onTrial: () => void;
   onOnline: () => void;
   onContinue: () => void;
   onRules: () => void;
 }) {
+  // はじめての人には、設定なしですぐ遊べる体験版をいちばん目立たせる
+  const first = !saved && finishedPlays() === 0;
+  const trial = (
+    <button className={`btn big ${first ? 'primary' : ''}`} onClick={onTrial}>
+      ▶ まず15分で遊んでみる <small>CPU2人と・1学期だけ</small>
+    </button>
+  );
   const parade = ['🦖', '👸', '🏛️', '🐉', '🌸', '🎨', '⚔️', '🌅', '🎩', '🏫', '🤖'];
   return (
     <div className="title-screen">
@@ -130,7 +160,8 @@ function Title({
         </p>
       </div>
       <div className="title-buttons">
-        <button className="btn primary big" onClick={onNew}>
+        {first && trial}
+        <button className={`btn big ${first ? '' : 'primary'}`} onClick={onNew}>
           新しく始める
         </button>
         <button className="btn big" onClick={onOnline}>
@@ -141,6 +172,7 @@ function Title({
             ▶ 続きから <small>{calendarLabel(saved)}</small>
           </button>
         )}
+        {!first && trial}
         <button className="btn ghost" onClick={onRules}>
           遊び方
         </button>
@@ -200,6 +232,7 @@ function Setup({
         <h3>期間</h3>
         <div className="seg">
           {[
+            [0, '1学期だけ（体験・約15分）'],
             [1, '1年（短め・約30分〜）'],
             [2, '2年'],
             [3, '3年（じっくり）'],

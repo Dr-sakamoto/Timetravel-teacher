@@ -124,7 +124,8 @@ export interface SetupPlayer {
   isCpu: boolean;
 }
 
-export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()): GameState {
+/** trial：体験版（1年生の1学期だけ遊んで、1学期の終わりに卒業式） */
+export function newGame(setup: SetupPlayer[], years: number, seed = Date.now(), trial = false): GameState {
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
@@ -143,7 +144,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
       roles: [],
       points: 0,
     })),
-    years,
+    years: trial ? 1 : years,
     year: 1,
     monthIdx: 0,
     queue: setup.map((_, i) => i),
@@ -157,10 +158,11 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
     uidCounter: 0,
     logCounter: 0,
     log: [],
+    ...(trial ? { trial: true } : {}),
   };
   drawYearEras(s);
   s.eventDeck = buildDeck(s);
-  log(s, `時空最強クラス決定戦、開幕！ ${years}年間の勝負です。`);
+  log(s, trial ? '時空最強クラス決定戦、開幕！ 体験版：1学期だけの勝負です。' : `時空最強クラス決定戦、開幕！ ${years}年間の勝負です。`);
   return s;
 }
 
@@ -501,7 +503,8 @@ function advanceMonth(s: GameState) {
     return;
   }
   s.monthIdx++;
-  if (s.monthIdx >= MONTHS.length) {
+  // 体験版は1学期の終わりで卒業式
+  if (s.monthIdx >= MONTHS.length || (s.trial && MONTHS[s.monthIdx] === 9)) {
     yearEnd(s);
     return;
   }

@@ -4,7 +4,9 @@ import type { Action, GameState } from '../game/types';
 import { GuestRoom, type GuestSnap } from '../net/guest';
 import { clearHostSave, HostRoom, loadHostSave, type HostSnap } from '../net/host';
 import { joinUrl, loadName, maxSeats, newRoomCode, normalizeCode, pairClasses, pairHasRoom, pairOffline, pairOwners, saveName, seatRoom, teamReady, PAIR_SIZE, type Cursor, type Lobby, type Seat } from '../net/protocol';
+import { track, trackGameStart } from '../analytics';
 import { GameView } from './GameView';
+import { useTracking } from './useTracking';
 import { cursorMarks, ProposalBar } from './Proposals';
 
 type Mode = { kind: 'menu' } | { kind: 'host'; resume: boolean } | { kind: 'guest'; code: string };
@@ -233,10 +235,12 @@ function ShareCode({ code }: { code: string }) {
   const share = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: '時空最強クラス決定戦', text: `部屋番号 ${code} で一緒に遊ぼう！`, url });
+        await navigator.share({ title: '時空最強クラス決定戦', text: `偉人や恐竜を転校させて、時空最強のクラスを作るボードゲーム。部屋番号 ${code} で一緒に遊ぼう！`, url });
+        track('invite_share', { via: 'share' });
         return;
       }
       await navigator.clipboard.writeText(url);
+      track('invite_share', { via: 'copy' });
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -275,6 +279,7 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
 
   const seq = snap?.seq ?? 0;
   const dispatch = useCallback((a: Action) => room.current?.apply(a, seq), [seq]);
+  useTracking(snap?.state, 'online-host');
 
   if (!snap) return null;
   const quit = () => {
@@ -439,7 +444,10 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
         <button className="btn ghost" onClick={onExit}>
           ルームを閉じる
         </button>
-        <button className="btn primary big" disabled={!canStart} onClick={() => room.current?.startGame()}>
+        <button className="btn primary big" disabled={!canStart} onClick={() => {
+            room.current?.startGame();
+            trackGameStart('online-host', { players: snap.lobby.seats.length, years: snap.lobby.years });
+          }}>
           ゲーム開始！
         </button>
       </div>
@@ -470,6 +478,12 @@ function GuestScreen({ code, name, onExit, onRules }: { code: string; name: stri
   }, [code, name]);
 
   const dispatch = useCallback((a: Action) => room.current?.act(a), []);
+  useTracking(snap?.state, 'online-guest');
+  // ゲームが始まった（途中から入り直した時も、この画面で初めて卓を見た時に1回だけ数える）
+  const playing = !!snap?.state;
+  useEffect(() => {
+    if (playing) trackGameStart('online-guest');
+  }, [playing]);
 
   if (!snap) return null;
   const quit = () => {

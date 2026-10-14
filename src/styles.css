@@ -4360,3 +4360,65 @@ body:has(.title-screen) {
   color: #fff;
   box-shadow: 0 0 8px #69db7c;
 }
+
+/* リンクをボタンの見た目で（結果画面の「𝕏 でポスト」など） */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* OGP画像の構図（#ogp） */
+.ogp {
+  width: 1200px;
+  height: 630px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 30% 40%, #24503d, #10201a);
+  border: 14px solid #b08850;
+  box-sizing: border-box;
+}
+.ogp-text {
+  width: 520px;
+  padding-left: 48px;
+  text-align: left;
+}
+.ogp-text .title-logo {
+  white-space: nowrap;
+  font-size: 66px;
+  line-height: 1.1;
+  margin: 0.15em 0;
+}
+.ogp-text .title-sub {
+  font-size: 22px;
+}
+.ogp-lead {
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.45;
+  color: #fff;
+  margin: 0.6em 0;
+}
+.ogp-foot {
+  font-size: 22px;
+  color: #ffd43b;
+  font-weight: 700;
+}
+.ogp-cards {
+  position: relative;
+  flex: 1;
+  height: 100%;
+}
+.ogp-card {
+  position: absolute;
+  width: 118px;
+  transform: scale(1.6) rotate(var(--r));
+  transform-origin: top left;
+}
+.ogp-card:nth-child(1) { left: 10px; top: 24px; --r: -4deg; }
+.ogp-card:nth-child(2) { left: 215px; top: 12px; --r: 0deg; }
+.ogp-card:nth-child(3) { left: 420px; top: 24px; --r: 4deg; }
+.ogp-card:nth-child(4) { left: 10px; top: 314px; --r: -4deg; }
+.ogp-card:nth-child(5) { left: 215px; top: 302px; --r: 0deg; }
+.ogp-card:nth-child(6) { left: 420px; top: 314px; --r: 4deg; }
