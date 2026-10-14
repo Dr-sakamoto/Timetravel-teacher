@@ -71,7 +71,7 @@ export async function renderResult(s: GameState): Promise<Blob> {
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffd43b';
-  fitText(ctx, `🏆 時空最強クラス決定！${s.trial ? '（体験版）' : ''}`, 48, 78, 700, 40, 900);
+  fitText(ctx, '🏆 時空最強クラス決定！', 48, 78, 700, 40, 900);
 
   // 優勝クラスと点数
   ctx.fillStyle = '#ffffff';

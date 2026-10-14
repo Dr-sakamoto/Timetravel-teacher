@@ -65,22 +65,6 @@ describe('engine', () => {
     }
   }
 
-  it('trial: plays only the first term, then holds the graduation at the end of term 1', () => {
-    let s = newGame(Array.from({ length: 3 }, (_, i) => ({ name: `P${i + 1}`, isCpu: true })), 3, 42, true);
-    expect(s.trial).toBe(true);
-    expect(s.years).toBe(1);
-    const months = new Set<number>();
-    let steps = 0;
-    while (s.phase.kind !== 'gameOver') {
-      months.add(MONTHS[s.monthIdx]);
-      if (s.phase.kind === 'result' && s.phase.ctx === 'final') expect(s.phase.result.title).toContain('卒業式');
-      s = step(s, cpuAction(s)!);
-      if (++steps > 20000) throw new Error('did not finish');
-    }
-    expect(s.year).toBe(1);
-    expect([...months].filter((m) => m !== 3).every((m) => termOfMonth(m) === 1)).toBe(true);
-  });
-
   it('turn order is fixed within a term and starts from the lowest score each new term', () => {
     let s = newGame(Array.from({ length: 4 }, (_, i) => ({ name: `P${i + 1}`, isCpu: true })), 2, 4);
     let term = '';

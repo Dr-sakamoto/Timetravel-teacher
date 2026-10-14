@@ -17,7 +17,7 @@ export function useTracking(state: GameState | null | undefined, mode: string) {
   const term1Done = !!state && (state.year > 1 || termOfMonth(MONTHS[Math.min(state.monthIdx, MONTHS.length - 1)]) !== 1 || over);
   useEffect(() => {
     if (!state) return;
-    const props = { mode, players: state.players.length, years: state.years, trial: !!state.trial };
+    const props = { mode, players: state.players.length, years: state.years };
     // 1学期を終えた：この画面で1学期を遊んでいたゲームだけ数える（2学期以降のセーブから再開した時は数えない）
     if (!term1Done) seen.add(`${key}/inTerm1`);
     else if (seen.has(`${key}/inTerm1`)) once(`${key}/term1`, () => track('term1_done', props));

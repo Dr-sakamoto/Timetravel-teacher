@@ -35,7 +35,7 @@ function writeSave(s: GameState | null) {
 }
 
 const DEFAULT_NAMES = ['赤井先生', '青山先生', '緑川先生', '黄瀬先生', '紫藤先生'];
-/** 「まず15分で遊んでみる」：あなた＋CPU2人で、1学期だけ */
+/** 「まず遊んでみる」：設定なしに、あなた＋CPU2人で1年 */
 const TRIAL_PLAYERS = [
   { name: 'あなた', isCpu: false },
   { name: DEFAULT_NAMES[1], isCpu: true },
@@ -64,10 +64,8 @@ function Game() {
   const dispatch = useCallback((a: Action) => setState((s) => (s ? step(s, a) : s)), []);
   useTracking(screen === 'game' ? state : null, 'local');
 
-  /** years が 0 なら体験版（1学期だけ） */
-  const start = (players: { name: string; isCpu: boolean }[], years: number) => {
-    const trial = years === 0;
-    setState(newGame(players, trial ? 1 : years, Date.now(), trial));
+  const start = (players: { name: string; isCpu: boolean }[], years: number, trial = false) => {
+    setState(newGame(players, years));
     setScreen('game');
     trackGameStart(trial ? 'trial' : 'local', { players: players.length, humans: players.filter((p) => !p.isCpu).length, years });
   };
@@ -88,7 +86,7 @@ function Game() {
         <Title
           saved={saved}
           onNew={() => setScreen('setup')}
-          onTrial={() => start(TRIAL_PLAYERS, 0)}
+          onTrial={() => start(TRIAL_PLAYERS, 1, true)}
           onOnline={() => setScreen('online')}
           onContinue={() => {
             if (saved) {
@@ -133,7 +131,7 @@ function Title({
   const first = !saved && finishedPlays() === 0;
   const trial = (
     <button className={`btn big ${first ? 'primary' : ''}`} onClick={onTrial}>
-      ▶ まず15分で遊んでみる <small>CPU2人と・1学期だけ</small>
+      ▶ まず遊んでみる <small>CPU2人と・1年・約30分</small>
     </button>
   );
   const parade = ['🦖', '👸', '🏛️', '🐉', '🌸', '🎨', '⚔️', '🌅', '🎩', '🏫', '🤖'];
@@ -232,7 +230,6 @@ function Setup({
         <h3>期間</h3>
         <div className="seg">
           {[
-            [0, '1学期だけ（体験・約15分）'],
             [1, '1年（短め・約30分〜）'],
             [2, '2年'],
             [3, '3年（じっくり）'],
