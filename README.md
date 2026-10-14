@@ -21,6 +21,8 @@
 
 **遊ぶ：https://timetravel-teacher.vercel.app/** （PWA対応。Chrome/Edgeのアドレスバーの「インストール」でPCアプリとして使え、オフラインでも動きます）
 
+はじめての人は、タイトルの「▶ まず遊んでみる」で、設定なしにCPU2人と1年（約30分）遊べます。遊び終わったら、結果の画面の「📸 結果を画像でシェア」「𝕏 でポスト」で、優勝したクラスの顔ぶれを画像にして送れます。
+
 スマホは**横向き**で遊ぶ想定です（卓全体が1画面に収まります。縦向きだと横にするよう案内が出ます）。
 
 画面には自分の教室と、手番の人の教室だけが出ます。ほかの人の教室は小さく畳まれていて、タップするとポップアップで見られます。
@@ -79,6 +81,12 @@ npm run build   # dist/ に静的ファイルを出力
 - `src/net/` — 通信対戦。`host.ts` がルームを作った人の端末（ゲームを進めて全員に状態を配る）、`guest.ts` が参加した人の端末（操作を送る）、`protocol.ts` がやりとりの型と「今その人が操作してよいか」の判定、`relay.ts` が中継サーバーとのやりとり
 
 通信対戦の中継サーバーを別の Supabase プロジェクトにする時は、ビルド時に `VITE_RELAY_URL`（プロジェクトのURL）と `VITE_RELAY_KEY`（公開用の publishable キー）を指定します。Supabase の無料プロジェクトは、しばらく使われないと休止するので、`.github/workflows/keepalive.yml` が3日ごとにアクセスして起こしておきます。
+
+- **計測**：`src/analytics.ts` が [Vercel Web Analytics](https://vercel.com/docs/analytics) に、来訪 → ゲーム開始（`game_start`）→ 1学期を終えた（`term1_done`）→ 最後まで遊んだ（`game_finish`）→ 次のゲームを始めた（`replay`）と、シェア（`share_result`・`invite_share`）・招待リンクで開いた（`invite_open`）を送る。カスタムイベントは Vercel の有料プランでしか見られないので、同じできごとを仮想ページ `/f/<名前>` の表示としても送っている（無料プランでも「Pages」の一覧で数を見られる）。Vercel のプロジェクトの Analytics を有効にしておくこと。Vercel 以外（開発サーバー・GitHub Pages）では何も送らない
+- **紹介ページ・プレスキット**：`public/about/index.html`（`/about/`。実況者・メディア向けの紹介文・画像・配信の案内）と `public/about/privacy.html`（プライバシーポリシー）。アプリとは別の静的なページで、PWAの事前キャッシュには入れない
+- **紙の試作品の印刷用シート**：`#print`（`src/ui/PrintSheet.tsx`）。全カードをポーカーサイズで A4 に9枚ずつ並べる。作り方は [docs/prototype.md](docs/prototype.md)
+- **収益化の計画と必要なお金**：[docs/monetization.md](docs/monetization.md)
+- **SNSのリンクのカード**：`index.html` の OGP と `public/ogp.png`（1200×630）。画像は `#ogp`（`src/ui/OgpCard.tsx`）の画面を 1200×630 で撮ったもの。顔ぶれや文言を変えたら撮り直す。公開URLを変える時は `index.html` と `src/site.ts` を合わせて直す
 
 進行状況はブラウザの localStorage に自動保存され、タイトル画面の「続きから」で再開できます。
 保存データの版（`src/game/saveVersion.ts` の `SAVE_VERSION`）は「形の版＋データの指紋」です。人物・イベント・グッズ・時代などのデータを変えると指紋が自動で変わり、前の版の保存データは読み込まれなくなります（名前や説明文だけの変更では変わりません）。GameState の項目の名前や意味を変えたときだけ、`SAVE_SCHEMA` を手で上げてください。

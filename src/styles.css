@@ -4360,3 +4360,253 @@ body:has(.title-screen) {
   color: #fff;
   box-shadow: 0 0 8px #69db7c;
 }
+
+/* リンクをボタンの見た目で（結果画面の「𝕏 でポスト」など） */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* OGP画像の構図（#ogp） */
+.ogp {
+  width: 1200px;
+  height: 630px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 30% 40%, #24503d, #10201a);
+  border: 14px solid #b08850;
+  box-sizing: border-box;
+}
+.ogp-text {
+  width: 520px;
+  padding-left: 48px;
+  text-align: left;
+}
+.ogp-text .title-logo {
+  white-space: nowrap;
+  font-size: 66px;
+  line-height: 1.1;
+  margin: 0.15em 0;
+}
+.ogp-text .title-sub {
+  font-size: 22px;
+}
+.ogp-lead {
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.45;
+  color: #fff;
+  margin: 0.6em 0;
+}
+.ogp-foot {
+  font-size: 22px;
+  color: #ffd43b;
+  font-weight: 700;
+}
+.ogp-cards {
+  position: relative;
+  flex: 1;
+  height: 100%;
+}
+.ogp-card {
+  position: absolute;
+  width: 118px;
+  transform: scale(1.6) rotate(var(--r));
+  transform-origin: top left;
+}
+.ogp-card:nth-child(1) { left: 10px; top: 24px; --r: -4deg; }
+.ogp-card:nth-child(2) { left: 215px; top: 12px; --r: 0deg; }
+.ogp-card:nth-child(3) { left: 420px; top: 24px; --r: 4deg; }
+.ogp-card:nth-child(4) { left: 10px; top: 314px; --r: -4deg; }
+.ogp-card:nth-child(5) { left: 215px; top: 302px; --r: 0deg; }
+.ogp-card:nth-child(6) { left: 420px; top: 314px; --r: 4deg; }
+
+/* 紙の試作品の印刷用シート（#print） */
+.print-root {
+  background: #888;
+  min-height: 100vh;
+  padding: 12px 0 40px;
+  color: var(--ink);
+}
+.print-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  margin: 0 auto 12px;
+  max-width: 210mm;
+  padding: 10px 14px;
+  background: var(--paper);
+  border-radius: 8px;
+}
+.print-bar small {
+  flex-basis: 100%;
+  color: #555;
+}
+.print-page {
+  position: relative;
+  width: 210mm;
+  height: 297mm;
+  margin: 0 auto 12px;
+  background: #fff;
+  display: grid;
+  grid-template-columns: repeat(3, 63mm);
+  grid-auto-rows: 88mm;
+  justify-content: center;
+  align-content: center;
+  overflow: hidden;
+}
+.pcard {
+  position: relative;
+  width: 63mm;
+  height: 88mm;
+  outline: 0.2mm dashed #bbb;
+  overflow: hidden;
+}
+.pcard-tag {
+  position: absolute;
+  right: 1.5mm;
+  bottom: 0.6mm;
+  font-size: 6pt;
+  color: #999;
+}
+.pcard-person {
+  width: 63mm;
+  height: 88mm;
+  position: relative;
+}
+.pcard-scale {
+  width: 118px;
+  transform: scale(calc(63 / 118 * 3.7795));
+  transform-origin: top left;
+}
+.pcard-scale .tcg {
+  max-width: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.pcard-cost {
+  position: absolute;
+  right: 2.5mm;
+  top: 2.5mm;
+  padding: 0.6mm 1.8mm;
+  border-radius: 99px;
+  background: #c2410c;
+  color: #fff;
+  font-weight: 900;
+  font-size: 9pt;
+  border: 0.4mm solid #fff;
+}
+.pcard-event {
+  box-sizing: border-box;
+  width: 63mm;
+  height: 88mm;
+  border: 2.5mm solid #7a6a4f;
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-bottom: 3mm;
+}
+.pcard-event.k-normal {
+  background: #fff8dc;
+}
+.pcard-event.k-kachikomi {
+  background: #ffe3e3;
+}
+.pe-head {
+  align-self: stretch;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.8mm 2mm;
+  color: #fff;
+  font-size: 7.5pt;
+  font-weight: 900;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+}
+.pe-guerrilla {
+  margin-top: 1mm;
+  font-size: 7pt;
+  font-weight: 900;
+  color: #7b2cbf;
+}
+.pe-icon {
+  font-size: 30pt;
+  line-height: 1.2;
+  margin-top: 2mm;
+}
+.pe-name {
+  font-size: 12pt;
+  font-weight: 900;
+  padding: 0 2mm;
+}
+.pe-attr {
+  margin-left: 1mm;
+}
+.pe-rule {
+  margin: 2mm 3mm 0;
+  padding: 1.5mm 2mm;
+  border-radius: 2mm;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 7.5pt;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+}
+.pe-desc {
+  margin: 1.5mm 3mm 0;
+  font-size: 6.5pt;
+  color: #555;
+  line-height: 1.35;
+  text-align: left;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+.pe-cost {
+  margin-top: auto;
+  padding: 0 2mm;
+  font-size: 9pt;
+  font-weight: 900;
+  color: #c2410c;
+}
+.pe-cost.free {
+  color: #2b8a3e;
+}
+.print-pageno {
+  position: absolute;
+  right: 6mm;
+  bottom: 4mm;
+  font-size: 7pt;
+  color: #aaa;
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-root {
+    background: none;
+    padding: 0;
+  }
+  .print-page {
+    margin: 0;
+    break-after: page;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+.title-foot a {
+  color: inherit;
+}

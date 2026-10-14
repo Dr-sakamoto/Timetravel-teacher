@@ -1,11 +1,28 @@
+import { useState } from 'react';
+import { track } from '../analytics';
 import { className, finalRanking } from '../game/engine';
 import type { GameState } from '../game/types';
+import { shareResult, xIntentUrl } from './shareResult';
 import { TcgCard } from './TcgCard';
 
 export function GameOver({ state, onQuit }: { state: GameState; onQuit: () => void }) {
   const ranking = finalRanking(state);
   const winner = ranking[0];
   const medal = ['🥇', '🥈', '🥉', '4位', '5位'];
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const share = async () => {
+    setBusy(true);
+    try {
+      const r = await shareResult(state);
+      if (r !== 'cancelled') track('share_result', { via: r });
+      if (r === 'downloaded') setSaved(true);
+    } catch {
+      /* 画像を作れなかった時は何もしない */
+    } finally {
+      setBusy(false);
+    }
+  };
   // チーム戦：同じ席番号の2クラス（この部屋のクラスと、もう一方の部屋のチームメイト）の合計点で勝負
   const team = state.team;
   const teams = team
@@ -67,6 +84,12 @@ export function GameOver({ state, onQuit }: { state: GameState; onQuit: () => vo
         );
       })}
       <div className="actions">
+        <button className="btn big" disabled={busy} onClick={share}>
+          {saved ? '🖼️ 画像を保存しました' : '📸 結果を画像でシェア'}
+        </button>
+        <a className="btn big" href={xIntentUrl(state)} target="_blank" rel="noopener noreferrer" onClick={() => track('share_result', { via: 'x' })}>
+          𝕏 でポスト
+        </a>
         <button className="btn primary big" onClick={onQuit}>
           タイトルへ戻る
         </button>
