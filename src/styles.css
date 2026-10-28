@@ -4610,3 +4610,55 @@ a.btn {
 .title-foot a {
   color: inherit;
 }
+
+/* ---------- 時代の風景（3Dの背景） ---------- */
+/* 画面いっぱいに敷き、卓（フェルト）を半透明にして奥の風景を透かす */
+.bg3d {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+/* body の背景が風景を覆わないように（:root の背景の上、body の中身の下に風景がくる） */
+body:has(.has-bg3d, .bg3d-demo) {
+  background: transparent;
+}
+.has-bg3d .felt {
+  background: radial-gradient(ellipse at 50% 40%, rgba(31, 90, 67, 0.08) 0%, rgba(25, 75, 56, 0.28) 55%, rgba(20, 63, 47, 0.62) 100%);
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .table-wrap.has-bg3d {
+    background: radial-gradient(ellipse at 60% 35%, rgba(31, 90, 67, 0.06) 0%, rgba(25, 75, 56, 0.28) 55%, rgba(20, 63, 47, 0.62) 100%);
+  }
+}
+@media (orientation: portrait) and (max-width: 900px) {
+  .has-bg3d .felt {
+    background: linear-gradient(180deg, rgba(20, 63, 47, 0.15), rgba(20, 63, 47, 0.55));
+  }
+}
+.bg3d-demo .bg3d {
+  z-index: 0;
+}
+.bg3d-panel {
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.bg3d-panel > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}

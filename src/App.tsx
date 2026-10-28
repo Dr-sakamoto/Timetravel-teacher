@@ -10,6 +10,7 @@ import { Rules } from './ui/Rules';
 import { ScoreDemo } from './ui/ScoreDemo';
 import { OgpCard } from './ui/OgpCard';
 import { PrintSheet } from './ui/PrintSheet';
+import { BackdropDemo } from './ui/bg3d/BackdropDemo';
 import { finishedPlays, track, trackGameStart } from './analytics';
 import { useTracking } from './ui/useTracking';
 
@@ -50,6 +51,8 @@ export default function App() {
   if (location.hash.startsWith('#ogp')) return <OgpCard />;
   // 紙の試作品の印刷用シート（#print）
   if (location.hash.startsWith('#print')) return <PrintSheet />;
+  // 時代の風景（3Dの背景）の見本（#bg3d）
+  if (location.hash.startsWith('#bg3d')) return <BackdropDemo />;
   return <Game />;
 }
 
