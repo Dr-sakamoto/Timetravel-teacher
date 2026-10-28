@@ -17,7 +17,6 @@ export function EraBar({ state }: { state: GameState }) {
             <span className="era-term">{t}学期</span>
             <span className="era-icon">{era.icon}</span>
             <span className="era-name">{era.name}</span>
-            <span className="era-left">残{state.pools[era.id].length}</span>
           </div>
         );
       })}

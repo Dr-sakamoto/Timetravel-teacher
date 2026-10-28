@@ -337,9 +337,6 @@ body:has(.title-screen) {
   font-size: 0.8rem;
   white-space: nowrap;
 }
-.era-chip .era-left {
-  display: none;
-}
 .era-chip.now {
   opacity: 1;
   border-color: var(--yellow);
@@ -585,11 +582,6 @@ body:has(.title-screen) {
       0 0 24px rgba(246, 216, 96, 0.6);
   }
 }
-.pile.discard {
-  background: rgba(0, 0, 0, 0.25);
-  border-style: dashed;
-  box-shadow: none;
-}
 .pile.era-pile {
   background: radial-gradient(circle, #2e3d4f, #1b2531);
 }
@@ -754,8 +746,7 @@ body:has(.title-screen) {
   color: var(--down);
   font-weight: 900;
 }
-.say-sub.era-motto,
-.deck-motto {
+.say-sub.era-motto {
   color: var(--yellow);
   font-weight: 900;
 }
@@ -2752,12 +2743,6 @@ body:has(.title-screen) {
 }
 
 /* 山札の内訳 */
-.deck-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-.deck-table th, .deck-table td { padding: 3px 6px; text-align: left; }
-.deck-table td:not(:first-child), .deck-table thead th:not(:first-child) { text-align: right; width: 4em; }
-.deck-group th { padding-top: 10px; border-bottom: 1px solid currentColor; }
-.deck-note { margin-left: 8px; font-weight: normal; opacity: 0.7; font-size: 0.85em; }
-.deck-empty { opacity: 0.4; }
 
 /* 係の種類のチップ（横向きスマホでは名前を省いて小さく） */
 @media (orientation: landscape) and (max-height: 600px) {
@@ -4675,7 +4660,7 @@ body:has(.has-bg3d, .bg3d-demo) {
   background: linear-gradient(90deg, transparent, rgba(8, 26, 18, 0.82) 14%, rgba(8, 26, 18, 0.82) 86%, transparent);
   border-block: 3px solid color-mix(in srgb, var(--era) 80%, #fff);
   box-shadow: 0 0 24px color-mix(in srgb, var(--era) 45%, transparent);
-  animation: era-band 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: era-band 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 .era-band-inner {
   display: flex;
@@ -4683,7 +4668,7 @@ body:has(.has-bg3d, .bg3d-demo) {
   gap: 0.7rem;
   color: var(--chalk);
   white-space: nowrap;
-  animation: era-band-text 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: era-band-text 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 .era-band-term {
   font-size: 0.95rem;
@@ -4735,10 +4720,10 @@ body:has(.has-bg3d, .bg3d-demo) {
 /* 木の板と枠線をやめ、うしろの風景をぼかして透かす。ガラスの色はそのクラスの担任の色 */
 .has-bg3d :is(.opp, .playmat) {
   /* 色の濃さ（--glass-tint）とすりガラスの濃さ（--glass-blur・--glass-haze）は #glass の調整パネルで変えられる */
-  background: color-mix(in srgb, var(--pc) var(--glass-tint, 36%), rgb(255 255 255 / var(--glass-haze, 0.12))) !important;
+  background: color-mix(in srgb, var(--pc) var(--glass-tint, 36%), rgb(255 255 255 / var(--glass-haze, 0.03))) !important;
   border-color: transparent;
-  -webkit-backdrop-filter: blur(var(--glass-blur, 10px)) saturate(1.25);
-  backdrop-filter: blur(var(--glass-blur, 10px)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 2.5px)) saturate(1.25);
+  backdrop-filter: blur(var(--glass-blur, 2.5px)) saturate(1.25);
   box-shadow:
     0 6px 18px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.4),

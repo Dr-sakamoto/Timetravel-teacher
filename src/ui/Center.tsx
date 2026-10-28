@@ -3,7 +3,6 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { canBuild, canTake, currentEra, kaguyaGift, kaguyaWin, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, GIFT_MAP, MARKET_SIZE, cardGlyph, kachikomiHit, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
-import { DeckInfo } from './DeckInfo';
 import { CursorFrames, type CursorMark } from './Proposals';
 import { ATTR_ICON, type Action, type EventResult, type GameState, type Player, type Student } from '../game/types';
 import { EventCardView } from './EventCardView';
@@ -92,7 +91,7 @@ function PyramidCard({ state, selected, dim, onClick, frames }: { state: GameSta
 /** ピラミッドを選んでいるときの sel の値（場のカードの位置と重ならない） */
 const PYRAMID_SEL = -1;
 
-/** 卓の中央：山札・場のカード・捨て札・めくったカードと手番の操作 */
+/** 卓の中央：山札・場のカード・めくったカードと手番の操作 */
 export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, side, frames, onSel }: Props) {
   const ph = state.phase;
   const era = ERAS[currentEra(state)];
@@ -100,7 +99,6 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
   const human = actor && !actor.isCpu && !cpuBusy;
   const canPick = human && ph.kind === 'draw';
   const canMember = human && ph.kind === 'memberDraw';
-  const [showDeck, setShowDeck] = useState(false);
   /** 手番の人が選んでいる場のカード */
   const [sel, setSel] = useState<number | null>(null);
   const selected = canPick && sel !== null && sel < state.market.length ? sel : null;
@@ -111,20 +109,18 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
 
   return (
     <div className={`center ph-${ph.kind} ${guerrilla ? 'in-guerrilla' : ''}`}>
-      {/* 山札（左）・場のカード（中央）・捨て札（右）を1列に */}
+      {/* 山札（左）・場のカード（右）を1列に。山札の残り枚数や捨て札は出さない（紙のボードゲームでは数えられない情報なので） */}
       {/* 場に並ぶ枚数（ピラミッドがあれば1枚多い）。カードの大きさを決めるのに使う */}
       <div className="board" style={{ '--mk': MARKET_SIZE + (state.pyramid ? 1 : 0) } as CSSProperties}>
         <div className="piles">
           <button className="pile event-pile" disabled title="イベントの山札">
             <span className="pile-back">🃏</span>
             <span className="pile-label">イベント</span>
-            <span className="pile-count">{state.eventDeck.length}</span>
           </button>
           {ph.kind === 'memberDraw' ? (
             <button className={`pile modern-pile ${canMember ? 'glow' : ''}`} disabled={!canMember} onClick={() => dispatch({ type: 'drawMember' })}>
               <span className="pile-back">🏫</span>
               <span className="pile-label">現代の生徒</span>
-              <span className="pile-count">{state.starters.length}</span>
             </button>
           ) : state.kaguya ? (
             // かぐや姫が滞在している間は、時代の偉人の山の場所に座る（卓の幅を変えない）
@@ -133,7 +129,6 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
             <div className="pile era-pile" style={{ borderColor: era.color }} title={`まだ転入していない${era.name}の生徒`}>
               <span className="pile-back">{era.icon}</span>
               <span className="pile-label">{era.id === 'present' ? '現代の生徒' : `${era.name}の偉人`}</span>
-              <span className="pile-count">{state.pools[era.id].length}</span>
             </div>
           )}
         </div>
@@ -170,15 +165,7 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
             )}
           </div>
         )}
-        <div className="piles">
-          <button className="pile discard" title="山札の内訳を見る" onClick={() => setShowDeck(true)}>
-            <span className="pile-back">🗑️</span>
-            <span className="pile-label">捨て札・内訳</span>
-            <span className="pile-count">{state.discard.length}</span>
-          </button>
-        </div>
       </div>
-      {showDeck && <DeckInfo state={state} onClose={() => setShowDeck(false)} />}
       <div className="action">
         <Action
           key={ph.kind}

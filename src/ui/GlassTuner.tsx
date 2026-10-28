@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 const KEY = 'ttt.glass';
-/** いまの既定（色 4・すりガラス 4 ＝ 色36%・ぼかし10px） */
-const DEFAULT = { tint: 4, frost: 4 };
+/** いまの既定（色 4・すりガラス 1 ＝ 色36%・ぼかし2.5px・くもり3%） */
+const DEFAULT = { tint: 4, frost: 1 };
 
 /** 段階（1〜10）から CSS の値へ。色は1段9%、すりガラスは1段ぼかし2.5px＋白いくもり3% */
 function apply(v: { tint: number; frost: number } | null) {

@@ -4,7 +4,7 @@ import { MONTHS, currentEra, termOfMonth } from '../game/engine';
 import type { GameState } from '../game/types';
 
 /** 帯が出ている時間（ms） */
-const SHOW = 2800;
+const SHOW = 1600;
 
 /**
  * 時代が明けた最初だけ、卓の上に「1学期 古代エジプト」の帯を重ねて出す。

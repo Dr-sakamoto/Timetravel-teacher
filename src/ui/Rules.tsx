@@ -83,7 +83,7 @@ export function Rules({ onClose }: { onClose: () => void }) {
         <p>
           山札は学期ごとに作り直す。<b>授業・カチコミ・転校・クラス替え・グッズは全時代共通</b>で、そこに
           <b>その時代の固有イベント・グッズ</b>と、<b>その時代のカードプールから人物カード最大{PERSON_CARDS_PER_TERM}枚</b>が混ざる。
-          中央の「捨て札・内訳」をタップすると今の山札と場の内訳が見られる。
+          
         </p>
         <ul className="rule-list">
           <li>
