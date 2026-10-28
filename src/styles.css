@@ -585,9 +585,6 @@ body:has(.title-screen) {
 .pile.era-pile {
   background: radial-gradient(circle, #2e3d4f, #1b2531);
 }
-.pile.modern-pile {
-  background: radial-gradient(circle, #33507a, #1e2f4a);
-}
 .pile-back {
   font-size: 1.7rem;
 }
