@@ -36,12 +36,14 @@ export class Backdrop {
   private t = 0;
   private swapTimer = 0;
   private shake = 0;
+  private sizer = new ResizeObserver(() => this.resize());
 
   constructor(private canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'low-power' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    window.addEventListener('resize', this.resize);
+    // キャンバスの大きさ（卓の大きさ）が変わったら描き直す
+    this.sizer.observe(canvas);
     this.resize();
     this.raf = requestAnimationFrame(this.loop);
   }
@@ -134,7 +136,7 @@ export class Backdrop {
   dispose() {
     cancelAnimationFrame(this.raf);
     clearTimeout(this.swapTimer);
-    window.removeEventListener('resize', this.resize);
+    this.sizer.disconnect();
     this.disposeView();
     this.renderer.dispose();
   }

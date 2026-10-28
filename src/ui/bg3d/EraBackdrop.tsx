@@ -77,6 +77,42 @@ export function EraBackdrop({ state }: { state: GameState }) {
     };
   }, []);
 
+  // 卓の緑の部分にぴったり重ねる（スマホ横向きでは .felt の箱が消え、外枠の .table-wrap が卓になる）
+  useEffect(() => {
+    const c = canvas.current;
+    const wrap = c?.parentElement;
+    if (!c || !wrap) return;
+    const table = () => {
+      const felt = wrap.querySelector<HTMLElement>('.felt');
+      return felt && getComputedStyle(felt).display !== 'contents' ? felt : wrap;
+    };
+    let watched: HTMLElement | null = null;
+    const ro = new ResizeObserver(() => place());
+    const place = () => {
+      const el = table();
+      if (el !== watched) {
+        if (watched) ro.unobserve(watched);
+        ro.observe(el);
+        watched = el;
+      }
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      c.style.left = `${r.left + el.clientLeft}px`;
+      c.style.top = `${r.top + el.clientTop}px`;
+      c.style.width = `${el.clientWidth}px`;
+      c.style.height = `${el.clientHeight}px`;
+      c.style.borderRadius = `${Math.max(0, parseFloat(cs.borderTopLeftRadius) - el.clientLeft)}px`;
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, []);
+
   const cue = cueOf(state);
   const cueKey = JSON.stringify(cue);
   useEffect(() => {

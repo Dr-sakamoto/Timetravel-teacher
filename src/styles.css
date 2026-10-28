@@ -4612,7 +4612,7 @@ a.btn {
 }
 
 /* ---------- 時代の風景（3Dの背景） ---------- */
-/* 画面いっぱいに敷き、卓（フェルト）を半透明にして奥の風景を透かす */
+/* 卓の緑の部分を、その時代の風景に置き換える（キャンバスは卓の内側にぴったり重ねる。位置は EraBackdrop が合わせる） */
 .bg3d {
   position: fixed;
   inset: 0;
@@ -4623,21 +4623,19 @@ a.btn {
   opacity: 0;
   transition: opacity 0.7s ease;
 }
-/* body の背景が風景を覆わないように（:root の背景の上、body の中身の下に風景がくる） */
+/* body の背景が風景を覆わないように、卓の外の背景は html に移す */
+html:has(.has-bg3d) {
+  background: radial-gradient(ellipse at 50% 0%, #22302a, var(--bg) 70%) fixed;
+}
 body:has(.has-bg3d, .bg3d-demo) {
   background: transparent;
 }
 .has-bg3d .felt {
-  background: radial-gradient(ellipse at 50% 40%, rgba(31, 90, 67, 0.08) 0%, rgba(25, 75, 56, 0.28) 55%, rgba(20, 63, 47, 0.62) 100%);
+  background: transparent;
 }
 @media (orientation: landscape) and (max-height: 600px) {
   .table-wrap.has-bg3d {
-    background: radial-gradient(ellipse at 60% 35%, rgba(31, 90, 67, 0.06) 0%, rgba(25, 75, 56, 0.28) 55%, rgba(20, 63, 47, 0.62) 100%);
-  }
-}
-@media (orientation: portrait) and (max-width: 900px) {
-  .has-bg3d .felt {
-    background: linear-gradient(180deg, rgba(20, 63, 47, 0.15), rgba(20, 63, 47, 0.55));
+    background: transparent;
   }
 }
 .bg3d-demo .bg3d {
