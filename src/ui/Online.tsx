@@ -375,15 +375,14 @@ function HostScreen({ name, resume, onExit, onRules }: { name: string; resume: b
   return (
     <div className="setup online">
       <h1>🏠 ルームを作りました</h1>
+      {/* 部屋番号はこの端末で決めているので、サーバーにつながる前（つながらない時）も出す */}
+      <ShareCode code={snap.code} />
       {snap.status === 'error' ? (
         <p className="online-warn">{snap.error}</p>
       ) : snap.status === 'opening' ? (
-        <p className="online-lead">{snap.error ?? '通信サーバーにつないでいます…'}</p>
+        <p className="online-warn">{snap.error ?? '通信サーバーにつないでいます…（つながるまで、ほかの人は入れません。電波のよい所で、このまま開いておいてください）'}</p>
       ) : (
-        <>
-          <ShareCode code={snap.code} />
-          <p className="online-lead">みんなに部屋番号を伝えてください。参加する人は「📱 通信対戦」→「🔢 部屋番号で入る」で入れます（招待リンクを送ってもOK）。</p>
-        </>
+        <p className="online-lead">みんなに部屋番号を伝えてください。参加する人は「📱 通信対戦」→「🔢 部屋番号で入る」で入れます（招待リンクを送ってもOK）。</p>
       )}
       <section>
         <h3>
