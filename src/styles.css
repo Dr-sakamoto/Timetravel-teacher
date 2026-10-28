@@ -4759,11 +4759,20 @@ body:has(.has-bg3d, .bg3d-demo) {
 .has-bg3d .role-zone.last::after {
   background: rgba(255, 255, 255, 0.4);
 }
-/* 「○○先生が考えています…」などの地も、無色のすりガラス */
-.has-bg3d .say {
-  background: rgba(255, 255, 255, 0.14);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+/* 卓の中央の操作の欄（場のカードの囲み・「1枚えらぶ」「まとめて」などの欄・めくったカードの説明・結果の明細）は、
+   クラスの板と同じ濃さ・同じぼかしの黒いすりガラス */
+.has-bg3d :is(.say, .market, .reveal-say, .tally-row, .lastlog) {
+  background: color-mix(in srgb, #000 var(--glass-tint, 36%), rgb(255 255 255 / var(--glass-haze, 0.03)));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 2.5px));
+  backdrop-filter: blur(var(--glass-blur, 2.5px));
+}
+.has-bg3d .market.glow {
+  box-shadow: 0 0 0 2px rgba(246, 216, 96, 0.55);
+}
+.has-bg3d .lastlog {
+  border-radius: 8px;
+  padding: 0.1rem 0.6rem;
+  color: var(--chalk);
 }
 
 /* ---------- すりガラスの調整パネル（#glass で開いたときだけ） ---------- */
