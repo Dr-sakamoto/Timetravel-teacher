@@ -35,9 +35,9 @@ export interface Pick {
 }
 
 /** 場のカード1枚の見た目 */
-function MarketCard({ id, selected, dim, onClick, buyer, frames }: { id: string; selected: boolean; dim: boolean; onClick?: () => void; buyer?: Player | null; frames?: CursorMark[] }) {
+function MarketCard({ state, id, selected, dim, onClick, buyer, frames }: { state: GameState; id: string; selected: boolean; dim: boolean; onClick?: () => void; buyer?: Player | null; frames?: CursorMark[] }) {
   const badge = <CursorFrames marks={frames} />;
-  const cost = marketCost(id, buyer ?? undefined);
+  const cost = marketCost(state, id, buyer ?? undefined);
   const costLabel = cost > 0 ? `${cost}点` : '無料';
   if (id.startsWith('person:')) {
     return (
@@ -142,6 +142,7 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
             {state.market.map((id, i) => (
               <MarketCard
                 key={`${i}-${id}`}
+                state={state}
                 id={id}
                 selected={selected === i}
                 dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
@@ -520,7 +521,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
       }
       const id = state.market[sel];
       const p = state.players[ph.player];
-      const cost = marketCost(id, p);
+      const cost = marketCost(state, id, p);
       const ok = canTake(state, ph.player, sel);
       const card = id.startsWith('person:') ? null : EVENT_MAP[id];
       const gainNow = card?.kind === 'normal' ? attrScore(p, card.attr).total : null;
@@ -553,7 +554,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
           <div className="say-sub">
             {chosen(st)} と {newcomer.name} を入れ替え
           </div>
-          {pair(() => dispatch({ type: 'makeRoom', uid: null }), `入れ替え −${marketCost(state.market[ph.slot])}`, !!pick.uid, () => pick.uid && dispatch({ type: 'makeRoom', uid: pick.uid }))}
+          {pair(() => dispatch({ type: 'makeRoom', uid: null }), `入れ替え −${marketCost(state, state.market[ph.slot])}`, !!pick.uid, () => pick.uid && dispatch({ type: 'makeRoom', uid: pick.uid }))}
         </div>
       );
     }
@@ -596,7 +597,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         <div className="say">
           改造する子をタップ
           <div className="say-sub">{chosen(st)}</div>
-          {pair(() => dispatch({ type: 'cyborg', uid: null }), `改造 −${marketCost('cyborg')}`, !!pick.uid, () => dispatch({ type: 'cyborg', uid: pick.uid }))}
+          {pair(() => dispatch({ type: 'cyborg', uid: null }), `改造 −${marketCost(state, 'cyborg')}`, !!pick.uid, () => dispatch({ type: 'cyborg', uid: pick.uid }))}
         </div>
       );
     }
@@ -608,7 +609,7 @@ function Action({ state, dispatch, cpuBusy, canContinue = true, pick, sel }: Pro
         <div className="say">
           {c.name}を装備する子をタップ（{attr}＋1）
           <div className="say-sub">{chosen(st)}</div>
-          {pair(() => dispatch({ type: 'equip', uid: null }), `装備 −${marketCost(ph.card, state.players[ph.player])}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
+          {pair(() => dispatch({ type: 'equip', uid: null }), `装備 −${marketCost(state, ph.card, state.players[ph.player])}`, !!pick.uid, () => dispatch({ type: 'equip', uid: pick.uid }))}
         </div>
       );
     }

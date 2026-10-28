@@ -124,7 +124,7 @@ export interface SetupPlayer {
   isCpu: boolean;
 }
 
-export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()): GameState {
+export function newGame(setup: SetupPlayer[], years: number, seed = Date.now(), trial = false): GameState {
   const pools = Object.fromEntries(ERAS.map((e) => [e.id, [] as string[]])) as Record<EraId, string[]>;
   for (const c of CARDS) pools[c.era].push(c.id);
   pools.present = [...MODERN_POOL];
@@ -144,6 +144,7 @@ export function newGame(setup: SetupPlayer[], years: number, seed = Date.now()):
       points: 0,
     })),
     years,
+    ...(trial && { trial }),
     year: 1,
     monthIdx: 0,
     queue: setup.map((_, i) => i),
@@ -1947,9 +1948,9 @@ export function previewStudent(id: string): Student {
   return { uid: `preview:${pid}`, cardId: pid, name: c.name, title: c.title, era: c.era, rarity: c.rarity, icon: c.icon, art: pid, attrs: [...c.attrs], flavor: c.flavor, joined: '', mvp: 0 };
 }
 
-/** 場のカードを取るのに払うクラスポイント（p を渡すと、楽市楽座でグッズがタダのクラスは0） */
-export function marketCost(id: string, p?: Player): number {
-  return isPerson(id) ? personCost(baseIcons(previewStudent(id))) : eventCost(EVENT_MAP[id], !!p?.freeGoods);
+/** 場のカードを取るのに払うクラスポイント（p を渡すと、楽市楽座でグッズがタダのクラスは0。体験版は人物が半額） */
+export function marketCost(s: GameState, id: string, p?: Player): number {
+  return isPerson(id) ? personCost(baseIcons(previewStudent(id)), !!s.trial) : eventCost(EVENT_MAP[id], !!p?.freeGoods);
 }
 
 /** 学期の頭に場を並べる（この時はゲリラは起こさず、山札の一番下に戻す） */
@@ -2008,7 +2009,7 @@ export function canTake(s: GameState, pi: number, slot: number): boolean {
   const id = s.market[slot];
   if (!id) return false;
   const p = s.players[pi];
-  const cost = marketCost(id, p);
+  const cost = marketCost(s, id, p);
   if (cost > 0 && p.points < cost) return false;
   if (isPerson(id)) return p.students.length < classCap(p) || droppable(p).length > 0;
   const c = EVENT_MAP[id];
@@ -2040,7 +2041,7 @@ function takeFromMarket(s: GameState, slot: number, discard = true): string {
 function buyPerson(s: GameState, pi: number, slot: number, gone?: Student) {
   const p = s.players[pi];
   const id = takeFromMarket(s, slot);
-  const cost = marketCost(id);
+  const cost = marketCost(s, id);
   p.points -= cost;
   const st = fromPoolId(s, personId(id), joinedLabel(s));
   addStudent(s, p, st);
@@ -2269,7 +2270,7 @@ export function step(prev: GameState, a: Action): GameState {
       const owner = s.players[ph.player];
       const st = cyborgable(owner).find((x) => x.uid === a.uid);
       if (!st) return prev;
-      owner.points -= marketCost(takeFromMarket(s, ph.slot));
+      owner.points -= marketCost(s, takeFromMarket(s, ph.slot));
       const was = st.name;
       // 元のカードに覆いかぶさる：同じ席（uid・係）のまま中身だけ入れ替わり、元のカードは消える
       Object.assign(st, {
@@ -2346,7 +2347,7 @@ export function step(prev: GameState, a: Action): GameState {
       const st = equippable(p).find((x) => x.uid === a.uid);
       if (!st) return prev;
       const free = !!p.freeGoods;
-      p.points -= marketCost(takeFromMarket(s, ph.slot, false), p);
+      p.points -= marketCost(s, takeFromMarket(s, ph.slot, false), p);
       // 楽市楽座のタダは1回きり
       delete p.freeGoods;
       st.goods = { id: c.id, name: c.name, icon: c.icon, attr: c.attr };

@@ -112,7 +112,7 @@ const KAGUYA_GIFT = (() => {
 export function marketValue(s: GameState, pi: number, slot: number): number {
   const p = s.players[pi];
   const id = s.market[slot];
-  const cost = marketCost(id, p);
+  const cost = marketCost(s, id, p);
   if (id.startsWith('person:')) {
     const out = p.students.length >= classCap(p) ? leastWorth(p) : undefined;
     const kept = p.students.filter((x) => x.uid !== out?.uid);

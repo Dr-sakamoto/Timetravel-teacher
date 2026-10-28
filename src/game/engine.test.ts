@@ -231,12 +231,23 @@ describe('engine', () => {
     }
   });
 
+  it('the trial game (one year) sells people at half price, rounded up', () => {
+    const setup = [{ name: 'A', isCpu: false }, { name: 'B', isCpu: true }];
+    const normal = newGame(setup, 1, 5);
+    const trial = newGame(setup, 1, 5, true);
+    expect(normal.trial).toBeUndefined();
+    for (const id of [...normal.pools.present, ...normal.pools.sengoku].map((x) => `person:${x}`)) {
+      expect(marketCost(trial, id)).toBe(Math.ceil(marketCost(normal, id) / 2));
+    }
+    expect(marketCost(trial, 'cyborg')).toBe(marketCost(normal, 'cyborg'));
+  });
+
   it('taking a person card costs class points; a full class must send someone away first', () => {
     let s = newGame([{ name: 'A', isCpu: true }, { name: 'B', isCpu: true }], 1, 5);
     while (s.phase.kind !== 'draw') s = step(s, cpuAction(s)!);
     const pi = s.phase.player;
     const m = `person:${s.pools.present[0]}`;
-    const cost = marketCost(m);
+    const cost = marketCost(s, m);
     expect(cost).toBeGreaterThan(0);
     // ポイントが足りなければ取れない
     const poor = structuredClone(s);
@@ -357,7 +368,7 @@ describe('engine', () => {
     t.players[pi].students = [mk('y', ['fight', 'fight']), mk('z', ['fight', 'study'])];
     t.players[pi].roles = [];
     t.market = ['kachikomi'];
-    expect(marketCost('kachikomi')).toBe(0);
+    expect(marketCost(s, 'kachikomi')).toBe(0);
     // 山札からめくっても起こらない（ゲリラではない）
     const g = structuredClone(t);
     g.market = ['n_study'];
@@ -463,7 +474,7 @@ describe('engine', () => {
     expect(st.attrs).toEqual(['study', 'sports']);
     expect(st.name).toBe('サイボーグ');
     expect(st.cardId).toBeUndefined();
-    expect(next.players[pi].points).toBe(10 - marketCost('cyborg'));
+    expect(next.players[pi].points).toBe(10 - marketCost(next, 'cyborg'));
     // もうサイボーグの子はもう一度サイボーグにできない
     const again = structuredClone(next);
     again.market[0] = 'cyborg';
@@ -1103,13 +1114,13 @@ describe('engine', () => {
       let t = structuredClone(r.after);
       t.phase = { kind: 'draw', player: 0 };
       t.market = ['g_tablet', 'g_sledge'];
-      expect(marketCost('g_tablet', t.players[0])).toBe(0);
-      expect(marketCost('g_tablet', t.players[1])).toBe(2);
+      expect(marketCost(t, 'g_tablet', t.players[0])).toBe(0);
+      expect(marketCost(t, 'g_tablet', t.players[1])).toBe(2);
       t = step(t, { type: 'take', slot: 0 });
       t = step(t, { type: 'equip', uid: 'a' });
       expect(t.players[0].points).toBe(10);
       expect(t.players[0].freeGoods).toBeFalsy();
-      expect(marketCost('g_sledge', t.players[0])).toBe(2);
+      expect(marketCost(t, 'g_sledge', t.players[0])).toBe(2);
     });
 
     it('tomikuji: everyone pays in and one class takes the pot', () => {
@@ -1307,7 +1318,7 @@ describe('engine', () => {
     const st = next.players[pi].students.find((x) => x.uid === uid)!;
     expect(st.attrs).toHaveLength(before + 1);
     expect(st.goods?.attr).toBe('study');
-    expect(next.players[pi].points).toBe(10 - marketCost('g_tablet'));
+    expect(next.players[pi].points).toBe(10 - marketCost(next, 'g_tablet'));
     // もう装備している子にはつけられない
     const again = structuredClone(next);
     again.market[0] = 'g_sledge';
