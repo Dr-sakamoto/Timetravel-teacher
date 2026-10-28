@@ -4734,10 +4734,11 @@ body:has(.has-bg3d, .bg3d-demo) {
 /* ---------- 風景を出しているときのクラスの板：プレイヤーの色のすりガラス ---------- */
 /* 木の板と枠線をやめ、うしろの風景をぼかして透かす。ガラスの色はそのクラスの担任の色 */
 .has-bg3d :is(.opp, .playmat) {
-  background: color-mix(in srgb, var(--pc) 34%, rgba(255, 255, 255, 0.12)) !important;
+  /* 色の濃さ（--glass-tint）とすりガラスの濃さ（--glass-blur・--glass-haze）は #glass の調整パネルで変えられる */
+  background: color-mix(in srgb, var(--pc) var(--glass-tint, 36%), rgb(255 255 255 / var(--glass-haze, 0.12))) !important;
   border-color: transparent;
-  -webkit-backdrop-filter: blur(10px) saturate(1.25);
-  backdrop-filter: blur(10px) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 10px)) saturate(1.25);
+  backdrop-filter: blur(var(--glass-blur, 10px)) saturate(1.25);
   box-shadow:
     0 6px 18px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
@@ -4755,7 +4756,7 @@ body:has(.has-bg3d, .bg3d-demo) {
 }
 /* 名前と点数の帯：同じ色の、少し濃いガラス */
 .has-bg3d :is(.opp-plate, .plate) {
-  background: color-mix(in srgb, var(--pc) 30%, rgba(8, 24, 18, 0.55));
+  background: color-mix(in srgb, var(--pc) var(--glass-tint, 36%), rgba(8, 24, 18, 0.55));
   border-color: transparent;
 }
 /* 席の下の机の板と空席の点線は、白い半透明に */
@@ -4781,4 +4782,61 @@ body:has(.has-bg3d, .bg3d-demo) {
   background: rgba(255, 255, 255, 0.14);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
+}
+
+/* ---------- すりガラスの調整パネル（#glass で開いたときだけ） ---------- */
+.glass-tuner {
+  position: fixed;
+  top: max(0.4rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: grid;
+  grid-template-columns: auto minmax(7rem, 12rem) 2.2rem;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 12px;
+  background: rgba(10, 24, 18, 0.88);
+  border: 2px solid var(--yellow);
+  color: var(--chalk);
+  font-size: 0.8rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.glass-tuner label {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.glass-tuner input[type='range'] {
+  width: 100%;
+  accent-color: var(--yellow);
+}
+.glass-tuner output {
+  font-weight: 900;
+  color: var(--yellow);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.glass-tuner .glass-tuner-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--chalk-dim);
+  font-size: 0.72rem;
+}
+.glass-tuner button {
+  font: inherit;
+  color: var(--chalk);
+  background: transparent;
+  border: 1px solid var(--chalk-dim);
+  border-radius: 6px;
+  padding: 0 0.5rem;
+  cursor: pointer;
+}
+.glass-tuner.glass-tuner-min {
+  display: block;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 0.25rem 0.7rem;
 }

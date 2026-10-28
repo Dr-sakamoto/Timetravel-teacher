@@ -11,6 +11,7 @@ import { EraBar } from './Timeline';
 import { useGameFx } from './useGameFx';
 import { EraBackdrop, useBackdropPref } from './bg3d/EraBackdrop';
 import { EraTitle } from './EraTitle';
+import { GlassTuner } from './GlassTuner';
 import type { CursorMarks } from './Proposals';
 import type { Cursor } from '../net/protocol';
 
@@ -189,6 +190,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
       {bg3d && <EraBackdrop state={state} />}
       {/* 渦へ突っ込み終わるころ（Warp.PLUNGE）に帯を出す */}
       <EraTitle state={state} delay={bg3d ? 1300 : 0} />
+      {/* すりガラスの濃さの調整（URLの最後に #glass を付けたときだけ） */}
+      {bg3d && location.hash === '#glass' && <GlassTuner />}
       <header className="topbar">
         <div className="calendar">
           <b>
