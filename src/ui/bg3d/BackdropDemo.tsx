@@ -10,7 +10,7 @@ export function BackdropDemo() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [bd, setBd] = useState<Backdrop | null>(null);
   const first = (location.hash.split('/')[1] as EraId | undefined) ?? 'egypt';
-  const [cue, setCue] = useState<Cue>({ era: ERAS.some((e) => e.id === first) ? first : 'egypt', pyramid: null, kaguya: null, patent: false, sunflower: 0, oath: false, plague: false });
+  const [cue, setCue] = useState<Cue>({ era: ERAS.some((e) => e.id === first) ? first : 'egypt', warp: false, pyramid: null, kaguya: null, patent: false, sunflower: 0, oath: false, plague: false });
 
   useEffect(() => {
     let made: Backdrop | null = null;
@@ -39,6 +39,9 @@ export function BackdropDemo() {
           ))}
         </div>
         <div>
+          <button className={`btn small ${cue.warp ? '' : 'ghost'}`} onClick={() => set({ warp: !cue.warp })}>
+            🌀 {cue.warp ? '次の時代へ突っ込む' : 'タイムスリップ'}
+          </button>
           {events.map((c) => (
             <button key={c.id} className="btn small ghost" onClick={() => bd?.fire(c.id)}>
               {c.icon} {c.name}

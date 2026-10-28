@@ -36,6 +36,7 @@ function cueOf(s: GameState): Cue {
   const stones = py ? py.stones.reduce((a, b) => a + b, 0) : 0;
   return {
     era: ERAS[currentEra(s)].id,
+    warp: s.phase.kind === 'memberDraw' || s.phase.kind === 'roles',
     pyramid: py ? { progress: py.need ? Math.min(1, stones / py.need) : 0, done: py.done } : null,
     kaguya: s.kaguya ? { offered: s.kaguya.filter((x) => x.by !== null).length, total: s.kaguya.length } : null,
     patent: s.patent !== undefined,

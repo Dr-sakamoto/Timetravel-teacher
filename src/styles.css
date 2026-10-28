@@ -337,9 +337,6 @@ body:has(.title-screen) {
   font-size: 0.8rem;
   white-space: nowrap;
 }
-.era-chip .era-left {
-  display: none;
-}
 .era-chip.now {
   opacity: 1;
   border-color: var(--yellow);
@@ -585,16 +582,8 @@ body:has(.title-screen) {
       0 0 24px rgba(246, 216, 96, 0.6);
   }
 }
-.pile.discard {
-  background: rgba(0, 0, 0, 0.25);
-  border-style: dashed;
-  box-shadow: none;
-}
 .pile.era-pile {
   background: radial-gradient(circle, #2e3d4f, #1b2531);
-}
-.pile.modern-pile {
-  background: radial-gradient(circle, #33507a, #1e2f4a);
 }
 .pile-back {
   font-size: 1.7rem;
@@ -754,8 +743,7 @@ body:has(.title-screen) {
   color: var(--down);
   font-weight: 900;
 }
-.say-sub.era-motto,
-.deck-motto {
+.say-sub.era-motto {
   color: var(--yellow);
   font-weight: 900;
 }
@@ -2752,12 +2740,6 @@ body:has(.title-screen) {
 }
 
 /* 山札の内訳 */
-.deck-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-.deck-table th, .deck-table td { padding: 3px 6px; text-align: left; }
-.deck-table td:not(:first-child), .deck-table thead th:not(:first-child) { text-align: right; width: 4em; }
-.deck-group th { padding-top: 10px; border-bottom: 1px solid currentColor; }
-.deck-note { margin-left: 8px; font-weight: normal; opacity: 0.7; font-size: 0.85em; }
-.deck-empty { opacity: 0.4; }
 
 /* 係の種類のチップ（横向きスマホでは名前を省いて小さく） */
 @media (orientation: landscape) and (max-height: 600px) {
@@ -4659,4 +4641,190 @@ body:has(.has-bg3d, .bg3d-demo) {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
+}
+
+/* ---------- 時代が明けたときの帯（「1学期 古代エジプト」） ---------- */
+.era-band {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 42%;
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  padding-block: 0.7rem;
+  background: linear-gradient(90deg, transparent, rgba(8, 26, 18, 0.82) 14%, rgba(8, 26, 18, 0.82) 86%, transparent);
+  border-block: 3px solid color-mix(in srgb, var(--era) 80%, #fff);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--era) 45%, transparent);
+  animation: era-band 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.era-band-inner {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  color: var(--chalk);
+  white-space: nowrap;
+  animation: era-band-text 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.era-band-term {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--yellow);
+}
+.era-band-icon {
+  font-size: 1.8rem;
+  align-self: center;
+}
+.era-band-name {
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), 0 0 18px color-mix(in srgb, var(--era) 70%, transparent);
+}
+.era-band-when {
+  font-size: 0.9rem;
+  color: var(--chalk-dim);
+}
+@keyframes era-band {
+  0% { opacity: 0; transform: scaleY(0); }
+  10% { opacity: 1; transform: scaleY(1); }
+  82% { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(0.6); }
+}
+@keyframes era-band-text {
+  0% { opacity: 0; transform: translateX(-40px); }
+  14% { opacity: 1; transform: translateX(0); }
+  82% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(30px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .era-band,
+  .era-band-inner {
+    animation-name: none;
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .era-band {
+    padding-block: 0.4rem;
+  }
+  .era-band-icon {
+    font-size: 1.4rem;
+  }
+}
+
+/* ---------- 風景を出しているときのクラスの板：プレイヤーの色のすりガラス ---------- */
+/* 木の板と枠線をやめ、うしろの風景をぼかして透かす。ガラスの色はそのクラスの担任の色 */
+.has-bg3d :is(.opp, .playmat) {
+  /* 色の濃さ（--glass-tint）とすりガラスの濃さ（--glass-blur・--glass-haze）は #glass の調整パネルで変えられる */
+  background: color-mix(in srgb, var(--pc) var(--glass-tint, 36%), rgb(255 255 255 / var(--glass-haze, 0.03))) !important;
+  border-color: transparent;
+  -webkit-backdrop-filter: blur(var(--glass-blur, 2.5px)) saturate(1.25);
+  backdrop-filter: blur(var(--glass-blur, 2.5px)) saturate(1.25);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+/* 手番の光り方はガラスでもそのまま */
+.has-bg3d :is(.opp, .playmat).acting {
+  box-shadow:
+    0 0 0 3px var(--yellow),
+    0 6px 18px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.has-bg3d .playmat {
+  color: var(--chalk);
+}
+/* 名前と点数の帯：同じ色の、少し濃いガラス */
+.has-bg3d :is(.opp-plate, .plate) {
+  background: color-mix(in srgb, var(--pc) var(--glass-tint, 36%), rgba(8, 24, 18, 0.55));
+  border-color: transparent;
+}
+/* 席の下の机の板と空席の点線は、白い半透明に */
+.has-bg3d .seat::after {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: none;
+}
+.has-bg3d .desk {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.has-bg3d .opp-seat {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+/* 係の場の敷物と仕切り */
+.has-bg3d .role-zone::before {
+  background: rgba(8, 24, 18, 0.28);
+}
+.has-bg3d .role-zone.last::after {
+  background: rgba(255, 255, 255, 0.4);
+}
+/* 卓の中央の操作の欄（「1枚えらぶ」「まとめて」などの欄・めくったカードの説明・結果の明細）は、
+   クラスの板と同じ濃さ・同じぼかしの黒いすりガラス */
+.has-bg3d :is(.say, .reveal-say, .tally-row, .lastlog) {
+  background: color-mix(in srgb, #000 var(--glass-tint, 36%), rgb(255 255 255 / var(--glass-haze, 0.03)));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 2.5px));
+  backdrop-filter: blur(var(--glass-blur, 2.5px));
+}
+.has-bg3d .lastlog {
+  border-radius: 8px;
+  padding: 0.1rem 0.6rem;
+  color: var(--chalk);
+}
+
+/* ---------- すりガラスの調整パネル（#glass で開いたときだけ） ---------- */
+.glass-tuner {
+  position: fixed;
+  top: max(0.4rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: grid;
+  grid-template-columns: auto minmax(7rem, 12rem) 2.2rem;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 12px;
+  background: rgba(10, 24, 18, 0.88);
+  border: 2px solid var(--yellow);
+  color: var(--chalk);
+  font-size: 0.8rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.glass-tuner label {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.glass-tuner input[type='range'] {
+  width: 100%;
+  accent-color: var(--yellow);
+}
+.glass-tuner output {
+  font-weight: 900;
+  color: var(--yellow);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.glass-tuner .glass-tuner-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--chalk-dim);
+  font-size: 0.72rem;
+}
+.glass-tuner button {
+  font: inherit;
+  color: var(--chalk);
+  background: transparent;
+  border: 1px solid var(--chalk-dim);
+  border-radius: 6px;
+  padding: 0 0.5rem;
+  cursor: pointer;
+}
+.glass-tuner.glass-tuner-min {
+  display: block;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 0.25rem 0.7rem;
 }
