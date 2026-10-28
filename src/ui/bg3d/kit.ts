@@ -4,6 +4,8 @@ import type { EraId } from '../../game/types';
 /** 背景に伝えるゲームの様子（毎回まるごと渡す。変わったところだけ反映する） */
 export interface Cue {
   era: EraId;
+  /** 時代と時代のあいだ（初期メンバー決め・係決め）：タイムスリップの渦を流す。終わったら渦の真ん中へ突っ込んで era へ抜ける */
+  warp: boolean;
   /** 建設中のピラミッド（古代エジプト）：積んだ石の割合 0〜1 と、完成したか */
   pyramid: { progress: number; done: boolean } | null;
   /** 滞在中のかぐや姫：差し出された宝の数／頼んでいる宝の数 */
