@@ -4730,3 +4730,55 @@ body:has(.has-bg3d, .bg3d-demo) {
     font-size: 1.4rem;
   }
 }
+
+/* ---------- 風景を出しているときのクラスの板：プレイヤーの色のすりガラス ---------- */
+/* 木の板と枠線をやめ、うしろの風景をぼかして透かす。ガラスの色はそのクラスの担任の色 */
+.has-bg3d :is(.opp, .playmat) {
+  background: color-mix(in srgb, var(--pc) 34%, rgba(255, 255, 255, 0.12)) !important;
+  border-color: transparent;
+  -webkit-backdrop-filter: blur(10px) saturate(1.25);
+  backdrop-filter: blur(10px) saturate(1.25);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+/* 手番の光り方はガラスでもそのまま */
+.has-bg3d :is(.opp, .playmat).acting {
+  box-shadow:
+    0 0 0 3px var(--yellow),
+    0 6px 18px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.has-bg3d .playmat {
+  color: var(--chalk);
+}
+/* 名前と点数の帯：同じ色の、少し濃いガラス */
+.has-bg3d :is(.opp-plate, .plate) {
+  background: color-mix(in srgb, var(--pc) 30%, rgba(8, 24, 18, 0.55));
+  border-color: transparent;
+}
+/* 席の下の机の板と空席の点線は、白い半透明に */
+.has-bg3d .seat::after {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: none;
+}
+.has-bg3d .desk {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.has-bg3d .opp-seat {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+/* 係の場の敷物と仕切り */
+.has-bg3d .role-zone::before {
+  background: rgba(8, 24, 18, 0.28);
+}
+.has-bg3d .role-zone.last::after {
+  background: rgba(255, 255, 255, 0.4);
+}
+/* 「○○先生が考えています…」などの地も、無色のすりガラス */
+.has-bg3d .say {
+  background: rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
