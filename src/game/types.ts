@@ -195,6 +195,8 @@ export interface GameState {
   rng: number;
   players: Player[];
   years: number;
+  /** 体験版（「まず遊んでみる」）：1年では高い子の元が取れないので、人物の値段を半分にする */
+  trial?: boolean;
   year: number;
   monthIdx: number;
   /** 今学期の手番の順（1学期はランダム、2学期からは得点の低い順＝最下位から） */

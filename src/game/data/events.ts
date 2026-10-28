@@ -213,8 +213,9 @@ export const MARKET_SIZE = 4;
 /** 人物カードを取るのに払うクラスポイント（カードに印刷されたアイコンの数ごと。添字＝アイコン数） */
 /** アイコンが少ない子は安くすぐ元が取れ、多い子は長い試合でないと元が取れない */
 export const PERSON_COST_BY_ICONS = [0, 2, 4, 8, 14, 24];
-export function personCost(icons: number): number {
-  return PERSON_COST_BY_ICONS[Math.min(icons, PERSON_COST_BY_ICONS.length - 1)];
+export function personCost(icons: number, trial = false): number {
+  const cost = PERSON_COST_BY_ICONS[Math.min(icons, PERSON_COST_BY_ICONS.length - 1)];
+  return trial ? Math.ceil(cost / 2) : cost;
 }
 /** グッズ・サイボーグ化を取るのに払うクラスポイント */
 export const GOODS_COST = 2;

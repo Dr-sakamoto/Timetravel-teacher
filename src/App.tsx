@@ -68,7 +68,7 @@ function Game() {
   useTracking(screen === 'game' ? state : null, 'local');
 
   const start = (players: { name: string; isCpu: boolean }[], years: number, trial = false) => {
-    setState(newGame(players, years));
+    setState(newGame(players, years, Date.now(), trial));
     setScreen('game');
     trackGameStart(trial ? 'trial' : 'local', { players: players.length, humans: players.filter((p) => !p.isCpu).length, years });
   };
