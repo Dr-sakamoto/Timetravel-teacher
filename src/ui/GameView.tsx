@@ -9,6 +9,7 @@ import { OpponentSeat, Playmat, type EraMark } from './Playmat';
 import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
 import { useGameFx } from './useGameFx';
+import { EraBackdrop, useBackdropPref } from './bg3d/EraBackdrop';
 import type { CursorMarks } from './Proposals';
 import type { Cursor } from '../net/protocol';
 
@@ -52,6 +53,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const allCpu = state.players.every((p) => p.isCpu);
   const [speed, setSpeed] = useState<'normal' | 'fast'>('normal');
   const [showLog, setShowLog] = useState(false);
+  const [bg3d, toggleBg3d] = useBackdropPref();
   /** タップして中身を見ている相手 */
   const [peek, setPeek] = useState<number | null>(null);
   const [focus, setFocus] = useState(() => mySeat ?? state.players.find((p) => !p.isCpu)?.id ?? 0);
@@ -182,7 +184,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const editingRoles = ph.kind === 'roles' && !ph.ready[focus] && !me.isCpu && !spectate;
 
   return (
-    <div className="table-wrap">
+    <div className={`table-wrap ${bg3d ? 'has-bg3d' : ''}`}>
+      {bg3d && <EraBackdrop state={state} />}
       <header className="topbar">
         <div className="calendar">
           <b>
@@ -200,6 +203,9 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               {speed === 'fast' ? '⏩' : '▶'}
             </button>
           )}
+          <button className="btn small ghost" title={bg3d ? '時代の風景を消す' : '時代の風景を出す'} onClick={toggleBg3d}>
+            {bg3d ? '🌄' : '🟩'}
+          </button>
           <button className="btn small ghost" title="ログ" onClick={() => setShowLog((v) => !v)}>
             📜
           </button>
