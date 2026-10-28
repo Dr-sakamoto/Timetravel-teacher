@@ -43,7 +43,7 @@ export class Backdrop {
   /** 'era'=時代の風景 'warp'=渦の中 'plunge'=渦の真ん中へ突っ込んでいる */
   private mode: 'era' | 'warp' | 'plunge' = 'era';
   /** 渦を抜けた直後に、風景の上にかぶせて引いていく光 */
-  private glare = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: '#e6ffdc', transparent: true, opacity: 0, depthTest: false }));
+  private glare = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: '#f2fff2', transparent: true, opacity: 0, depthTest: false }));
   private glareScene = new THREE.Scene();
   private glareCam = new THREE.Camera();
 

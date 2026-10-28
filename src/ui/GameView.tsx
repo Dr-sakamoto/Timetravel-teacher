@@ -10,6 +10,7 @@ import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
 import { useGameFx } from './useGameFx';
 import { EraBackdrop, useBackdropPref } from './bg3d/EraBackdrop';
+import { EraTitle } from './EraTitle';
 import type { CursorMarks } from './Proposals';
 import type { Cursor } from '../net/protocol';
 
@@ -186,6 +187,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   return (
     <div className={`table-wrap ${bg3d ? 'has-bg3d' : ''}`}>
       {bg3d && <EraBackdrop state={state} />}
+      {/* 渦へ突っ込み終わるころ（Warp.PLUNGE）に帯を出す */}
+      <EraTitle state={state} delay={bg3d ? 1300 : 0} />
       <header className="topbar">
         <div className="calendar">
           <b>

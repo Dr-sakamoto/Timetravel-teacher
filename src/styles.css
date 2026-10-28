@@ -4660,3 +4660,73 @@ body:has(.has-bg3d, .bg3d-demo) {
   align-items: center;
   gap: 0.25rem;
 }
+
+/* ---------- 時代が明けたときの帯（「1学期 古代エジプト」） ---------- */
+.era-band {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 42%;
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  padding-block: 0.7rem;
+  background: linear-gradient(90deg, transparent, rgba(8, 26, 18, 0.82) 14%, rgba(8, 26, 18, 0.82) 86%, transparent);
+  border-block: 3px solid color-mix(in srgb, var(--era) 80%, #fff);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--era) 45%, transparent);
+  animation: era-band 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.era-band-inner {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  color: var(--chalk);
+  white-space: nowrap;
+  animation: era-band-text 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.era-band-term {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--yellow);
+}
+.era-band-icon {
+  font-size: 1.8rem;
+  align-self: center;
+}
+.era-band-name {
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), 0 0 18px color-mix(in srgb, var(--era) 70%, transparent);
+}
+.era-band-when {
+  font-size: 0.9rem;
+  color: var(--chalk-dim);
+}
+@keyframes era-band {
+  0% { opacity: 0; transform: scaleY(0); }
+  10% { opacity: 1; transform: scaleY(1); }
+  82% { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(0.6); }
+}
+@keyframes era-band-text {
+  0% { opacity: 0; transform: translateX(-40px); }
+  14% { opacity: 1; transform: translateX(0); }
+  82% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(30px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .era-band,
+  .era-band-inner {
+    animation-name: none;
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .era-band {
+    padding-block: 0.4rem;
+  }
+  .era-band-icon {
+    font-size: 1.4rem;
+  }
+}

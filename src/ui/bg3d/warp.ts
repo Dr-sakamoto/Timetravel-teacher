@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /**
- * タイムスリップの渦（明るい緑のうずまき）。時代と時代のあいだ（初期メンバー決め・係決め）に流し、
+ * タイムスリップの渦（ミントの雲のトンネルに、ホログラムのような淡い虹色）。時代と時代のあいだ（初期メンバー決め・係決め）に流し、
  * 全員の準備ができたら真ん中の光へ突っ込んで（plunge）次の時代へ抜ける。
  * 画面いっぱいの板1枚にシェーダーで描くので、カメラも風景も使わない。
  */
@@ -29,61 +29,34 @@ float fbm(vec2 p) {
   return v;
 }
 
-// 渦の模様：渦巻きの腕にそって回りながら、真ん中へ吸い込まれていく雲（2枚を交互に重ねて、いつまでも途切れない）
-float cloud(float ang, float L, float ph, vec2 off) {
-  vec2 d = vec2(cos(ang), sin(ang));
-  float rho = (2.2 - L - ph * 1.4) * 1.7;
-  return fbm(d * rho + off);
-}
+const vec3 MINT = vec3(0.5, 0.92, 0.66);
+const vec3 DEEP = vec3(0.15, 0.56, 0.37);
 
 void main() {
   vec2 uv = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
   uv /= uZoom;
   float r = max(length(uv), 1e-4);
   float A = atan(uv.y, uv.x);
-  float L = log(r);
   float t = uTime;
 
-  // 腕の巻き具合と回る速さ（内側ほど速く見える）
-  float ang = A + 2.6 * L - t * 0.62;
-  float ph1 = fract(t * 0.16);
-  float ph2 = fract(t * 0.16 + 0.5);
-  float w1 = 1.0 - abs(2.0 * ph1 - 1.0);
-  float n = cloud(ang, L, ph1, vec2(0.0)) * w1 + cloud(ang, L, ph2, vec2(5.3, 2.1)) * (1.0 - w1);
-  float arms = pow(0.5 + 0.5 * cos(3.0 * ang), 2.2);
-  // 腕の中のもやもやした塊（銀河の塵のように、細かくちぎれて見せる）
-  vec2 d2 = vec2(cos(ang), sin(ang));
-  float clump = fbm(d2 * (7.0 - L * 5.0) + vec2(t * 0.05, 0.0));
-  float dens = smoothstep(0.3, 0.95, n * (0.5 + arms * 0.9) * (0.55 + clump * 0.9));
-  // 細かい星くず（腕にそってきらきら）
-  float grain = pow(fbm(vec2(cos(ang * 2.0), sin(ang * 2.0)) * (14.0 - L * 9.0) + t * 0.2), 5.0) * 4.0;
-  vec2 sp = d2 * (30.0 - L * 22.0);
-  float star = step(0.985, hash(floor(sp))) * (1.0 - smoothstep(0.0, 0.45, length(fract(sp) - 0.5)));
+  // 奥へ流れながらねじれる雲の壁（トンネル）
+  float depth = 0.35 / r + t * 1.2;
+  float tw = A + depth * 0.35 + t * 0.45;
+  vec2 d = vec2(cos(tw), sin(tw));
+  float w = fbm(d * 2.2 + vec2(depth * 0.9, -depth * 0.4)) * 0.8 + fbm(d * 5.0 + vec2(-depth * 1.6, depth * 0.8)) * 0.35;
+  float dens = smoothstep(0.3, 0.9, w);
 
-  // 地も明るい緑（黒いところを作らない）
-  vec3 bg = vec3(0.13, 0.5, 0.27);
-  vec3 arm = vec3(0.2, 0.75, 0.38);
-  vec3 lime = vec3(0.72, 1.0, 0.38);
-  vec3 col = bg + arm * dens * 1.1 + lime * pow(dens, 3.0) * 0.9 + lime * grain * dens + vec3(0.85, 1.0, 0.8) * star * (0.4 + dens);
-  // 外へ向かってほんの少し落ち着かせ、真ん中は白く光る
-  col *= smoothstep(1.6, 0.15, r) * 0.3 + 0.8;
-  float core = exp(-r * 6.0) * 0.9 + 0.03 / (r + 0.05);
-  col += vec3(0.75, 1.0, 0.72) * core;
+  // ミントの地に、ホログラムのような淡い虹色（ミント・ラベンダー・ピンク・水色）が場所と奥行きで移ろう
+  vec3 holo = vec3(0.72) + vec3(0.28) * cos(6.2831853 * (depth * 0.1 + A * 0.16 + w * 1.2 + t * 0.06 + vec3(0.0, 0.33, 0.67)));
+  vec3 col = mix(DEEP, MINT, dens);
+  col = mix(col, holo, 0.5 * (0.35 + dens));
+  col += vec3(1.0) * pow(dens, 4.0) * 0.15;
 
-  // 外へ飛び散る光の粒（ワープの星）
-  float sectors = 150.0;
-  float sa = (A + 3.14159265) / 6.2831853 * sectors;
-  float id = floor(sa);
-  float h = hash(vec2(id, 3.1));
-  float pos = fract(h * 7.3 + t * (0.32 + h * 0.5));
-  float rr = pos * pos * 1.9;
-  float len = 0.01 + rr * 0.09;
-  float along = 1.0 - smoothstep(0.0, len, abs(r - rr));
-  float across = 1.0 - smoothstep(0.0, 0.18, abs(fract(sa) - 0.5));
-  col += vec3(0.75, 1.0, 0.8) * along * across * step(0.45, h) * smoothstep(0.0, 0.3, rr) * 1.4;
+  // 真ん中は白く光る
+  col += vec3(0.85, 1.0, 0.9) * (exp(-r * 9.0) * 0.8 + 0.018 / (r + 0.06));
 
-  // 突っ込む瞬間：全体が白っぽい緑の光に包まれる
-  col = mix(col, vec3(0.9, 1.0, 0.86), uFlash);
+  // 突っ込む瞬間：全体が白っぽい光に包まれる
+  col = mix(col, vec3(0.95, 1.0, 0.95), uFlash);
   gl_FragColor = vec4(col, 1.0);
 }
 `;
