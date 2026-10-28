@@ -60,12 +60,13 @@ void main() {
   vec2 sp = d2 * (30.0 - L * 22.0);
   float star = step(0.985, hash(floor(sp))) * (1.0 - smoothstep(0.0, 0.45, length(fract(sp) - 0.5)));
 
-  vec3 bg = vec3(0.01, 0.07, 0.04);
-  vec3 arm = vec3(0.16, 0.85, 0.42);
+  // 地も明るい緑（黒いところを作らない）
+  vec3 bg = vec3(0.13, 0.5, 0.27);
+  vec3 arm = vec3(0.2, 0.75, 0.38);
   vec3 lime = vec3(0.72, 1.0, 0.38);
   vec3 col = bg + arm * dens * 1.1 + lime * pow(dens, 3.0) * 0.9 + lime * grain * dens + vec3(0.85, 1.0, 0.8) * star * (0.4 + dens);
-  // 外へ向かって少し暗く、真ん中は白く光る
-  col *= smoothstep(1.6, 0.15, r) * 0.85 + 0.25;
+  // 外へ向かってほんの少し落ち着かせ、真ん中は白く光る
+  col *= smoothstep(1.6, 0.15, r) * 0.3 + 0.8;
   float core = exp(-r * 6.0) * 0.9 + 0.03 / (r + 0.05);
   col += vec3(0.75, 1.0, 0.72) * core;
 
