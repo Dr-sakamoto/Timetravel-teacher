@@ -1,5 +1,5 @@
 import { ERAS, PRESENT_INDEX } from '../game/data/eras';
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { canBuild, canTake, currentEra, kaguyaGift, kaguyaWin, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, GIFT_MAP, MARKET_SIZE, cardGlyph, kachikomiHit, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
@@ -8,6 +8,7 @@ import { ATTR_ICON, type Action, type EventResult, type GameState, type Player, 
 import { EventCardView } from './EventCardView';
 import { TcgCard } from './TcgCard';
 import { KaguyaStay } from './KaguyaStay';
+import { useDealAnimation } from './dealFx';
 
 interface Props {
   state: GameState;
@@ -103,6 +104,9 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
   const [sel, setSel] = useState<number | null>(null);
   const selected = canPick && sel !== null && sel < state.market.length ? sel : null;
   const guerrilla = inGuerrilla(state);
+  const marketRef = useRef<HTMLDivElement>(null);
+  /** 場のカードの key。山札から新しく出たカードは、山札から飛んできてめくれる */
+  const keys = useDealAnimation(state.market, marketRef);
   useEffect(() => {
     onSel?.(selected);
   }, [selected, onSel]);
@@ -129,18 +133,23 @@ export function Center({ state, dispatch, cpuBusy, canContinue = true, pick, sid
           {ph.kind !== 'memberDraw' && state.kaguya && <KaguyaStay state={state} />}
         </div>
         {ph.kind !== 'memberDraw' && state.market.length > 0 && (
-          <div className={`market ${canPick ? 'glow' : ''}`}>
+          <div ref={marketRef} className={`market ${canPick ? 'glow' : ''}`}>
             {state.market.map((id, i) => (
-              <MarketCard
-                key={`${i}-${id}`}
-                state={state}
-                id={id}
-                selected={selected === i}
-                dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
-                onClick={canPick ? () => setSel(i) : undefined}
-                buyer={actor}
-                frames={frames?.[i]}
-              />
+              <div key={keys[i]} className="mslot" data-mkey={keys[i]}>
+                <MarketCard
+                  state={state}
+                  id={id}
+                  selected={selected === i}
+                  dim={!!canPick && ph.kind === 'draw' && !canTake(state, ph.player, i)}
+                  onClick={canPick ? () => setSel(i) : undefined}
+                  buyer={actor}
+                  frames={frames?.[i]}
+                />
+                {/* 山札からめくれる前の裏面（アニメーションの間だけ見える） */}
+                <span className="mcard-back" style={{ borderColor: era.color }} aria-hidden>
+                  {era.icon}
+                </span>
+              </div>
             ))}
             {/* ゲリラ中：補充しようとした場所に、山札からめくれたゲリラを示す */}
             {guerrilla &&

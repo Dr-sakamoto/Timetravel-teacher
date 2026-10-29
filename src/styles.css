@@ -4828,3 +4828,30 @@ body:has(.has-bg3d, .bg3d-demo) {
   cursor: pointer;
   padding: 0.25rem 0.7rem;
 }
+
+/* ---------- 山札をめくって場に足すアニメーション（src/ui/dealFx.ts） ---------- */
+.mslot {
+  position: relative;
+  display: flex;
+  flex: none;
+  transform-style: preserve-3d;
+}
+/* めくれる前の裏面。ふだんは隠れていて、山札から飛んでくる間だけ見える */
+.mcard-back {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: 9px;
+  border: 3px solid #e9d9b0;
+  background: radial-gradient(circle, #2e3d4f, #1b2531);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+  pointer-events: none;
+  opacity: 0;
+}
+.mslot.dealing .mcard-cost,
+.mslot.dealing .cur-frame {
+  visibility: hidden;
+}
