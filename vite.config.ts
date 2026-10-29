@@ -11,8 +11,8 @@ export default defineConfig({
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
         id: '.',
-        name: '時空最強クラス決定戦 〜タイムトラベル・ティーチャー〜',
-        short_name: '時空最強クラス',
+        name: 'タイムトラベルティーチャー',
+        short_name: 'タイムトラベルティーチャー',
         description: '歴史上の偉人や恐竜を転校させて最強のクラスを作る2〜5人用ボードゲーム',
         lang: 'ja',
         start_url: '.',
