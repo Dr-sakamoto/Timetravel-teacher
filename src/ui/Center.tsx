@@ -1,5 +1,6 @@
 import { ERAS, PRESENT_INDEX } from '../game/data/eras';
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { canBuild, canTake, currentEra, kaguyaGift, kaguyaWin, pyramidCard, inGuerrilla, marketCost, nextTurnPlayer, oathTargets, previewStudent, voteTargets } from '../game/engine';
 import { EVENT_MAP, GIFT_MAP, MARKET_SIZE, cardGlyph, kachikomiHit, shortRule } from '../game/data/events';
 import { STARTING_MEMBERS, attrScore } from '../game/calc';
@@ -236,7 +237,8 @@ function effectOf(state: GameState, pi: number, id: string): ReactNode {
 function VotePopup({ state, voter, onVote }: { state: GameState; voter: number; onVote: (target: number) => void }) {
   const [target, setTarget] = useState<number | null>(null);
   const me = state.players[voter];
-  return (
+  // .center は container-type: size で fixed の基準になってしまい、ポップアップが切れて押せなくなる。body 直下に出す
+  return createPortal(
     <div className="modal-back">
       <div className="modal vote-modal">
         <h2>
@@ -258,7 +260,8 @@ function VotePopup({ state, voter, onVote }: { state: GameState; voter: number; 
           投票する
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -267,7 +270,7 @@ function OathPopup({ state, chooser, max, onSwear }: { state: GameState; chooser
   const [targets, setTargets] = useState<number[]>([]);
   const me = state.players[chooser];
   const toggle = (pi: number) => setTargets((t) => (t.includes(pi) ? t.filter((x) => x !== pi) : t.length < max ? [...t, pi] : t));
-  return (
+  return createPortal(
     <div className="modal-back">
       <div className="modal vote-modal">
         <h2>
@@ -289,7 +292,8 @@ function OathPopup({ state, chooser, max, onSwear }: { state: GameState; chooser
           誓う
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
