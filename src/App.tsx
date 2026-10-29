@@ -13,6 +13,7 @@ import { PrintSheet } from './ui/PrintSheet';
 import { BackdropDemo } from './ui/bg3d/BackdropDemo';
 import { finishedPlays, track, trackGameStart } from './analytics';
 import { useTracking } from './ui/useTracking';
+import { resetTips } from './ui/Tutorial';
 
 const SAVE_KEY = 'timetravel-teacher-save-v10';
 
@@ -71,6 +72,7 @@ function Game() {
   useTracking(screen === 'game' ? state : null, 'local');
 
   const start = (players: { name: string; isCpu: boolean }[], years: number, trial = false) => {
+    if (trial) resetTips();
     setState(newGame(players, years, Date.now(), trial));
     setScreen('game');
     trackGameStart(trial ? 'trial' : 'local', { players: players.length, humans: players.filter((p) => !p.isCpu).length, years });

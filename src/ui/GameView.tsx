@@ -12,6 +12,7 @@ import { useGameFx } from './useGameFx';
 import { EraBackdrop, useBackdropPref } from './bg3d/EraBackdrop';
 import { EraTitle } from './EraTitle';
 import { GlassTuner } from './GlassTuner';
+import { Tutorial, useTipsPref } from './Tutorial';
 import type { CursorMarks } from './Proposals';
 import type { Cursor } from '../net/protocol';
 
@@ -56,6 +57,9 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const [speed, setSpeed] = useState<'normal' | 'fast'>('normal');
   const [showLog, setShowLog] = useState(false);
   const [bg3d, toggleBg3d] = useBackdropPref();
+  const [tipsOn, toggleTips] = useTipsPref();
+  /** チュートリアル：体験版（「まず遊んでみる」）の1台で遊ぶときだけ */
+  const tutorial = !!state.trial && !online;
   /** タップして中身を見ている相手 */
   const [peek, setPeek] = useState<number | null>(null);
   const [focus, setFocus] = useState(() => mySeat ?? state.players.find((p) => !p.isCpu)?.id ?? 0);
@@ -212,6 +216,11 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
           <button className="btn small ghost" title={bg3d ? '時代の風景を消す' : '時代の風景を出す'} onClick={toggleBg3d}>
             {bg3d ? '🌄' : '🟩'}
           </button>
+          {tutorial && (
+            <button className="btn small ghost" title={tipsOn ? 'チュートリアルのヒントを消す' : 'チュートリアルのヒントを出す'} onClick={toggleTips}>
+              {tipsOn ? '💡' : '🔕'}
+            </button>
+          )}
           <button className="btn small ghost" title="ログ" onClick={() => setShowLog((v) => !v)}>
             📜
           </button>
@@ -328,6 +337,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
       )}
 
       {fx && <div className="fx-layer">{fx.overlay}</div>}
+
+      {tutorial && tipsOn && <Tutorial state={state} me={focus} onOff={toggleTips} />}
 
       {showLog && (
         <div className="log" ref={logRef}>
