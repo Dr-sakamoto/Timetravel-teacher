@@ -36,6 +36,10 @@ export class Backdrop {
   private acc = 0;
   private t = 0;
   private swapTimer = 0;
+  /** 暗転のあとに作り替える予約が入っている */
+  private swapping = false;
+  /** 描画の仕組み（WebGL）が端末の都合で落ちている（アプリを裏に回したときなど） */
+  private lost = false;
   private shake = 0;
   private sizer = new ResizeObserver(() => this.resize());
   /** タイムスリップの渦（時代と時代のあいだだけ） */
@@ -55,8 +59,41 @@ export class Backdrop {
     this.glareScene.add(this.glare);
     // キャンバスの大きさ（卓の大きさ）が変わったら描き直す
     this.sizer.observe(canvas);
+    // スマホでアプリを裏に回すなどして描画の仕組みが落ちたら、戻ったときに今の風景（または渦）を作り直す
+    canvas.addEventListener('webglcontextlost', this.onLost);
+    canvas.addEventListener('webglcontextrestored', this.onRestored);
     this.resize();
     this.raf = requestAnimationFrame(this.loop);
+  }
+
+  private onLost = (e: Event) => {
+    e.preventDefault();
+    this.lost = true;
+  };
+  private onRestored = () => {
+    this.lost = false;
+    if (this.mode === 'era') this.build();
+    else {
+      this.warp?.dispose();
+      this.warp = null;
+      this.mode = 'era';
+      if (this.cue?.warp) this.startWarp();
+      else this.build();
+    }
+  };
+
+  /** 暗転してから fn を呼ぶ予約（予約のあいだは swapping） */
+  private later(fn: () => void) {
+    clearTimeout(this.swapTimer);
+    this.swapping = true;
+    this.swapTimer = window.setTimeout(() => {
+      this.swapping = false;
+      fn();
+    }, FADE);
+  }
+  private cancelLater() {
+    clearTimeout(this.swapTimer);
+    this.swapping = false;
   }
 
   private resize = () => {
@@ -79,6 +116,14 @@ export class Backdrop {
       return;
     }
     if (this.mode === 'warp') {
+      // 渦に入る暗転の途中で全員そろった（渦がまだできていない）：突っ込まずに、そのまま次の時代の風景を出す
+      if (!this.warp) {
+        this.cancelLater();
+        this.mode = 'era';
+        this.era = cue.era;
+        this.build();
+        return;
+      }
       // 全員そろった：渦の真ん中へグンッと突っ込み、光の中から次の時代へ
       this.mode = 'plunge';
       this.warp?.plunge(() => {
@@ -95,11 +140,11 @@ export class Backdrop {
     if (cue.era !== this.era) {
       const first = this.era === null;
       this.era = cue.era;
-      clearTimeout(this.swapTimer);
+      this.cancelLater();
       if (first) this.build();
       else {
         this.canvas.style.opacity = '0';
-        this.swapTimer = window.setTimeout(() => this.build(), FADE);
+        this.later(() => this.build());
       }
       return;
     }
@@ -118,7 +163,7 @@ export class Backdrop {
 
   /** 渦に入る（風景を出していたら、いったん暗転してから） */
   private startWarp() {
-    clearTimeout(this.swapTimer);
+    this.cancelLater();
     const begin = () => {
       this.disposeView();
       this.warp?.dispose();
@@ -131,13 +176,19 @@ export class Backdrop {
     if (!this.view && !this.warp) return begin();
     this.mode = 'warp';
     this.canvas.style.opacity = '0';
-    this.swapTimer = window.setTimeout(begin, FADE);
+    this.later(begin);
   }
 
   private build() {
     if (!this.era) return;
     this.disposeView();
-    this.view = BUILDERS[this.era]();
+    try {
+      this.view = BUILDERS[this.era]();
+    } catch (e) {
+      // 風景が作れなかった時代は、現代の風景で代わりに（真っ暗にしない）
+      console.error('風景を作れなかった', this.era, e);
+      this.view = BUILDERS.present();
+    }
     this.common = new Bursts(this.view.scene, 500, 0.8, false);
     const c = this.view.camera ?? { pos: [0, 5, 22], look: [0, 9, -40] };
     this.camera.position.set(...c.pos);
@@ -159,6 +210,12 @@ export class Backdrop {
     if (this.acc < 1 / FPS - 0.002) return;
     const step = Math.min(0.1, this.acc);
     this.acc = 0;
+    if (this.lost) return;
+    // 念のための自己回復：風景も渦もないまま止まっていたら（作り替えの予約もない）、今の時代の風景を作り直す
+    if (!this.swapping && !this.view && !this.warp && this.era) {
+      this.mode = 'era';
+      this.build();
+    }
     if (this.warp && this.mode !== 'era') {
       const w = this.warp;
       w.tick(step);
@@ -204,6 +261,10 @@ export class Backdrop {
     this.sizer.disconnect();
     this.disposeView();
     this.warp?.dispose();
+    this.canvas.removeEventListener('webglcontextlost', this.onLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.onRestored);
     this.renderer.dispose();
+    // 描画の仕組みをすぐ手放す（ゲーム画面を開き直すたびに増えて、スマホの上限で古いものが落ちないように）
+    this.renderer.forceContextLoss();
   }
 }

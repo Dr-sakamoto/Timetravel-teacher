@@ -4602,6 +4602,8 @@ a.btn {
   height: 100dvh;
   z-index: -1;
   pointer-events: none;
+  /* 描画の仕組みが端末の都合で落ちて何も描けないときは、真っ暗ではなく、いつもの緑の卓が見えるように */
+  background: radial-gradient(ellipse at 50% 45%, #2a7656 0%, var(--felt) 45%, var(--felt-dark) 100%);
   opacity: 0;
   transition: opacity 0.7s ease;
 }
