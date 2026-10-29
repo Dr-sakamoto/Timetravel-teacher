@@ -10,7 +10,7 @@ import { RoleEditor } from './RoleEditor';
 import { EraBar } from './Timeline';
 import { useGameFx } from './useGameFx';
 import { EraBackdrop, useBackdropPref } from './bg3d/EraBackdrop';
-import { EraTitle } from './EraTitle';
+import { EraTitle, useEraIntro } from './EraTitle';
 import { GlassTuner } from './GlassTuner';
 import type { CursorMarks } from './Proposals';
 import type { Cursor } from '../net/protocol';
@@ -56,6 +56,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   const [speed, setSpeed] = useState<'normal' | 'fast'>('normal');
   const [showLog, setShowLog] = useState(false);
   const [bg3d, toggleBg3d] = useBackdropPref();
+  // 時代が明けたときの幕間（渦へ突っ込み → 時代名の帯）。終わるまで卓の中央は隠し、CPUも待つ。突っ込む長さは Warp.PLUNGE
+  const intro = useEraIntro(state, bg3d ? 1300 : 0);
   /** タップして中身を見ている相手 */
   const [peek, setPeek] = useState<number | null>(null);
   const [focus, setFocus] = useState(() => mySeat ?? state.players.find((p) => !p.isCpu)?.id ?? 0);
@@ -104,7 +106,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
 
   // CPUの自動進行
   useEffect(() => {
-    if (ph.kind === 'gameOver' || !driver) return;
+    if (ph.kind === 'gameOver' || !driver || intro) return;
     const mul = speed === 'fast' ? 0.35 : 1;
     if (ph.kind === 'result') {
       const auto = (ph.player !== null && state.players[ph.player].isCpu) || allCpu;
@@ -117,7 +119,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
     if (!a) return;
     const t = setTimeout(() => dispatch(a), 800 * mul);
     return () => clearTimeout(t);
-  }, [state, cpuTurn, allCpu, speed, dispatch, ph, fxLength, driver]);
+  }, [state, cpuTurn, allCpu, speed, dispatch, ph, fxLength, driver, intro]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -188,8 +190,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   return (
     <div className={`table-wrap ${bg3d ? 'has-bg3d' : ''}`}>
       {bg3d && <EraBackdrop state={state} />}
-      {/* 渦へ突っ込み終わるころ（Warp.PLUNGE）に帯を出す */}
-      <EraTitle state={state} delay={bg3d ? 1300 : 0} />
+      <EraTitle intro={intro} />
       {/* すりガラスの濃さの調整（URLの最後に #glass を付けたときだけ） */}
       {bg3d && location.hash === '#glass' && <GlassTuner />}
       <header className="topbar">
@@ -250,7 +251,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
           ))}
         </div>
         {/* 相手の教室は卓に出さない（名札をタップしたときだけ開く） */}
-        <div className="stage">
+        <div className={`stage ${intro ? 'era-intro' : ''}`}>
           <Center state={state} dispatch={dispatch} cpuBusy={(cpuTurn && ph.kind !== 'roles') || othersTurn} canContinue={canContinue} pick={pick} side={fx?.side} frames={cursorMarks?.slot} onSel={onCursor ? setSel : undefined} />
         </div>
         <div className="near-seat">

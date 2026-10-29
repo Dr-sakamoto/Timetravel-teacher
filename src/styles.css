@@ -4602,6 +4602,8 @@ a.btn {
   height: 100dvh;
   z-index: -1;
   pointer-events: none;
+  /* 描画の仕組みが端末の都合で落ちて何も描けないときは、真っ暗ではなく、いつもの緑の卓が見えるように */
+  background: radial-gradient(ellipse at 50% 45%, #2a7656 0%, var(--felt) 45%, var(--felt-dark) 100%);
   opacity: 0;
   transition: opacity 0.7s ease;
 }
@@ -4827,4 +4829,18 @@ body:has(.has-bg3d, .bg3d-demo) {
   font-weight: 900;
   cursor: pointer;
   padding: 0.25rem 0.7rem;
+}
+
+/* 時代が明けたときの幕間（渦へ突っ込み → 時代名の帯）が終わるまで、卓の中央は隠しておき、終わったらふわっと出す */
+.stage .center {
+  transition: opacity 0.45s ease;
+}
+.stage.era-intro .center {
+  opacity: 0;
+  pointer-events: none;
+}
+/* 係決め（渦の中）のあいだは、卓の中央（次の時代の山札・場のカード・係決めの状況）をまるごと見せず、渦だけにする（帯のあとで初めて出す）。
+   係の決め方と準備OKのボタンは自分の教室の側にあるので困らない */
+.center.ph-roles {
+  visibility: hidden;
 }
