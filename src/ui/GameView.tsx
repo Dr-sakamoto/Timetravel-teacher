@@ -126,6 +126,8 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
   if (ph.kind === 'gameOver') return <GameOver state={state} onQuit={onQuit} />;
 
   const n = state.players.length;
+  /** 今学期の手番順（1から） */
+  const turnNo = (pi: number) => state.queue.indexOf(pi) + 1 || undefined;
   const others = Array.from({ length: n - 1 }, (_, i) => (focus + 1 + i) % n);
   const deltas = new Map<number, number>();
   /** 順位のあるイベントの順位（名札にメダルを出す） */
@@ -236,6 +238,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               acting={!guerrilla && actor === pi}
               picking={guerrilla && actor === pi}
               upNext={upNext === pi}
+              turnNo={turnNo(pi)}
               offline={offline?.(pi)}
               delta={deltas.get(pi)}
               rank={ranks.get(pi)}
@@ -273,6 +276,7 @@ export function GameView({ state, dispatch, onQuit, onRules, me: mySeat, driver 
               acting={!guerrilla && actor === focus}
               picking={guerrilla && actor === focus}
               upNext={upNext === focus}
+              turnNo={turnNo(focus)}
               delta={deltas.get(focus)}
               rank={ranks.get(focus)}
               lit={matLit(focus)}

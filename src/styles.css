@@ -2137,6 +2137,7 @@ body:has(.title-screen) {
 /* ---------- スマホ横持ち：左に日付・時代・相手・メニュー、右に卓の中央と自分の教室 ---------- */
 @media (orientation: landscape) and (max-height: 600px) {
   .table-wrap {
+    position: relative;
     height: 100dvh;
     max-width: none;
     margin: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
@@ -2192,14 +2193,17 @@ body:has(.title-screen) {
   .era-chip .era-name {
     font-size: 0.66rem;
   }
+  /* メニューは右上に置く（卓の中央に重ねる） */
   .top-actions {
-    grid-area: act;
-    align-self: end;
-    justify-content: center;
+    position: absolute;
+    top: 0.45rem;
+    right: 0.5rem;
+    z-index: 5;
+    gap: 0.2rem;
   }
   .top-actions .btn.small {
-    font-size: 0.75rem;
-    padding: 0.15em 0.6em;
+    font-size: 0.7rem;
+    padding: 0.1em 0.5em;
   }
 
   /* 卓 */
@@ -4827,4 +4831,20 @@ body:has(.has-bg3d, .bg3d-demo) {
   font-weight: 900;
   cursor: pointer;
   padding: 0.25rem 0.7rem;
+}
+
+/* 名札の手番順（今学期の何番目に手番が回るか） */
+.turn-no {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15em;
+  height: 1.15em;
+  margin-right: 0.25em;
+  border-radius: 50%;
+  background: var(--pc, #666);
+  color: #fff;
+  font-size: 0.7em;
+  font-weight: 700;
+  line-height: 1;
 }
