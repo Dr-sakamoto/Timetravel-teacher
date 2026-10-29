@@ -4839,7 +4839,8 @@ body:has(.has-bg3d, .bg3d-demo) {
   opacity: 0;
   pointer-events: none;
 }
-/* 係決め（渦の中）のあいだは、次の時代の山札と場のカードを見せない（帯のあとで初めて出す）。準備OKの状況などの操作の欄は残す */
-.center.ph-roles .board {
+/* 係決め（渦の中）のあいだは、卓の中央（次の時代の山札・場のカード・係決めの状況）をまるごと見せず、渦だけにする（帯のあとで初めて出す）。
+   係の決め方と準備OKのボタンは自分の教室の側にあるので困らない */
+.center.ph-roles {
   visibility: hidden;
 }
