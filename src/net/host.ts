@@ -6,6 +6,8 @@ import type { Action, GameState } from '../game/types';
 import { canAct, maxSeats, MAX_SEATS, pairClasses, pairDefaultClass, pairHasRoom, pairOwners, roomSeats, sameAction, seatRoom, teamPartner, teamReady, waitsFor, PING_MS, TIMEOUT_MS, type Cursor, type Lobby, type Proposal, type Seat, type SeatCursor, type ToGuest, type ToHost, type ToHostEnvelope } from './protocol';
 
 const SAVE_KEY = 'jikuu-saikyou-host-v1';
+/** 中継サーバーにこれだけつながらなければ、画面に知らせる */
+const SLOW_MS = 10000;
 
 export interface HostSnap {
   status: 'opening' | 'open' | 'error';
@@ -65,6 +67,8 @@ export class HostRoom {
   private closed = false;
   /** チーム戦：部屋を作った人の画面に出ていない部屋（部屋B）のCPUを進めるタイマー */
   private driveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 中継サーバーにつながらないまま SLOW_MS たったら知らせるタイマー */
+  private slowTimer: ReturnType<typeof setTimeout> | null = null;
   snap: HostSnap;
 
   constructor(
@@ -90,11 +94,17 @@ export class HostRoom {
       },
       (s) => {
         if (this.closed) return;
-        this.set({ status: s === 'open' ? 'open' : 'opening' });
+        this.set({ status: s === 'open' ? 'open' : 'opening', error: undefined });
         // つながった（つなぎ直した）ら、今の状態を全員に配り直す
         if (s === 'open') this.broadcast();
       },
     );
+    // いつまでもつながらない時は、待たされているだけに見えないよう知らせる（つなぎ直しは続ける）
+    this.slowTimer = setTimeout(() => {
+      if (!this.closed && this.snap.status !== 'open') {
+        this.set({ error: '通信サーバーにつながりません。電波のよい所へ移るか、少し待ってからもう一度ためしてください（つながり次第、ほかの人も入れます）' });
+      }
+    }, SLOW_MS);
     this.timer = setInterval(() => this.heartbeat(), PING_MS);
     this.drive();
     document.addEventListener('visibilitychange', this.onWake);
@@ -560,6 +570,7 @@ export class HostRoom {
     this.sendTo('*', { t: 'closed' });
     this.closed = true;
     if (this.timer) clearInterval(this.timer);
+    if (this.slowTimer) clearTimeout(this.slowTimer);
     if (this.driveTimer) clearTimeout(this.driveTimer);
     document.removeEventListener('visibilitychange', this.onWake);
     window.removeEventListener('online', this.onWake);

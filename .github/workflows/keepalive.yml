@@ -1,9 +1,10 @@
 name: Keep relay awake
 
-# 通信対戦の中継サーバー（Supabase の無料プロジェクト）は、しばらく使われないと休止するので、ときどきアクセスしておく
+# 通信対戦の中継サーバー（Supabase の無料プロジェクト）は、しばらく使われないと休止するので、ときどきアクセスしておく。
+# 3日おきでは休止を防げなかったので毎日にし、つながらない時は失敗として気づけるよう curl -f にしている
 on:
   schedule:
-    - cron: '17 3 */3 * *'
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -14,5 +15,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -sS -o /dev/null -w "%{http_code}\n" "https://cyxprbysihbrjtckaxqe.supabase.co/rest/v1/" -H "apikey: sb_publishable_zU9Slge0coUocJzPMGt_vQ_0CX1bQqO"
-          curl -sS -o /dev/null -w "%{http_code}\n" "https://cyxprbysihbrjtckaxqe.supabase.co/auth/v1/health" -H "apikey: sb_publishable_zU9Slge0coUocJzPMGt_vQ_0CX1bQqO"
+          curl -fsS -o /dev/null -w "rest %{http_code}\n" --retry 3 --retry-delay 10 "https://cyxprbysihbrjtckaxqe.supabase.co/rest/v1/" -H "apikey: sb_publishable_zU9Slge0coUocJzPMGt_vQ_0CX1bQqO"
+          curl -fsS -o /dev/null -w "auth %{http_code}\n" --retry 3 --retry-delay 10 "https://cyxprbysihbrjtckaxqe.supabase.co/auth/v1/health" -H "apikey: sb_publishable_zU9Slge0coUocJzPMGt_vQ_0CX1bQqO"
