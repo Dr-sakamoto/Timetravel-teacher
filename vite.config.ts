@@ -19,7 +19,7 @@ export default defineConfig({
         scope: '.',
         display: 'standalone',
         orientation: 'landscape',
-        background_color: '#16221d',
+        background_color: '#268F5E',
         theme_color: '#16221d',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
