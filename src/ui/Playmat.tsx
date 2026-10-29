@@ -37,6 +37,8 @@ interface Props {
   picking?: boolean;
   /** ゲリラのあと次に手番をする */
   upNext?: boolean;
+  /** この学期の手番順（1から） */
+  turnNo?: number;
   /** 直前のイベントでの得点 */
   delta?: number;
   /** 直前のイベントでの順位（0が1位） */
@@ -78,7 +80,7 @@ function parseDrop(v: string): DropTo {
 
 /** 教室プレイマット：名札・係の場（そこに置いたカードがその係）・座席 */
 export function Playmat(props: Props) {
-  const { player, year, variant, acting, picking, upNext, delta, arrange } = props;
+  const { player, year, variant, acting, picking, upNext, turnNo, delta, arrange } = props;
   const view: Player = { ...player, roles: props.roles ?? player.roles, unlocked: props.unlocked ?? player.unlocked };
   const { drag, grab, wasDrag } = useCardDrag((uid, to) => arrange?.onPlace(uid, parseDrop(to)));
   const held = drag?.uid ?? arrange?.held ?? null;
@@ -190,6 +192,7 @@ export function Playmat(props: Props) {
       <div className="plate">
         <span className="plate-name">
           {/* 名前が長いときは名前だけを省略記号で切り、印（🤖🍑🪙💡🖼️）は残す */}
+          {turnNo !== undefined && <TurnNo n={turnNo} />}
           <span className="name-text">{player.name}</span>
           {player.isCpu && <small>🤖</small>}
           {props.sworn && <small title="桃園の誓い：義兄弟（学期の区切りで点を山分け）">🍑</small>}
@@ -271,12 +274,23 @@ export function Playmat(props: Props) {
   );
 }
 
+/** 名前の横に出す手番順の数字 */
+function TurnNo({ n }: { n: number }) {
+  return (
+    <small className="turn-no" title={`今学期の手番：${n}番目`}>
+      {n}
+    </small>
+  );
+}
+
 interface SeatProps {
   player: Player;
   year: number;
   acting: boolean;
   picking?: boolean;
   upNext?: boolean;
+  /** この学期の手番順（1から） */
+  turnNo?: number;
   /** 通信対戦で、この人の通信が切れている */
   offline?: boolean;
   delta?: number;
@@ -295,7 +309,7 @@ interface SeatProps {
 }
 
 /** 相手の席：小さく畳んだ教室（名札と12席の埋まり具合）。タップで教室をポップアップ（転校中は押しつけ先に選ぶ） */
-export function OpponentSeat({ player, year, acting, picking, upNext, offline, delta, rank, litIcons, targetable, targeted, onClick, sworn, marks, frames }: SeatProps) {
+export function OpponentSeat({ player, year, acting, picking, upNext, turnNo, offline, delta, rank, litIcons, targetable, targeted, onClick, sworn, marks, frames }: SeatProps) {
   return (
     <button
       data-pid={player.id}
@@ -306,6 +320,7 @@ export function OpponentSeat({ player, year, acting, picking, upNext, offline, d
     >
       <span className="opp-plate">
         <span className="opp-name">
+          {turnNo !== undefined && <TurnNo n={turnNo} />}
           <span className="name-text">{player.name}</span>
           {player.isCpu && <small>🤖</small>}
           {offline && <small title="通信が切れています">📵</small>}

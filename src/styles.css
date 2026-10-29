@@ -4828,3 +4828,19 @@ body:has(.has-bg3d, .bg3d-demo) {
   cursor: pointer;
   padding: 0.25rem 0.7rem;
 }
+
+/* 名札の手番順（今学期の何番目に手番が回るか） */
+.turn-no {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15em;
+  height: 1.15em;
+  margin-right: 0.25em;
+  border-radius: 50%;
+  background: var(--pc, #666);
+  color: #fff;
+  font-size: 0.7em;
+  font-weight: 700;
+  line-height: 1;
+}
