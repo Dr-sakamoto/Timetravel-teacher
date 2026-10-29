@@ -4830,3 +4830,12 @@ body:has(.has-bg3d, .bg3d-demo) {
   cursor: pointer;
   padding: 0.25rem 0.7rem;
 }
+
+/* 時代が明けたときの幕間（渦へ突っ込み → 時代名の帯）が終わるまで、卓の中央は隠しておき、終わったらふわっと出す */
+.stage .center {
+  transition: opacity 0.45s ease;
+}
+.stage.era-intro .center {
+  opacity: 0;
+  pointer-events: none;
+}
