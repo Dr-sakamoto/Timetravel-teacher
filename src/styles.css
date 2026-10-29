@@ -2196,10 +2196,16 @@ body:has(.title-screen) {
     grid-area: act;
     align-self: end;
     justify-content: center;
+    /* 左の欄（9.5rem）に5つ並べても、左右にはみ出して欠けないように */
+    gap: 0.15rem;
+    min-width: 0;
   }
   .top-actions .btn.small {
-    font-size: 0.75rem;
-    padding: 0.15em 0.6em;
+    font-size: 0.7rem;
+    padding: 0.15em 0;
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
   }
 
   /* 卓 */
