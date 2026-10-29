@@ -4828,3 +4828,72 @@ body:has(.has-bg3d, .bg3d-demo) {
   cursor: pointer;
   padding: 0.25rem 0.7rem;
 }
+
+/* ---------- チュートリアルのヒント（体験版） ---------- */
+/* 卓の中央と手前の教室をふさがないよう、右上（相手の名札の上）に浮かべる。遊び方のポップアップ（.modal-back）より下 */
+.tip {
+  position: fixed;
+  top: 3.4rem;
+  right: 0.8rem;
+  z-index: 45;
+  width: min(22rem, calc(100vw - 2rem));
+  background: rgba(18, 26, 23, 0.94);
+  border: 2px solid var(--yellow);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  animation: tip-in 0.3s ease-out;
+}
+.tip-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.tip-head b {
+  color: var(--yellow);
+  font-size: 1.05rem;
+}
+.tip-step {
+  font-size: 0.72rem;
+  color: var(--chalk-dim);
+}
+.tip p {
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.tip-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tip {
+    animation: none;
+  }
+}
+/* スマホの横向き：右上は操作の欄と係決めのボタンなので、左の列（暦・相手の名札）の上に出す。下の操作ボタンはふさがない */
+@media (orientation: landscape) and (max-height: 600px) {
+  .tip {
+    top: 0.5rem;
+    left: 0.5rem;
+    right: auto;
+    width: min(18rem, 45vw);
+    max-height: calc(100vh - 3.4rem);
+    overflow-y: auto;
+    padding: 0.4rem 0.6rem;
+  }
+  .tip-head b {
+    font-size: 0.9rem;
+  }
+  .tip p {
+    font-size: 0.72rem;
+    margin: 0.2rem 0 0.35rem;
+  }
+}
